@@ -1,0 +1,3191 @@
+{
+  "original": true,
+  "samples_or_downloads": false,
+  "synthesis": "authored pitched acoustic modal instruments and membrane drums, deterministic, no noise generator",
+  "loop_method": "circular note tails and room reflections",
+  "listening_verified": false,
+  "tracks": [
+    {
+      "context": "title",
+      "title": "Embers and Footprints",
+      "bpm": 72,
+      "meter": "4/4",
+      "beats": 32,
+      "chords": [
+        [
+          48,
+          [
+            60,
+            64,
+            67,
+            69
+          ]
+        ],
+        [
+          43,
+          [
+            59,
+            62,
+            67,
+            69
+          ]
+        ],
+        [
+          45,
+          [
+            60,
+            64,
+            69,
+            72
+          ]
+        ],
+        [
+          41,
+          [
+            60,
+            65,
+            69,
+            72
+          ]
+        ]
+      ],
+      "motif": [
+        [
+          0.5,
+          72,
+          1
+        ],
+        [
+          2,
+          76,
+          0.7
+        ],
+        [
+          3,
+          79,
+          0.7
+        ],
+        [
+          4.5,
+          81,
+          1.3
+        ],
+        [
+          6.5,
+          79,
+          0.7
+        ],
+        [
+          8.5,
+          76,
+          1
+        ],
+        [
+          10,
+          74,
+          1.4
+        ],
+        [
+          12.5,
+          72,
+          1.1
+        ],
+        [
+          14,
+          69,
+          1.3
+        ],
+        [
+          16.5,
+          72,
+          0.8
+        ],
+        [
+          18,
+          76,
+          0.7
+        ],
+        [
+          19,
+          79,
+          0.8
+        ],
+        [
+          20.5,
+          84,
+          1.4
+        ],
+        [
+          22.5,
+          81,
+          0.6
+        ],
+        [
+          24.5,
+          79,
+          1
+        ],
+        [
+          26,
+          76,
+          1
+        ],
+        [
+          28,
+          74,
+          1
+        ],
+        [
+          30,
+          72,
+          1.4
+        ]
+      ],
+      "lead": "flute",
+      "description": "Warm C major campfire flute call/response over spaced wooden plucks and a gentle two-step drum",
+      "duration_seconds": 26.666666666666668,
+      "frames": 1176000,
+      "sample_rate": 44100,
+      "channels": 2,
+      "bits": 16,
+      "preview": "full-gain source WAV; runtime gain separate",
+      "qc": {
+        "peak": 0.719970703125,
+        "rms": 0.179668116843261,
+        "boundary_step": 0.00360107421875,
+        "max_internal_step": 0.080841064453125,
+        "dc": 1.4947385204081632e-08,
+        "clipped_samples": 0,
+        "listening_verified": false
+      },
+      "sha256": "59ebd24c24a8594035b799e71a9b1fe0ff03a4989371bf04f6f37be1a340e88c",
+      "arrangement": [
+        {
+          "instrument": "bass",
+          "midi": 48,
+          "beat": 0,
+          "length": 3.4
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 0,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 1,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 2.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 3.25,
+          "length": 0.8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 0
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 2
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 3
+        },
+        {
+          "instrument": "bass",
+          "midi": 43,
+          "beat": 4,
+          "length": 3.4
+        },
+        {
+          "instrument": "thumb",
+          "midi": 59,
+          "beat": 4,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 6.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 7.25,
+          "length": 0.8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 4
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 6
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 7
+        },
+        {
+          "instrument": "bass",
+          "midi": 45,
+          "beat": 8,
+          "length": 3.4
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 8,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 9,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 10.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 11.25,
+          "length": 0.8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 10
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 11
+        },
+        {
+          "instrument": "bass",
+          "midi": 41,
+          "beat": 12,
+          "length": 3.4
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 12,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 13,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 65,
+          "beat": 14.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 15.25,
+          "length": 0.8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 12
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 14
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 15
+        },
+        {
+          "instrument": "bass",
+          "midi": 48,
+          "beat": 16,
+          "length": 3.4
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 16,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 17,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 18.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 19.25,
+          "length": 0.8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 16
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 18
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 19
+        },
+        {
+          "instrument": "bass",
+          "midi": 43,
+          "beat": 20,
+          "length": 3.4
+        },
+        {
+          "instrument": "thumb",
+          "midi": 59,
+          "beat": 20,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 21,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 22.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 23.25,
+          "length": 0.8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 20
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 22
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 23
+        },
+        {
+          "instrument": "bass",
+          "midi": 45,
+          "beat": 24,
+          "length": 3.4
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 24,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 25,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 26.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 27.25,
+          "length": 0.8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 24
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 26
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 27
+        },
+        {
+          "instrument": "bass",
+          "midi": 41,
+          "beat": 28,
+          "length": 3.4
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 28,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 29,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 65,
+          "beat": 30.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 31.25,
+          "length": 0.8
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 28
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 30
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 31
+        },
+        {
+          "instrument": "flute",
+          "midi": 72,
+          "beat": 0.5,
+          "length": 1
+        },
+        {
+          "instrument": "flute",
+          "midi": 76,
+          "beat": 2,
+          "length": 0.7
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 3,
+          "length": 0.7
+        },
+        {
+          "instrument": "flute",
+          "midi": 81,
+          "beat": 4.5,
+          "length": 1.3
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 6.5,
+          "length": 0.7
+        },
+        {
+          "instrument": "flute",
+          "midi": 76,
+          "beat": 8.5,
+          "length": 1
+        },
+        {
+          "instrument": "flute",
+          "midi": 74,
+          "beat": 10,
+          "length": 1.4
+        },
+        {
+          "instrument": "flute",
+          "midi": 72,
+          "beat": 12.5,
+          "length": 1.1
+        },
+        {
+          "instrument": "flute",
+          "midi": 69,
+          "beat": 14,
+          "length": 1.3
+        },
+        {
+          "instrument": "flute",
+          "midi": 72,
+          "beat": 16.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "flute",
+          "midi": 76,
+          "beat": 18,
+          "length": 0.7
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 19,
+          "length": 0.8
+        },
+        {
+          "instrument": "flute",
+          "midi": 84,
+          "beat": 20.5,
+          "length": 1.4
+        },
+        {
+          "instrument": "flute",
+          "midi": 81,
+          "beat": 22.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 24.5,
+          "length": 1
+        },
+        {
+          "instrument": "flute",
+          "midi": 76,
+          "beat": 26,
+          "length": 1
+        },
+        {
+          "instrument": "flute",
+          "midi": 74,
+          "beat": 28,
+          "length": 1
+        },
+        {
+          "instrument": "flute",
+          "midi": 72,
+          "beat": 30,
+          "length": 1.4
+        }
+      ]
+    },
+    {
+      "context": "battle",
+      "title": "Hunters on the Trail",
+      "bpm": 80,
+      "meter": "4/4",
+      "beats": 32,
+      "chords": [
+        [
+          38,
+          [
+            62,
+            65,
+            69,
+            72
+          ]
+        ],
+        [
+          46,
+          [
+            62,
+            65,
+            70,
+            74
+          ]
+        ],
+        [
+          41,
+          [
+            60,
+            65,
+            69,
+            72
+          ]
+        ],
+        [
+          36,
+          [
+            60,
+            64,
+            67,
+            70
+          ]
+        ]
+      ],
+      "motif": [
+        [
+          0,
+          74,
+          0.4
+        ],
+        [
+          0.75,
+          77,
+          0.4
+        ],
+        [
+          1.5,
+          81,
+          0.6
+        ],
+        [
+          2.5,
+          77,
+          0.4
+        ],
+        [
+          3.25,
+          74,
+          0.4
+        ],
+        [
+          4,
+          72,
+          0.6
+        ],
+        [
+          5,
+          74,
+          0.4
+        ],
+        [
+          5.75,
+          77,
+          0.4
+        ],
+        [
+          6.5,
+          79,
+          0.7
+        ],
+        [
+          8,
+          81,
+          0.7
+        ],
+        [
+          9,
+          84,
+          0.4
+        ],
+        [
+          9.75,
+          81,
+          0.4
+        ],
+        [
+          10.5,
+          77,
+          0.7
+        ],
+        [
+          12,
+          79,
+          0.5
+        ],
+        [
+          13,
+          77,
+          0.5
+        ],
+        [
+          14,
+          74,
+          1.2
+        ],
+        [
+          16,
+          74,
+          0.4
+        ],
+        [
+          16.75,
+          77,
+          0.4
+        ],
+        [
+          17.5,
+          81,
+          0.6
+        ],
+        [
+          18.5,
+          84,
+          0.4
+        ],
+        [
+          19.25,
+          81,
+          0.4
+        ],
+        [
+          20,
+          79,
+          0.6
+        ],
+        [
+          21,
+          77,
+          0.4
+        ],
+        [
+          21.75,
+          74,
+          0.4
+        ],
+        [
+          22.5,
+          72,
+          0.7
+        ],
+        [
+          24,
+          74,
+          0.7
+        ],
+        [
+          25,
+          77,
+          0.4
+        ],
+        [
+          25.75,
+          79,
+          0.4
+        ],
+        [
+          26.5,
+          81,
+          0.7
+        ],
+        [
+          28,
+          77,
+          0.5
+        ],
+        [
+          29,
+          76,
+          0.5
+        ],
+        [
+          30,
+          74,
+          1.2
+        ]
+      ],
+      "lead": "marimba",
+      "description": "D dorian syncopated mallet melody, alternating bass fifths, interlocking hand drums and short flute answers",
+      "duration_seconds": 24.0,
+      "frames": 1058400,
+      "sample_rate": 44100,
+      "channels": 2,
+      "bits": 16,
+      "preview": "full-gain source WAV; runtime gain separate",
+      "qc": {
+        "peak": 0.719970703125,
+        "rms": 0.14609412385347711,
+        "boundary_step": 0.00445556640625,
+        "max_internal_step": 0.067657470703125,
+        "dc": 2.220194175760582e-08,
+        "clipped_samples": 0,
+        "listening_verified": false
+      },
+      "sha256": "1f44390f9d0c40319127260230c1e1a19a5bfee15c32091a70144e33a3e058fa",
+      "arrangement": [
+        {
+          "instrument": "bass",
+          "midi": 38,
+          "beat": 0,
+          "length": 3.4
+        },
+        {
+          "instrument": "bass",
+          "midi": 45,
+          "beat": 2,
+          "length": 0.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 0.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 1.25,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 65,
+          "beat": 2,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 2.75,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 3.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 0
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 0.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 1.5
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 2
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 2.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 3.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 46,
+          "beat": 4,
+          "length": 3.4
+        },
+        {
+          "instrument": "bass",
+          "midi": 53,
+          "beat": 6,
+          "length": 0.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 4.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 70,
+          "beat": 5.25,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 65,
+          "beat": 6,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 74,
+          "beat": 6.75,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 70,
+          "beat": 7.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 4
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 4.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 5.5
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 6
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 6.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 7.5
+        },
+        {
+          "instrument": "flute",
+          "midi": 82,
+          "beat": 6.5,
+          "length": 0.9
+        },
+        {
+          "instrument": "bass",
+          "midi": 41,
+          "beat": 8,
+          "length": 3.4
+        },
+        {
+          "instrument": "bass",
+          "midi": 48,
+          "beat": 10,
+          "length": 0.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 8.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 9.25,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 65,
+          "beat": 10,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 10.75,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 11.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 8
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 8.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 9.5
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 10
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 10.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 11.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 36,
+          "beat": 12,
+          "length": 3.4
+        },
+        {
+          "instrument": "bass",
+          "midi": 43,
+          "beat": 14,
+          "length": 0.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 12.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 13.25,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 14,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 70,
+          "beat": 14.75,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 15.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 12
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 12.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 13.5
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 14
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 14.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 15.5
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 14.5,
+          "length": 0.9
+        },
+        {
+          "instrument": "bass",
+          "midi": 38,
+          "beat": 16,
+          "length": 3.4
+        },
+        {
+          "instrument": "bass",
+          "midi": 45,
+          "beat": 18,
+          "length": 0.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 16.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 17.25,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 65,
+          "beat": 18,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 18.75,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 19.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 16
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 16.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 17.5
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 18
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 18.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 19.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 46,
+          "beat": 20,
+          "length": 3.4
+        },
+        {
+          "instrument": "bass",
+          "midi": 53,
+          "beat": 22,
+          "length": 0.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 20.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 70,
+          "beat": 21.25,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 65,
+          "beat": 22,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 74,
+          "beat": 22.75,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 70,
+          "beat": 23.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 20
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 20.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 21.5
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 22
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 22.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 23.5
+        },
+        {
+          "instrument": "flute",
+          "midi": 82,
+          "beat": 22.5,
+          "length": 0.9
+        },
+        {
+          "instrument": "bass",
+          "midi": 41,
+          "beat": 24,
+          "length": 3.4
+        },
+        {
+          "instrument": "bass",
+          "midi": 48,
+          "beat": 26,
+          "length": 0.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 24.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 25.25,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 65,
+          "beat": 26,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 26.75,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 27.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 24
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 24.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 25.5
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 26
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 26.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 27.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 36,
+          "beat": 28,
+          "length": 3.4
+        },
+        {
+          "instrument": "bass",
+          "midi": 43,
+          "beat": 30,
+          "length": 0.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 60,
+          "beat": 28.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 29.25,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 30,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 70,
+          "beat": 30.75,
+          "length": 0.45
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 31.5,
+          "length": 0.45
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 28
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 28.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 29.5
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 30
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 30.75
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 31.5
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 30.5,
+          "length": 0.9
+        },
+        {
+          "instrument": "marimba",
+          "midi": 74,
+          "beat": 0,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 0.75,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 81,
+          "beat": 1.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 2.5,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 74,
+          "beat": 3.25,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 72,
+          "beat": 4,
+          "length": 0.6
+        },
+        {
+          "instrument": "marimba",
+          "midi": 74,
+          "beat": 5,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 5.75,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 79,
+          "beat": 6.5,
+          "length": 0.7
+        },
+        {
+          "instrument": "marimba",
+          "midi": 81,
+          "beat": 8,
+          "length": 0.7
+        },
+        {
+          "instrument": "marimba",
+          "midi": 84,
+          "beat": 9,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 81,
+          "beat": 9.75,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 10.5,
+          "length": 0.7
+        },
+        {
+          "instrument": "marimba",
+          "midi": 79,
+          "beat": 12,
+          "length": 0.5
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 13,
+          "length": 0.5
+        },
+        {
+          "instrument": "marimba",
+          "midi": 74,
+          "beat": 14,
+          "length": 1.2
+        },
+        {
+          "instrument": "marimba",
+          "midi": 74,
+          "beat": 16,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 16.75,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 81,
+          "beat": 17.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "marimba",
+          "midi": 84,
+          "beat": 18.5,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 81,
+          "beat": 19.25,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 79,
+          "beat": 20,
+          "length": 0.6
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 21,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 74,
+          "beat": 21.75,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 72,
+          "beat": 22.5,
+          "length": 0.7
+        },
+        {
+          "instrument": "marimba",
+          "midi": 74,
+          "beat": 24,
+          "length": 0.7
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 25,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 79,
+          "beat": 25.75,
+          "length": 0.4
+        },
+        {
+          "instrument": "marimba",
+          "midi": 81,
+          "beat": 26.5,
+          "length": 0.7
+        },
+        {
+          "instrument": "marimba",
+          "midi": 77,
+          "beat": 28,
+          "length": 0.5
+        },
+        {
+          "instrument": "marimba",
+          "midi": 76,
+          "beat": 29,
+          "length": 0.5
+        },
+        {
+          "instrument": "marimba",
+          "midi": 74,
+          "beat": 30,
+          "length": 1.2
+        }
+      ]
+    },
+    {
+      "context": "grove",
+      "title": "Leaves Above the River",
+      "bpm": 54,
+      "meter": "3/4",
+      "beats": 24,
+      "chords": [
+        [
+          52,
+          [
+            64,
+            67,
+            71,
+            74
+          ]
+        ],
+        [
+          48,
+          [
+            64,
+            67,
+            72,
+            76
+          ]
+        ],
+        [
+          43,
+          [
+            62,
+            67,
+            71,
+            74
+          ]
+        ],
+        [
+          50,
+          [
+            62,
+            66,
+            69,
+            74
+          ]
+        ]
+      ],
+      "motif": [
+        [
+          0.25,
+          83,
+          1.2
+        ],
+        [
+          2,
+          79,
+          0.7
+        ],
+        [
+          3.5,
+          78,
+          1.1
+        ],
+        [
+          5,
+          76,
+          0.6
+        ],
+        [
+          6.5,
+          79,
+          1.3
+        ],
+        [
+          8.2,
+          83,
+          0.5
+        ],
+        [
+          9.5,
+          86,
+          1.2
+        ],
+        [
+          11,
+          83,
+          0.7
+        ],
+        [
+          12.5,
+          81,
+          1.2
+        ],
+        [
+          14,
+          79,
+          0.6
+        ],
+        [
+          15.5,
+          78,
+          1.2
+        ],
+        [
+          17,
+          74,
+          0.6
+        ],
+        [
+          18.5,
+          76,
+          1.5
+        ],
+        [
+          20.5,
+          79,
+          0.8
+        ],
+        [
+          22,
+          76,
+          1.4
+        ]
+      ],
+      "lead": "flute",
+      "description": "Airy E minor woodland waltz, high breathy flute, rippling thumb piano, soft sustained strings; sparse percussion",
+      "duration_seconds": 26.666666666666668,
+      "frames": 1176000,
+      "sample_rate": 44100,
+      "channels": 2,
+      "bits": 16,
+      "preview": "full-gain source WAV; runtime gain separate",
+      "qc": {
+        "peak": 0.719970703125,
+        "rms": 0.15756350198838479,
+        "boundary_step": 0.001556396484375,
+        "max_internal_step": 0.071685791015625,
+        "dc": 5.605269451530612e-09,
+        "clipped_samples": 0,
+        "listening_verified": false
+      },
+      "sha256": "5ac3b6ee836ee886361be0a103fa5b5c4ac0d3993617a524f15c0028d8ce49ec",
+      "arrangement": [
+        {
+          "instrument": "bass",
+          "midi": 52,
+          "beat": 0,
+          "length": 2.55
+        },
+        {
+          "instrument": "strings",
+          "midi": 64,
+          "beat": 0,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 67,
+          "beat": 0,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 71,
+          "beat": 0,
+          "length": 2.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 0,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 0.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 71,
+          "beat": 1,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 74,
+          "beat": 1.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 71,
+          "beat": 2,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 2.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 0
+        },
+        {
+          "instrument": "bass",
+          "midi": 48,
+          "beat": 3,
+          "length": 2.55
+        },
+        {
+          "instrument": "strings",
+          "midi": 64,
+          "beat": 3,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 67,
+          "beat": 3,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 72,
+          "beat": 3,
+          "length": 2.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 3,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 3.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 4,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 76,
+          "beat": 4.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 5.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "bass",
+          "midi": 43,
+          "beat": 6,
+          "length": 2.55
+        },
+        {
+          "instrument": "strings",
+          "midi": 62,
+          "beat": 6,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 67,
+          "beat": 6,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 71,
+          "beat": 6,
+          "length": 2.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 6,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 6.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 71,
+          "beat": 7,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 74,
+          "beat": 7.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 71,
+          "beat": 8,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 8.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 6
+        },
+        {
+          "instrument": "bass",
+          "midi": 50,
+          "beat": 9,
+          "length": 2.55
+        },
+        {
+          "instrument": "strings",
+          "midi": 62,
+          "beat": 9,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 66,
+          "beat": 9,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 69,
+          "beat": 9,
+          "length": 2.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 9,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 66,
+          "beat": 9.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 10,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 74,
+          "beat": 10.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 11,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 66,
+          "beat": 11.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "bass",
+          "midi": 52,
+          "beat": 12,
+          "length": 2.55
+        },
+        {
+          "instrument": "strings",
+          "midi": 64,
+          "beat": 12,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 67,
+          "beat": 12,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 71,
+          "beat": 12,
+          "length": 2.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 12,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 12.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 71,
+          "beat": 13,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 74,
+          "beat": 13.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 71,
+          "beat": 14,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 14.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 12
+        },
+        {
+          "instrument": "bass",
+          "midi": 48,
+          "beat": 15,
+          "length": 2.55
+        },
+        {
+          "instrument": "strings",
+          "midi": 64,
+          "beat": 15,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 67,
+          "beat": 15,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 72,
+          "beat": 15,
+          "length": 2.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 64,
+          "beat": 15,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 15.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 16,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 76,
+          "beat": 16.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 72,
+          "beat": 17,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 17.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "bass",
+          "midi": 43,
+          "beat": 18,
+          "length": 2.55
+        },
+        {
+          "instrument": "strings",
+          "midi": 62,
+          "beat": 18,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 67,
+          "beat": 18,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 71,
+          "beat": 18,
+          "length": 2.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 18,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 18.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 71,
+          "beat": 19,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 74,
+          "beat": 19.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 71,
+          "beat": 20,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 67,
+          "beat": 20.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 18
+        },
+        {
+          "instrument": "bass",
+          "midi": 50,
+          "beat": 21,
+          "length": 2.55
+        },
+        {
+          "instrument": "strings",
+          "midi": 62,
+          "beat": 21,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 66,
+          "beat": 21,
+          "length": 2.6
+        },
+        {
+          "instrument": "strings",
+          "midi": 69,
+          "beat": 21,
+          "length": 2.6
+        },
+        {
+          "instrument": "thumb",
+          "midi": 62,
+          "beat": 21,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 66,
+          "beat": 21.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 22,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 74,
+          "beat": 22.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 69,
+          "beat": 23,
+          "length": 0.55
+        },
+        {
+          "instrument": "thumb",
+          "midi": 66,
+          "beat": 23.5,
+          "length": 0.55
+        },
+        {
+          "instrument": "flute",
+          "midi": 83,
+          "beat": 0.25,
+          "length": 1.2
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 2,
+          "length": 0.7
+        },
+        {
+          "instrument": "flute",
+          "midi": 78,
+          "beat": 3.5,
+          "length": 1.1
+        },
+        {
+          "instrument": "flute",
+          "midi": 76,
+          "beat": 5,
+          "length": 0.6
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 6.5,
+          "length": 1.3
+        },
+        {
+          "instrument": "flute",
+          "midi": 83,
+          "beat": 8.2,
+          "length": 0.5
+        },
+        {
+          "instrument": "flute",
+          "midi": 86,
+          "beat": 9.5,
+          "length": 1.2
+        },
+        {
+          "instrument": "flute",
+          "midi": 83,
+          "beat": 11,
+          "length": 0.7
+        },
+        {
+          "instrument": "flute",
+          "midi": 81,
+          "beat": 12.5,
+          "length": 1.2
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 14,
+          "length": 0.6
+        },
+        {
+          "instrument": "flute",
+          "midi": 78,
+          "beat": 15.5,
+          "length": 1.2
+        },
+        {
+          "instrument": "flute",
+          "midi": 74,
+          "beat": 17,
+          "length": 0.6
+        },
+        {
+          "instrument": "flute",
+          "midi": 76,
+          "beat": 18.5,
+          "length": 1.5
+        },
+        {
+          "instrument": "flute",
+          "midi": 79,
+          "beat": 20.5,
+          "length": 0.8
+        },
+        {
+          "instrument": "flute",
+          "midi": 76,
+          "beat": 22,
+          "length": 1.4
+        }
+      ]
+    },
+    {
+      "context": "volcano",
+      "title": "Under the Ember Mountain",
+      "bpm": 76,
+      "meter": "4/4",
+      "beats": 32,
+      "chords": [
+        [
+          33,
+          [
+            57,
+            60,
+            64,
+            71
+          ]
+        ],
+        [
+          41,
+          [
+            56,
+            60,
+            65,
+            69
+          ]
+        ],
+        [
+          38,
+          [
+            57,
+            62,
+            65,
+            69
+          ]
+        ],
+        [
+          40,
+          [
+            56,
+            59,
+            64,
+            68
+          ]
+        ]
+      ],
+      "motif": [
+        [
+          0,
+          69,
+          1.3
+        ],
+        [
+          2,
+          72,
+          0.6
+        ],
+        [
+          3,
+          71,
+          0.6
+        ],
+        [
+          4.5,
+          68,
+          1
+        ],
+        [
+          6,
+          64,
+          1.4
+        ],
+        [
+          8,
+          65,
+          0.7
+        ],
+        [
+          9.5,
+          69,
+          0.7
+        ],
+        [
+          11,
+          72,
+          0.7
+        ],
+        [
+          12,
+          71,
+          1.5
+        ],
+        [
+          14,
+          68,
+          1.3
+        ],
+        [
+          16,
+          69,
+          0.7
+        ],
+        [
+          17.5,
+          72,
+          0.6
+        ],
+        [
+          18.5,
+          76,
+          1
+        ],
+        [
+          20,
+          77,
+          1
+        ],
+        [
+          21.5,
+          76,
+          0.7
+        ],
+        [
+          23,
+          72,
+          0.6
+        ],
+        [
+          24,
+          74,
+          1
+        ],
+        [
+          25.5,
+          72,
+          0.6
+        ],
+        [
+          27,
+          71,
+          0.6
+        ],
+        [
+          28,
+          68,
+          1
+        ],
+        [
+          30,
+          69,
+          1.4
+        ]
+      ],
+      "lead": "reed",
+      "description": "A harmonic minor low reed melody, 3+3+2 ritual drum accents, low bowed pedal and stone mallet ostinato",
+      "duration_seconds": 25.26315192743764,
+      "frames": 1114105,
+      "sample_rate": 44100,
+      "channels": 2,
+      "bits": 16,
+      "preview": "full-gain source WAV; runtime gain separate",
+      "qc": {
+        "peak": 0.719970703125,
+        "rms": 0.15535092481951296,
+        "boundary_step": 0.00238037109375,
+        "max_internal_step": 0.061248779296875,
+        "dc": 1.0874628976285897e-08,
+        "clipped_samples": 0,
+        "listening_verified": false
+      },
+      "sha256": "b6cdc6c0d49e8f7b472ce60a0feb19203417a4889abbf5d7ae55dc36fef07a4c",
+      "arrangement": [
+        {
+          "instrument": "bass",
+          "midi": 33,
+          "beat": 0,
+          "length": 3.4
+        },
+        {
+          "instrument": "strings",
+          "midi": 45,
+          "beat": 0,
+          "length": 3.8
+        },
+        {
+          "instrument": "stone",
+          "midi": 57,
+          "beat": 0,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 64,
+          "beat": 0.75,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 60,
+          "beat": 1.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 71,
+          "beat": 2.25,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 64,
+          "beat": 3,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 60,
+          "beat": 3.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 0
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 0.75
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 1.5
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 2.25
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 3
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 3.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 41,
+          "beat": 4,
+          "length": 3.4
+        },
+        {
+          "instrument": "strings",
+          "midi": 53,
+          "beat": 4,
+          "length": 3.8
+        },
+        {
+          "instrument": "stone",
+          "midi": 56,
+          "beat": 4,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 65,
+          "beat": 4.75,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 60,
+          "beat": 5.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 69,
+          "beat": 6.25,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 65,
+          "beat": 7,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 60,
+          "beat": 7.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 4
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 4.75
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 5.5
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 6.25
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 7
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 7.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 38,
+          "beat": 8,
+          "length": 3.4
+        },
+        {
+          "instrument": "strings",
+          "midi": 50,
+          "beat": 8,
+          "length": 3.8
+        },
+        {
+          "instrument": "stone",
+          "midi": 57,
+          "beat": 8,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 65,
+          "beat": 8.75,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 62,
+          "beat": 9.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 69,
+          "beat": 10.25,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 65,
+          "beat": 11,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 62,
+          "beat": 11.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 8
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 8.75
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 9.5
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 10.25
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 11
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 11.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 40,
+          "beat": 12,
+          "length": 3.4
+        },
+        {
+          "instrument": "strings",
+          "midi": 52,
+          "beat": 12,
+          "length": 3.8
+        },
+        {
+          "instrument": "stone",
+          "midi": 56,
+          "beat": 12,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 64,
+          "beat": 12.75,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 59,
+          "beat": 13.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 68,
+          "beat": 14.25,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 64,
+          "beat": 15,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 59,
+          "beat": 15.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 12
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 12.75
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 13.5
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 14.25
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 15
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 15.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 33,
+          "beat": 16,
+          "length": 3.4
+        },
+        {
+          "instrument": "strings",
+          "midi": 45,
+          "beat": 16,
+          "length": 3.8
+        },
+        {
+          "instrument": "stone",
+          "midi": 57,
+          "beat": 16,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 64,
+          "beat": 16.75,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 60,
+          "beat": 17.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 71,
+          "beat": 18.25,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 64,
+          "beat": 19,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 60,
+          "beat": 19.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 16
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 16.75
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 17.5
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 18.25
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 19
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 19.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 41,
+          "beat": 20,
+          "length": 3.4
+        },
+        {
+          "instrument": "strings",
+          "midi": 53,
+          "beat": 20,
+          "length": 3.8
+        },
+        {
+          "instrument": "stone",
+          "midi": 56,
+          "beat": 20,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 65,
+          "beat": 20.75,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 60,
+          "beat": 21.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 69,
+          "beat": 22.25,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 65,
+          "beat": 23,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 60,
+          "beat": 23.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 20
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 20.75
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 21.5
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 22.25
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 23
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 23.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 38,
+          "beat": 24,
+          "length": 3.4
+        },
+        {
+          "instrument": "strings",
+          "midi": 50,
+          "beat": 24,
+          "length": 3.8
+        },
+        {
+          "instrument": "stone",
+          "midi": 57,
+          "beat": 24,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 65,
+          "beat": 24.75,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 62,
+          "beat": 25.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 69,
+          "beat": 26.25,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 65,
+          "beat": 27,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 62,
+          "beat": 27.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 24
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 24.75
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 25.5
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 26.25
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 27
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 27.5
+        },
+        {
+          "instrument": "bass",
+          "midi": 40,
+          "beat": 28,
+          "length": 3.4
+        },
+        {
+          "instrument": "strings",
+          "midi": 52,
+          "beat": 28,
+          "length": 3.8
+        },
+        {
+          "instrument": "stone",
+          "midi": 56,
+          "beat": 28,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 64,
+          "beat": 28.75,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 59,
+          "beat": 29.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 68,
+          "beat": 30.25,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 64,
+          "beat": 31,
+          "length": 0.6
+        },
+        {
+          "instrument": "stone",
+          "midi": 59,
+          "beat": 31.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 28
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 28.75
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 29.5
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 30.25
+        },
+        {
+          "instrument": "low_drum",
+          "beat": 31
+        },
+        {
+          "instrument": "high_drum",
+          "beat": 31.5
+        },
+        {
+          "instrument": "reed",
+          "midi": 69,
+          "beat": 0,
+          "length": 1.3
+        },
+        {
+          "instrument": "reed",
+          "midi": 72,
+          "beat": 2,
+          "length": 0.6
+        },
+        {
+          "instrument": "reed",
+          "midi": 71,
+          "beat": 3,
+          "length": 0.6
+        },
+        {
+          "instrument": "reed",
+          "midi": 68,
+          "beat": 4.5,
+          "length": 1
+        },
+        {
+          "instrument": "reed",
+          "midi": 64,
+          "beat": 6,
+          "length": 1.4
+        },
+        {
+          "instrument": "reed",
+          "midi": 65,
+          "beat": 8,
+          "length": 0.7
+        },
+        {
+          "instrument": "reed",
+          "midi": 69,
+          "beat": 9.5,
+          "length": 0.7
+        },
+        {
+          "instrument": "reed",
+          "midi": 72,
+          "beat": 11,
+          "length": 0.7
+        },
+        {
+          "instrument": "reed",
+          "midi": 71,
+          "beat": 12,
+          "length": 1.5
+        },
+        {
+          "instrument": "reed",
+          "midi": 68,
+          "beat": 14,
+          "length": 1.3
+        },
+        {
+          "instrument": "reed",
+          "midi": 69,
+          "beat": 16,
+          "length": 0.7
+        },
+        {
+          "instrument": "reed",
+          "midi": 72,
+          "beat": 17.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "reed",
+          "midi": 76,
+          "beat": 18.5,
+          "length": 1
+        },
+        {
+          "instrument": "reed",
+          "midi": 77,
+          "beat": 20,
+          "length": 1
+        },
+        {
+          "instrument": "reed",
+          "midi": 76,
+          "beat": 21.5,
+          "length": 0.7
+        },
+        {
+          "instrument": "reed",
+          "midi": 72,
+          "beat": 23,
+          "length": 0.6
+        },
+        {
+          "instrument": "reed",
+          "midi": 74,
+          "beat": 24,
+          "length": 1
+        },
+        {
+          "instrument": "reed",
+          "midi": 72,
+          "beat": 25.5,
+          "length": 0.6
+        },
+        {
+          "instrument": "reed",
+          "midi": 71,
+          "beat": 27,
+          "length": 0.6
+        },
+        {
+          "instrument": "reed",
+          "midi": 68,
+          "beat": 28,
+          "length": 1
+        },
+        {
+          "instrument": "reed",
+          "midi": 69,
+          "beat": 30,
+          "length": 1.4
+        }
+      ]
+    }
+  ],
+  "pairwise_waveform_correlation": {
+    "title:battle": 0.007589973693576534,
+    "title:grove": -0.014265518617024414,
+    "title:volcano": -0.006536214167533808,
+    "battle:grove": -0.01381799232310584,
+    "battle:volcano": 0.007876770896167184,
+    "grove:volcano": -0.012520168487322372
+  }
+}

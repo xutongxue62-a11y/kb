@@ -1,0 +1,25 @@
+{
+  "tool": "built-in image_gen",
+  "reference": "assets/ui/title_empty_v09.png",
+  "user_steering": "Rejected framed one-screen terrain; runtime uses only open center swatch as mirrored floor material and independent world-space props, never perimeter illustrations.",
+  "assets": [
+    {
+      "key": "ochre",
+      "file": "assets/maps/v10/ochre.png",
+      "source": "D:\\Codex\\.codex\\generated_images\\01a1d944-1346-7a10-bfa4-32eed98505c7\\exec-736cb17d-4bd7-49b7-b7df-51833c41affa.png",
+      "prompt": "Create a production background plate for a 2D top-down caveman survival game. Match the supplied image's hand painted parchment grain, bold slightly imperfect dark ink shapes, flat gouache fills and restrained illustrated game aesthetic exactly. NEW FULL ARENA: remove the navy menu region entirely; terrain must span the whole 16:10 canvas. Orthographic flat oblique/top-down ground, no horizon or side-view scenery. The central 75 percent is a wide open walkable floor, sparse detail, readable behind small character sprites. Detail concentrated at perimeter and corners; no people, dinosaurs, weapons, loot, coins, crystals, UI, lettering, borders or watermarks. No grid, no rectangular arena border, no photorealism, no 3D render. Terrain texture subtle, avoid busy tiny pattern. Biome: early game sunlit prehistoric dry grassland, warm ivory and ochre parchment floor like the reference, scattered low flat rocks and tufts of muted sage dry grass, a few small pebbles and faint dusty tracks. All ground continuous and unobstructed, no large buildings/doors. Calm warm handmade palette."
+    },
+    {
+      "key": "grove",
+      "file": "assets/maps/v10/grove.png",
+      "source": "D:\\Codex\\.codex\\generated_images\\01a1d944-1346-7a10-bfa4-32eed98505c7\\exec-4734e7e4-cd55-4547-acc5-1633cc160090.png",
+      "prompt": "Create a production background plate for a 2D top-down caveman survival game. Match the supplied image's hand painted parchment grain, bold slightly imperfect dark ink shapes, flat gouache fills and restrained illustrated game aesthetic exactly. NEW FULL ARENA: remove the navy menu region entirely; terrain must span the whole 16:10 canvas. Orthographic flat oblique/top-down ground, no horizon or side-view scenery. The central 75 percent is a wide open walkable floor, sparse detail, readable behind small character sprites. Detail concentrated at perimeter and corners; no people, dinosaurs, weapons, loot, coins, crystals, UI, lettering, borders or watermarks. No grid, no rectangular arena border, no photorealism, no 3D render. Terrain texture subtle, avoid busy tiny pattern. Biome: later game fern grove. Pale moss/olive green warm parchment soil, sparse ground ferns, little mossy flat slate rocks and fallen leaf shapes at edges, tiny roots at corners, central ground mostly clear. Keep the reference's simple handpainted visual language, gentle sage and muted amber, no huge trees/vertical trunks in the arena, no jungle wall. Subtle illustrated light patches."
+    },
+    {
+      "key": "volcano",
+      "file": "assets/maps/v10/volcano.png",
+      "source": "D:\\Codex\\.codex\\generated_images\\01a1d944-1346-7a10-bfa4-32eed98505c7\\exec-bf9b7736-9c63-4231-b178-885291f20a41.png",
+      "prompt": "Create a production background plate for a 2D top-down caveman survival game. Match the supplied image's hand painted parchment grain, bold slightly imperfect dark ink shapes, flat gouache fills and restrained illustrated game aesthetic exactly. NEW FULL ARENA: remove the navy menu region entirely; terrain must span the whole 16:10 canvas. Orthographic flat oblique/top-down ground, no horizon or side-view scenery. The central 75 percent is a wide open walkable floor, sparse detail, readable behind small character sprites. Detail concentrated at perimeter and corners; no people, dinosaurs, weapons, loot, coins, crystals, UI, lettering, borders or watermarks. No grid, no rectangular arena border, no photorealism, no 3D render. Terrain texture subtle, avoid busy tiny pattern. Biome: late game volcanic badlands. Warm charcoal purple-brown basalt parchment ground, layered angular flat dark rock plates, orange amber molten lava crevices and a couple of small lava pools confined to the outermost sides/corners, a few thin warm glowing cracks near edges, occasional cooling red rock. Central 75 percent is wide open charcoal ground with subtle texture and a few light ash specks, no lava river across the center, no holes or towering volcano mountain. Handpainted flat ink style with orange strokes and warm pale details, softly luminous lava rather than neon or realistic bloom."
+    }
+  ]
+}

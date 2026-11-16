@@ -1,0 +1,272 @@
+{
+  "workspace": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_UI预览\\v30_reward_readability",
+  "applied_to_formal_game": false,
+  "awaiting_user_visual_review": true,
+  "formal_sources_and_assets_unchanged": true,
+  "native": {
+    "applied_to_formal_game": false,
+    "checks": 137,
+    "failures": 0,
+    "real_player_storage_used": false,
+    "screenshots": [
+      {
+        "name": "buff_rewards",
+        "native_viewport": true
+      },
+      {
+        "name": "shop_readability",
+        "native_viewport": true
+      },
+      {
+        "name": "replace_readability",
+        "native_viewport": true
+      }
+    ]
+  },
+  "test_groups": [
+    {
+      "name": "rules",
+      "checks": 27
+    },
+    {
+      "name": "scene",
+      "checks": 19
+    },
+    {
+      "name": "controls",
+      "checks": 10
+    },
+    {
+      "name": "attack_links",
+      "checks": 43
+    },
+    {
+      "name": "growth",
+      "checks": 17
+    },
+    {
+      "name": "feedback",
+      "checks": 31
+    },
+    {
+      "name": "impact",
+      "checks": 46
+    },
+    {
+      "name": "progression",
+      "checks": 19
+    },
+    {
+      "name": "armory",
+      "checks": 16
+    },
+    {
+      "name": "save_store",
+      "checks": 403
+    },
+    {
+      "name": "hud_navigation",
+      "checks": 1066
+    },
+    {
+      "name": "campaign",
+      "checks": 40
+    },
+    {
+      "name": "frontend",
+      "checks": 55
+    },
+    {
+      "name": "ui_motion",
+      "checks": 79
+    },
+    {
+      "name": "ui_audio",
+      "checks": 112
+    },
+    {
+      "name": "home_v09",
+      "checks": 28
+    },
+    {
+      "name": "chest_pickup",
+      "checks": 89
+    },
+    {
+      "name": "sprite_edges",
+      "checks": 94
+    },
+    {
+      "name": "dodge",
+      "checks": 40
+    },
+    {
+      "name": "music",
+      "checks": 33
+    },
+    {
+      "name": "world_camera",
+      "checks": 62
+    },
+    {
+      "name": "battle_ui_v10",
+      "checks": 6
+    },
+    {
+      "name": "map_chunks",
+      "checks": 10
+    },
+    {
+      "name": "terrain_physics",
+      "checks": 30
+    },
+    {
+      "name": "growth_v11",
+      "checks": 2398
+    },
+    {
+      "name": "supports_v11",
+      "checks": 16
+    },
+    {
+      "name": "ui_v11",
+      "checks": 27
+    },
+    {
+      "name": "resources_v12",
+      "checks": 184
+    },
+    {
+      "name": "rounds_v12",
+      "checks": 23
+    },
+    {
+      "name": "weapons_v12",
+      "checks": 69
+    },
+    {
+      "name": "enemies_v12",
+      "checks": 99
+    },
+    {
+      "name": "battle_visuals_v12",
+      "checks": 102
+    },
+    {
+      "name": "class_egg_loadout",
+      "checks": 113
+    },
+    {
+      "name": "character_loot",
+      "checks": 55
+    },
+    {
+      "name": "settlement_v14",
+      "checks": 27
+    },
+    {
+      "name": "evolution_v14",
+      "checks": 58
+    },
+    {
+      "name": "weapon_presentation_v15",
+      "checks": 1242
+    },
+    {
+      "name": "companions_v16",
+      "checks": 199
+    },
+    {
+      "name": "combat_art_v16",
+      "checks": 75
+    },
+    {
+      "name": "terrain_broadphase_v16",
+      "checks": 165
+    },
+    {
+      "name": "monster_surface_v16",
+      "checks": 48
+    },
+    {
+      "name": "pickup_renderer_v16",
+      "checks": 12
+    },
+    {
+      "name": "weapon_replace_v20",
+      "checks": 873
+    },
+    {
+      "name": "ui_brush_v22",
+      "checks": 24
+    },
+    {
+      "name": "reward_sale_v23",
+      "checks": 26
+    },
+    {
+      "name": "reward_buff_sale_v30",
+      "checks": 17
+    }
+  ],
+  "checks": 8227,
+  "pricing": "Passive and support rewards use half the actual next-stack shop price, floored; existing weapon resale is unchanged.",
+  "changes": [
+    "Buff reward sale preserves existing stacks and equipment.",
+    "Direct numeric percentages and explicit real stack caps.",
+    "Centered, larger level/effect/purchase/refund labels.",
+    "Replacement scroll widened to fit six cards, with full functions and no category badges."
+  ],
+  "old_weapon_sale_test_updated_for_new_buff_contract": true,
+  "full_suite_fixture_note": "Copied the unchanged historical docs/v16_baseline.json into the isolated project so the art and terrain comparison tests can read their original baseline.",
+  "preview_source_sha256": {
+    "src/actor_view.gd": "730ba4e2606bee3593b70bf8a519e7bb63c7588626b581a9df0f166feac0f904",
+    "src/armory.gd": "e875b48e0f38d8c80a994a2b6d0d05959d7ec8dc13fceb31e36ae896cd8ecfcc",
+    "src/asset_library.gd": "122869e8bf06d7f39f2644523167c79c78dadd4ee67e9ca16d7cb2bdfc03e008",
+    "src/audio_pool.gd": "68bec478905c8e7d3d65ab9a4d0ed0d447d7c006643f6803477a1574713a8406",
+    "src/battle_visuals.gd": "d191ce1f8ada671e10b727ffe89c927d138e686600d6dbf46f930c522ec8595d",
+    "src/catalog.gd": "6d28e91514565409c4d895102ce548a9764de401e75e0e3a2f94e4a0012a6d37",
+    "src/combat_art.gd": "5fb334e1a9a5b9e40b969c921b68e539cd21dd3514a0d097c583c8b0d69fcd8d",
+    "src/companions.gd": "56d13c59ee8e448b71ec5558d2db57398fb8ca9cf2e94f4c46a009f3583841f1",
+    "src/dino_view.gd": "8cecab2a82e84a153961fdfca2eb392752f0ef671de03f16caee2a2fa2acfcc1",
+    "src/economy.gd": "ad86e731b69c085a78c660ca135525b6a83c1c49be8da6303196a01cf9eaf411",
+    "src/effects.gd": "9550ef7f791c8221a8c3e6e871f3cbdd2b6d4cc0487aae48481ec0b3f9b9840d",
+    "src/enemy_art.gd": "e80bc19e5b8a33ba0e386ced1f8d8969a3e740be8b8398a455118aff49416663",
+    "src/enemy_roster.gd": "e266a2a5e9c098736f5abab5aee54c207b939fc0b3508fd333e54cc683e6ddf3",
+    "src/expanded_weapons.gd": "dda7a66d7d71009702ca7c082f6cbf8d8261f48018c91db01953a8e4417fc76e",
+    "src/growth.gd": "affe36d4c8d869175da66c14e19be7381423d403c239978270783bb289be30d4",
+    "src/hud.gd": "9eee845dec9c361e7cd34143bf27e736141a25d73b7cde06aa607d745a9779fa",
+    "src/loot_drops.gd": "0ac14f33fea43733892ac079a8a3b6b1299852a9ffad624484d7e17876192086",
+    "src/loot_rules.gd": "235f1e18951cf9b27fa9bb78146733218ca08026479b3cd38d303aba636dd18d",
+    "src/main.gd": "68cfae3129a1b046010fbc3c78ee2d611bd96c4c05298ca4643b78b18b8bcef0",
+    "src/music_controller.gd": "f0ecf48c53e5a8bec6deb557813809d5553952ddc08cb1a35e01a374de72f236",
+    "src/pickup_renderer.gd": "576cb9a6349bc910cc499da2a620947020e4e3108f76efeecd6e7b1f864bda6b",
+    "src/progression.gd": "d445f462afb58567e27ca8e4ab7bc7fc02d51b282bbdb0b76e4a67febf292fbb",
+    "src/rules.gd": "51eb889ca54b0996bc2e2cec81a58f1ff736d12afe875f6ea808c3249a505dec",
+    "src/save_store.gd": "30a4bbc354decb09bb6ffb63a8ced39a6cb366c1732138b43a908ad4e5e205eb",
+    "src/session_state.gd": "660c04f1797981d765c42e7cf83248a02224c7d3584feb4c6453732c5a77454c",
+    "src/support_art.gd": "5413a6ad8bcb8552192119be64ff1e9ba018aaac4e901073dfb117f962b7e814",
+    "src/support_rig.gd": "0669354d4c72e4afe598bc87258d44aae7c713fe31a758c86e404c43a14f31d9",
+    "src/ui_audio.gd": "df544d5172ef56bf7537901369480edee79a9d047215d045efe97bf6e8cb78f1",
+    "src/ui_battle_hud.gd": "7a262b488b2350eefca01385ec760e71c6ecda140745e4322e2038bf8189b4e4",
+    "src/ui_battle_paper.gd": "39f04b6615b74b22357948014ca1856b879bc2376b7bb4f166bf189178e0db4d",
+    "src/ui_buff_details.gd": "20479853162b75d5bf702ca2ebceaf0e489991a8ddcc39a523f6e78ae3b529ee",
+    "src/ui_button_fx.gd": "260511594e0598fc6d38f3cd03a4d53cd90b3a55e6b68d5e2a82ebc555dbed3c",
+    "src/ui_frontend.gd": "dafd370092ef5eacdcc9724f2f3dc80b6f94bc95ee592162c033a9b7745ba4c8",
+    "src/ui_home_action.gd": "e038b9ddbbeee1d78527542d91eb4ce1e8254bb15fdf391937ef848c25c1ef9e",
+    "src/ui_home_stage.gd": "a9589b049beaea4954756388ce3d505aa86c67de4c3a87355cfab74550175de0",
+    "src/ui_ink_button_fx.gd": "0df25e183c40e67d7ee668edef251597c36fc3dfa7d645269cc9428135283c0d",
+    "src/ui_offer_layout.gd": "dab70ecf5374cc1f25598219f0fc5d955d202185ccf433a2ed3ed5b8d892b1d2",
+    "src/ui_paper.gd": "1b8ddb3dd180939e5881f1e2e1ec0b3d149690de8a61a0af96696e329c3f9daa",
+    "src/ui_paper_brush.gd": "c8a6482c5caef4af9478b09cb595abba7310a454095b6865dfdb6373077f29a6",
+    "src/ui_paper_edge.gd": "813ba13e69f40bb9bc02a8e0fc09d78020f4bee141e37d1552a58c5c17617853",
+    "src/ui_paper_pattern.gd": "9321f63e4b0ea4a57e41f38cbb049dcaf99f95f2a08c1db7bff2480377e6e732",
+    "src/ui_paper_toggle.gd": "d27562973682362b1ee24ce70d04ad67192f60291a68f5b53c2541e3be60f0a7",
+    "src/ui_reward_scroll_art.gd": "208d09066ac9911e1a4b4c43b4e3b2d0503aa825443aabfaf3f881d218bf9d04",
+    "src/ui_transition.gd": "2063165df6252e03e46ce361244f014048edd2a64364ee611571583ec4a49b75",
+    "src/ui_weapon_details.gd": "92df60f5ad5e8472fb3decd30cc4264b89d4bf97de2058470060d35ce3886b06",
+    "src/weapon_art.gd": "b2847aebaef72bd97937cd23ac9610e6f07b7be9885cb8cfa18e2089dd0fe3bf",
+    "src/weapon_evolution.gd": "ecd8d2b16be7956af35e2a9a9ad74ca6a7681a45563d3fe399cfe1ed67e1f783",
+    "src/world_map.gd": "5a717c58eed03f873f7cca8e2d7e362d78803563d488d1e57cf75ff11c52c5fa"
+  }
+}

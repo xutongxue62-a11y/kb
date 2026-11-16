@@ -1,0 +1,14 @@
+{
+  "workspace": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_UI预览\\v25_pastel",
+  "formal_sources_restored_to_turn_start": true,
+  "formal_assets_and_player_saves_unchanged": true,
+  "restored_visual_sources": [
+    "src/ui_paper_brush.gd",
+    "src/ui_home_action.gd",
+    "src/ui_ink_button_fx.gd",
+    "src/ui_paper.gd",
+    "src/ui_offer_layout.gd"
+  ],
+  "applied_to_formal_game": false,
+  "awaiting_user_visual_review": true
+}

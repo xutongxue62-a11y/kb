@@ -1,0 +1,13 @@
+# v16 combat art, companions and performance
+
+The user accepts v15 weapon spacing and requests richer, distinguishable weapon effects, clearly evolving weapon appearances, refined monsters and colors, natural ground-pet motion, actual wingbeats for the flying companion, and performance work for dense later combat. Continue directly in the accepted local game; preserve earlier versions and real saves.
+
+Use the existing Godot renderer and ink/ochre hand-drawn style. Build reusable native SVG material and effect art with transparent contours, rather than replacing the art direction or UI. Per-weapon material shapes must distinguish blunt chips/dust, axe wedges, thin cuts, spear thrusts, physical arrows, magical facets, fire and drum pulses. Avoid large generic full rings that dominate combat. Lv3/Lv5 strengthen the existing upgrade ornaments and silhouettes within the accepted weapon footprint; all damage/skills/recipes remain intact.
+
+Ground pet: cap normal chase around 225px/s, accelerate and brake, use footfall phase from actual distance travelled, retain terrain collision/contact-only bites. Both ground feet and tail get independently animated art parts. Flyer: independent wing hinges, short lift/recovery/glide beats, a stable ground projection and small body bob. Keep the friendly teal/ivory pet and ochre/bone/teal flyer identity. Old generated PNGs remain archived.
+
+Monsters: retain per-kind silhouettes and combat geometry while adding shaped skin/armor highlights, scales, scars and distinct material palettes. Preserve warning telegraphs and elite identification. Native before/after sheets and real combat footage are the visual acceptance artifacts.
+
+Performance: benchmark a deterministic 42-enemy six-weapon/max-support scene before changes. Record per-subsystem simulation time, native frame time, draw calls and live resource counts. Prioritize measured hotspots, cache reusable effect geometry/textures, avoid redundant HUD reconstruction, and retain all loot and hit/settlement semantics. No reduction in enemy caps, rewards, attack rate or simulation accuracy to manufacture a speedup. Timings describe this machine and fixture only.
+
+Approaches considered: (1) redraw everything as raster sprite sheets: coherent but replaces accepted assets and increases iteration cost; (2) add more immediate geometry each frame: easy but worsens dense-scene CPU/draw-call cost; (3) cached native art + articulated support parts + measured render/update fixes, selected as the implementation judgment because it fits the current code and preserves accepted presentation. User has already authorized direct iterative implementation.

@@ -1,0 +1,33 @@
+{
+  "installed_at": "2026-11-16T16:24:37.133586+08:00",
+  "approved_preview_workspace": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_UI预览\\v31_incoming_weapon",
+  "approval_record": "docs/native_ui_v31_preview.json",
+  "includes_preview": "native_ui_v30",
+  "before_snapshot": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\native_ui_v31_before_20261116_162217",
+  "changed_source_files": [
+    "src/economy.gd",
+    "src/hud.gd",
+    "src/main.gd",
+    "src/ui_buff_details.gd",
+    "src/ui_offer_layout.gd",
+    "src/ui_paper_pattern.gd"
+  ],
+  "installed_sha256": {
+    "src/economy.gd": "ad86e731b69c085a78c660ca135525b6a83c1c49be8da6303196a01cf9eaf411",
+    "src/hud.gd": "9eee845dec9c361e7cd34143bf27e736141a25d73b7cde06aa607d745a9779fa",
+    "src/main.gd": "68cfae3129a1b046010fbc3c78ee2d611bd96c4c05298ca4643b78b18b8bcef0",
+    "src/ui_buff_details.gd": "20479853162b75d5bf702ca2ebceaf0e489991a8ddcc39a523f6e78ae3b529ee",
+    "src/ui_offer_layout.gd": "186fbb937b58c12bfa389dfda951eb63a117af85cc4ffe9a3a9de22befa4bd09",
+    "src/ui_paper_pattern.gd": "9321f63e4b0ea4a57e41f38cbb049dcaf99f95f2a08c1db7bff2480377e6e732",
+    "tests/test_reward_buff_sale_v30.gd": "1354544f1de4ea108f582ae4c57546f5030c1a3c314015adfc42990c946c695b",
+    "tests/test_reward_sale_v23.gd": "ef4033b9f8197a22cdc482bd014618f4840efdbf1f84698c986022a658a8f930",
+    "tests/capture_ui_v30.gd": "0bc76906abc1f738978738655de374bbd21c850de7ba9b295cbf4dc2377cf4d4",
+    "tests/capture_ui_v31.gd": "663c4858a6f17f939d653c48bc8d74d8662cb4e12dc7473855cc6c6b6b3506fa",
+    "tools/run_tests.ps1": "1eec78e2f254f31350abac18910fc5232afa5aa93552a56534dda83d3e6a2dc1",
+    "README.md": "b9b505530262bbf4ffe5bfe4ae785868b5a1963164ac328d6553e3c31cb3fa2a"
+  },
+  "user_visual_approval": "还行吧，那就应用上去就。那就应用上去吧。",
+  "verification_pending": false,
+  "real_player_storage_used": false,
+  "verification_report": "docs/ui_v31_verification.json"
+}

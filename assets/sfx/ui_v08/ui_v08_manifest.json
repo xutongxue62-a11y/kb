@@ -1,0 +1,198 @@
+{
+  "source": "Original procedural foley; no recordings or third-party media",
+  "format": "44100 Hz, mono, signed 16-bit PCM WAV",
+  "level_policy": "Fixed layer gains; no peak/loudness normalization and no upward compression",
+  "listening_verified": false,
+  "verification_boundary": "Durations, samples, headroom, DC and endpoints were measured. This model environment cannot receive audio input; timbre and mix require human listening.",
+  "preview": {
+    "file": "ui_v08_preview.wav",
+    "duration_s": 7.524,
+    "applied_gains": "same as ui_audio.gd; no preview boost",
+    "order": [
+      {
+        "cue": "button_press",
+        "starts_at_s": 0.5,
+        "ends_at_s": 0.572,
+        "gain_db": -3.0,
+        "gesture": "One small, muted wooden contact; nearly no trailing fiber."
+      },
+      {
+        "cue": "paper_popup",
+        "starts_at_s": 1.222,
+        "ends_at_s": 1.442,
+        "gain_db": -2.0,
+        "gesture": "Two small paper folds opening, then a soft settling touch."
+      },
+      {
+        "cue": "page_turn",
+        "starts_at_s": 2.092,
+        "ends_at_s": 2.472,
+        "gain_db": -3.0,
+        "gesture": "Paper picked up, flexed across the middle, and lightly laid down."
+      },
+      {
+        "cue": "scroll_unroll",
+        "starts_at_s": 3.122,
+        "ends_at_s": 3.702,
+        "gain_db": -4.0,
+        "gesture": "Four uneven low paper rolls, slowing into a faint final contact."
+      },
+      {
+        "cue": "paper_close",
+        "starts_at_s": 4.352,
+        "ends_at_s": 4.516,
+        "gain_db": -2.0,
+        "gesture": "A short padded paper flap with a warm, non-resonant contact."
+      },
+      {
+        "cue": "parchment_burn",
+        "starts_at_s": 5.166,
+        "ends_at_s": 6.056,
+        "gain_db": -5.0,
+        "gesture": "A low fibrous crumble with sparse tiny ember textures and a long fade."
+      },
+      {
+        "cue": "choice_confirm",
+        "starts_at_s": 6.706,
+        "ends_at_s": 6.874,
+        "gain_db": -1.0,
+        "gesture": "A deliberate two-part wooden/paper seal press, without a chime."
+      }
+    ]
+  },
+  "cues": [
+    {
+      "file": "button_press.wav",
+      "duration_s": 0.071995,
+      "peak": 0.1102939,
+      "peak_dbfs": -19.15,
+      "rms": 0.0204026,
+      "rms_dbfs": -33.81,
+      "dc_mean": 1.44e-07,
+      "max_adjacent_step": 0.0251167,
+      "endpoint_samples": [
+        0.0,
+        0.0
+      ],
+      "clipped_samples": 0,
+      "sha256": "e242753c85dd83078fbd9ecc5a76d3db769e67ef286f319c52e2877e5762e56c",
+      "playback_gain_db": -3.0,
+      "playback_peak_dbfs": -22.15,
+      "playback_rms_dbfs": -36.81
+    },
+    {
+      "file": "paper_popup.wav",
+      "duration_s": 0.22,
+      "peak": 0.1333964,
+      "peak_dbfs": -17.5,
+      "rms": 0.0288891,
+      "rms_dbfs": -30.79,
+      "dc_mean": 2.55e-07,
+      "max_adjacent_step": 0.0416883,
+      "endpoint_samples": [
+        0.0,
+        0.0
+      ],
+      "clipped_samples": 0,
+      "sha256": "454d77d8231276a317fec3e5d199b747fe2ac8fad16e2ad80e28014f49902db9",
+      "playback_gain_db": -2.0,
+      "playback_peak_dbfs": -19.5,
+      "playback_rms_dbfs": -32.79
+    },
+    {
+      "file": "page_turn.wav",
+      "duration_s": 0.38,
+      "peak": 0.147496,
+      "peak_dbfs": -16.62,
+      "rms": 0.0309665,
+      "rms_dbfs": -30.18,
+      "dc_mean": -3.26e-07,
+      "max_adjacent_step": 0.0471816,
+      "endpoint_samples": [
+        0.0,
+        0.0
+      ],
+      "clipped_samples": 0,
+      "sha256": "30054a0a2389a5f80273903d48c01614d9d514e3cf1c73ccd2878f2fc47f6769",
+      "playback_gain_db": -3.0,
+      "playback_peak_dbfs": -19.62,
+      "playback_rms_dbfs": -33.18
+    },
+    {
+      "file": "scroll_unroll.wav",
+      "duration_s": 0.58,
+      "peak": 0.196173,
+      "peak_dbfs": -14.15,
+      "rms": 0.0354761,
+      "rms_dbfs": -29.0,
+      "dc_mean": 5.51e-07,
+      "max_adjacent_step": 0.0393689,
+      "endpoint_samples": [
+        0.0,
+        0.0
+      ],
+      "clipped_samples": 0,
+      "sha256": "7426e3d5b3140851ae46fdee27a1b59cfd1a0f1e6dd85ab03bf078f8e1423071",
+      "playback_gain_db": -4.0,
+      "playback_peak_dbfs": -18.15,
+      "playback_rms_dbfs": -33.0
+    },
+    {
+      "file": "paper_close.wav",
+      "duration_s": 0.163991,
+      "peak": 0.1287271,
+      "peak_dbfs": -17.81,
+      "rms": 0.024242,
+      "rms_dbfs": -32.31,
+      "dc_mean": -2.74e-07,
+      "max_adjacent_step": 0.0239875,
+      "endpoint_samples": [
+        0.0,
+        0.0
+      ],
+      "clipped_samples": 0,
+      "sha256": "454093263f463a3cb70612ebc9ad496d780a110f8b9a5049bed1279f7b196186",
+      "playback_gain_db": -2.0,
+      "playback_peak_dbfs": -19.81,
+      "playback_rms_dbfs": -34.31
+    },
+    {
+      "file": "parchment_burn.wav",
+      "duration_s": 0.89,
+      "peak": 0.1076083,
+      "peak_dbfs": -19.36,
+      "rms": 0.0154488,
+      "rms_dbfs": -36.22,
+      "dc_mean": -3.03e-07,
+      "max_adjacent_step": 0.0311899,
+      "endpoint_samples": [
+        0.0,
+        0.0
+      ],
+      "clipped_samples": 0,
+      "sha256": "2b29de2ddd3536251541a31afa05678d614a14dbfe7416ef28ca9bb3c7e88f50",
+      "playback_gain_db": -5.0,
+      "playback_peak_dbfs": -24.36,
+      "playback_rms_dbfs": -41.22
+    },
+    {
+      "file": "choice_confirm.wav",
+      "duration_s": 0.168005,
+      "peak": 0.1215857,
+      "peak_dbfs": -18.3,
+      "rms": 0.0219616,
+      "rms_dbfs": -33.17,
+      "dc_mean": 5.4e-07,
+      "max_adjacent_step": 0.0174871,
+      "endpoint_samples": [
+        0.0,
+        0.0
+      ],
+      "clipped_samples": 0,
+      "sha256": "c77d211cdb1b42cc276d254bb998cfe1379d72bb77ef02f009dc5621034b5f61",
+      "playback_gain_db": -1.0,
+      "playback_peak_dbfs": -19.3,
+      "playback_rms_dbfs": -34.17
+    }
+  ]
+}

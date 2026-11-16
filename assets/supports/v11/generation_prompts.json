@@ -1,0 +1,10 @@
+{
+  "provider": "built-in image_gen",
+  "references": [
+    "assets/dinosaurs.png",
+    "assets/hero.png"
+  ],
+  "pet": "Use case: stylized-concept. Asset type: finished transparent 2D game companion sprite. Reference images are style guides only: match their warm hand-drawn caveman cartoon look, thick dark brown softly irregular ink contours, simple softly textured gouache fills and rounded chunky anatomy. Create ONE friendly baby raptor companion, full body side view facing RIGHT, long expressive tail on left, two sturdy little feet at bottom, big rounded head, warm teal body and ivory belly, small ivory back spines, friendly shiny dark eye, tiny bone necklace with teal bead. Adventurous and charming. Designed to read clearly at 72 pixels wide, moderately simple large shapes. Center isolated character with 6 percent padding all around, genuine transparent background, no cast shadow, no environment, no text, no border, no props, no additional poses. Preserve the style of the supplied dinosaur and hero references, no vector-perfect geometry, no modern items.",
+  "drone": "Use case: stylized-concept. Asset type: finished transparent 2D game aerial support sprite. Use supplied dinosaur and hero images as STYLE guides only. Match their warm hand-drawn caveman cartoon, bold dark brown softly irregular ink outline, rounded chunky proportions, gouache paper-grain color fills. Create ONE charming ancient magic drone shaped like a small pterosaur/bone-wing glider, full object facing RIGHT in three-quarter side view, broad swept wings visible. Carved warm ivory bone wing struts, muted teal hide wing membranes, small rounded sandstone torso, friendly dark eye and beak-shaped ivory nose, one glowing turquoise rune stone embedded in breast, leather lashings and a tiny feather tail. Organic prehistoric craft, polished and readable at 76 pixels wide. No modern technology, no rotors, no geometry-icon look. Actual transparent background; isolated centered object with 7 percent padding, no cast shadow, no text, no environment, no extra objects or multiple poses.",
+  "originals_preserved": true
+}

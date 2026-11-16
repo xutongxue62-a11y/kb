@@ -1,0 +1,662 @@
+{
+  "verified_at": "2026-11-16T02:25:30.734541+08:00",
+  "baseline": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\v16_before_20261116_011850",
+  "groups": [
+    {
+      "group": "rules",
+      "checks": 27,
+      "failures": 0,
+      "sha256": "3e70a71ac1f376be24c77f9213d2a6bcf663469ac5fab45da1b7de1c409ab795"
+    },
+    {
+      "group": "scene",
+      "checks": 19,
+      "failures": 0,
+      "sha256": "39b7d0f52d31dcabce2f4b56d4044696e1d73f4f6e8bbf82ab9e51c4da67b9e6"
+    },
+    {
+      "group": "controls",
+      "checks": 10,
+      "failures": 0,
+      "sha256": "00849374f5eabb7d87b2d02826bbbf3103e5b8d0bb252e33a3c6cd6c0fac6551"
+    },
+    {
+      "group": "attack_links",
+      "checks": 43,
+      "failures": 0,
+      "sha256": "049fcbf4540bf97f77b4dae33c95e52e04c2d5b26481a7105e7eb7d6fe5c0ea0"
+    },
+    {
+      "group": "growth",
+      "checks": 14,
+      "failures": 0,
+      "sha256": "0680935ca9db2ad28c909bdd33c7dff4bf07f6985634f9ef1cb7fb3f0bf66083"
+    },
+    {
+      "group": "feedback",
+      "checks": 31,
+      "failures": 0,
+      "sha256": "17dcccbf5395e398daefbe66eb63374dbfc1263937f2bcc809c22b294c111258"
+    },
+    {
+      "group": "impact",
+      "checks": 46,
+      "failures": 0,
+      "sha256": "4cacabc2220dae45cd45b9819fb31811fce0c80db21f9fbbee2645bc9ed7f51d"
+    },
+    {
+      "group": "progression",
+      "checks": 19,
+      "failures": 0,
+      "sha256": "306d628549347332acca74cb9595fc16c216d0f91f57f166b0bb6c59ac937d0f"
+    },
+    {
+      "group": "armory",
+      "checks": 16,
+      "failures": 0,
+      "sha256": "0f4eff8772745d41856861c6126b989cf43e13dd7d351e0c05e6a8cb4c120cdb"
+    },
+    {
+      "group": "save_store",
+      "checks": 403,
+      "failures": 0,
+      "sha256": "734877910b2400f816f2f4d8b7ac935b7edddc18f7fb613ebf883b963d8748c3"
+    },
+    {
+      "group": "hud_navigation",
+      "checks": 884,
+      "failures": 0,
+      "sha256": "0dfbd320fc3baafcaaf171e378b3fe1cf2ac7c1fe7321b2f32c25a9643b1ef99"
+    },
+    {
+      "group": "campaign",
+      "checks": 40,
+      "failures": 0,
+      "sha256": "bc3e847bb4f0689d20381320fbae0deafc4e038f78c110d5cf5aa3c32c992f55"
+    },
+    {
+      "group": "frontend",
+      "checks": 55,
+      "failures": 0,
+      "sha256": "be6fd02da7141f4796c4fb16b5c4f38338fdd2fd8a73f8a2a224069a967cf612"
+    },
+    {
+      "group": "ui_motion",
+      "checks": 79,
+      "failures": 0,
+      "sha256": "4194c89533c133b0ee0ec4098925144e65d9b2d6529ad18bbc6f8d56cc33a292"
+    },
+    {
+      "group": "ui_audio",
+      "checks": 112,
+      "failures": 0,
+      "sha256": "b32885de7087f691c9abe98039975be183f373c4c092014aa4dc91ab12484d20"
+    },
+    {
+      "group": "home_v09",
+      "checks": 28,
+      "failures": 0,
+      "sha256": "1ede7f03162b17d6e12e71306cfa930e647baf09765b97bc16e0f2f9d466aa52"
+    },
+    {
+      "group": "chest_pickup",
+      "checks": 89,
+      "failures": 0,
+      "sha256": "c4328dd1070003351a675de363013800e6b01e9f34a9891519cca6c27967b949"
+    },
+    {
+      "group": "sprite_edges",
+      "checks": 94,
+      "failures": 0,
+      "sha256": "c890f61cac9024e5259c4ac2f6971b66685c8b397bfcea3b182d4536f5e8e12c"
+    },
+    {
+      "group": "dodge",
+      "checks": 40,
+      "failures": 0,
+      "sha256": "6ea326f217f12ba01b5effe8ea575d09d5be6d3635058ce04294b4777ca0a418"
+    },
+    {
+      "group": "music",
+      "checks": 33,
+      "failures": 0,
+      "sha256": "253327c176909277fbb997c8c0009448df3c096c1ac4d10a7a525fab5de4b250"
+    },
+    {
+      "group": "world_camera",
+      "checks": 62,
+      "failures": 0,
+      "sha256": "796a8c1bd8b50800b97f09761589b3ea1ed54a5ae5756d9a9b42f416fc37f3de"
+    },
+    {
+      "group": "battle_ui_v10",
+      "checks": 6,
+      "failures": 0,
+      "sha256": "16e7dc6d8cfbd4022a8cd41e3cd96f736d579b0cb5957586ea0cb431cd1782d2"
+    },
+    {
+      "group": "map_chunks",
+      "checks": 10,
+      "failures": 0,
+      "sha256": "33e297cf86e6cd7c799eb77616a5c5cf4c4455bc80c9505c326c6f476b92b71a"
+    },
+    {
+      "group": "terrain_physics",
+      "checks": 30,
+      "failures": 0,
+      "sha256": "9bf8a883a3d51b0b61182d9c597cfaaecf1d80aa88ffebf4c297cc0d98a6c4fe"
+    },
+    {
+      "group": "growth_v11",
+      "checks": 2395,
+      "failures": 0,
+      "sha256": "c490b0874b0306cd350946a60547a0f6304bbbdaad91a8a868d9c181279963d1"
+    },
+    {
+      "group": "supports_v11",
+      "checks": 16,
+      "failures": 0,
+      "sha256": "ce58d90472f4195d9e5597ba05bd47bb97d379b3ada70de99161fa628d96bb98"
+    },
+    {
+      "group": "ui_v11",
+      "checks": 27,
+      "failures": 0,
+      "sha256": "38614eee1b7f87383b3548165c54789fa028f20f181b5a5b6e93686846f51628"
+    },
+    {
+      "group": "resources_v12",
+      "checks": 184,
+      "failures": 0,
+      "sha256": "96ee268937bc8541c97558580d3cc4290ed385f75fb13397fcd2cec06a7ef527"
+    },
+    {
+      "group": "rounds_v12",
+      "checks": 23,
+      "failures": 0,
+      "sha256": "e9891bf75a56224d82d475e09d01ddce7abd616d53cb69be3e6bae93afe389f0"
+    },
+    {
+      "group": "weapons_v12",
+      "checks": 69,
+      "failures": 0,
+      "sha256": "b4884dfcb1da792cabdda41749f013b21cb9faeef37be3d1b9b005159d31711e"
+    },
+    {
+      "group": "enemies_v12",
+      "checks": 99,
+      "failures": 0,
+      "sha256": "f56d9f3e360e459d4110b4fc8ff519a8df7da3e90d6861ee6304834adb602071"
+    },
+    {
+      "group": "battle_visuals_v12",
+      "checks": 102,
+      "failures": 0,
+      "sha256": "7a64de33b7515758594202fa35a017439f6c4b4ae65b13ec01cdbac1d599e764"
+    },
+    {
+      "group": "class_egg_loadout",
+      "checks": 113,
+      "failures": 0,
+      "sha256": "85ad9bc133f422f02362d8c5bd7bc828027fa0dfc823ebfae08a60ae7b3c0be1"
+    },
+    {
+      "group": "character_loot",
+      "checks": 55,
+      "failures": 0,
+      "sha256": "1227beaa669be41a709e679ace1293a3fe8f5b85cacf2cd7d15b2750821259f8"
+    },
+    {
+      "group": "settlement_v14",
+      "checks": 27,
+      "failures": 0,
+      "sha256": "562c0c6ffc750970f7bf60013d24876e68739582db21ffd8f62bb93d631b9483"
+    },
+    {
+      "group": "evolution_v14",
+      "checks": 58,
+      "failures": 0,
+      "sha256": "a55212d9d76273d6b382fd996ab369dfbd2d692ff20b5d9a816d8e556c519163"
+    },
+    {
+      "group": "weapon_presentation_v15",
+      "checks": 1242,
+      "failures": 0,
+      "sha256": "0d0eeea3636a8361850b71db4b30509702933dc059f00ae78e6a27a0169cc7af"
+    },
+    {
+      "group": "companions_v16",
+      "checks": 199,
+      "failures": 0,
+      "sha256": "7a10ab02edb01b3302be7385c6fa874fc400aebadabe86b06de1254a393e8256"
+    },
+    {
+      "group": "combat_art_v16",
+      "checks": 75,
+      "failures": 0,
+      "sha256": "6fadfbc78cc29a7791cdce5219b2087d111598df750bb0a8bf9b03c05b4f24f8"
+    },
+    {
+      "group": "terrain_broadphase_v16",
+      "checks": 165,
+      "failures": 0,
+      "sha256": "483537c5b7d0c3112d862767a279a771a8ac600e568449abdb89acfa155feeb9"
+    },
+    {
+      "group": "monster_surface_v16",
+      "checks": 48,
+      "failures": 0,
+      "sha256": "715a1ea0f4f363eaa094e4b21aaaca7fb3c55bd866e178cad21f5449e8b0f437"
+    },
+    {
+      "group": "pickup_renderer_v16",
+      "checks": 5,
+      "failures": 0,
+      "sha256": "bc751fd36a269b0a1b207d79ac8bb70df65ffc234e16e26baf1a47aceeb831bb"
+    }
+  ],
+  "checks": 7092,
+  "native": {
+    "checks": 14,
+    "failures": 0,
+    "real_player_storage_used": false,
+    "screenshots": [
+      {
+        "chests": 0,
+        "coins": 0,
+        "frame": 42,
+        "name": "supports_idle",
+        "pickups": 0,
+        "shop": false,
+        "xp": 0.0
+      },
+      {
+        "chests": 0,
+        "coins": 0,
+        "frame": 105,
+        "name": "supports_walking",
+        "pickups": 0,
+        "shop": false,
+        "xp": 0.0
+      },
+      {
+        "chests": 0,
+        "coins": 0,
+        "frame": 166,
+        "name": "supports_following",
+        "pickups": 0,
+        "shop": false,
+        "xp": 0.0
+      },
+      {
+        "chests": 0,
+        "coins": 0,
+        "frame": 203,
+        "name": "melee_material_impacts",
+        "pickups": 0,
+        "shop": false,
+        "xp": 0.0
+      },
+      {
+        "chests": 0,
+        "coins": 0,
+        "frame": 335,
+        "name": "ranged_material_impacts",
+        "pickups": 0,
+        "shop": false,
+        "xp": 0.0
+      },
+      {
+        "chests": 0,
+        "coins": 0,
+        "frame": 502,
+        "name": "fire_drum_materials",
+        "pickups": 0,
+        "shop": false,
+        "xp": 0.0
+      }
+    ],
+    "source_version": "v0.16"
+  },
+  "native_multimesh_checks": 6,
+  "native_multimesh_log_sha256": "f30ed02430eb4db599d25daa792715fd921272af9f11c6b03224e51f378ef8d4",
+  "video": {
+    "file": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_Godot_v0.1\\previews\\v16_native_v4.mp4",
+    "frames": 600,
+    "fps": "60/1",
+    "dimensions": [
+      1280,
+      800
+    ],
+    "seconds": 10.0,
+    "audio_codec": "aac",
+    "audio_seconds": 10.0,
+    "bytes": 4770007,
+    "manual_listening_verified": false
+  },
+  "preview_sha256": {
+    "supports_idle.png": "b104470f36782b87941fa8ad58b3181f90c9275cd739f95a8a768a16d482a650",
+    "supports_walking.png": "a5db7ce792e8196681a5189b3b1166cf2b7577fd35fff47b3bb65b268a295572",
+    "supports_following.png": "2457e000141420eb860ee07e5617b297150047c9db9182c819c5bcab18e61237",
+    "melee_material_impacts.png": "03ea4c7fc65f48f88f34f4dde4fca5183a09b4e53ff83e6ba5422e4e6fec5257",
+    "ranged_material_impacts.png": "eaf6f9ead8756bc41eef9961c9c6ad67b919823acd230946bc1a8d9058f2c432",
+    "fire_drum_materials.png": "f957cce9868e26c83195d2c165448afbf5e9e6b9d35b01a511d7b56201b7f3ab",
+    "effect_families.png": "b3e91558f55c31171ff6f18a71ac0f381043dabaf34b05191383f7f0df0da1c8",
+    "support_motion_phases.png": "e6c3f0a1f73e71df7a88709493d0011626f37792092814c8d38b8008974e255f",
+    "monster_materials_before_after.png": "46033c79a0df9f0f0bf5306630c122d8f46630cfd16ad14034b270a68aa07596",
+    "weapon_growth_sheet.png": "f8753ec876e71eaeee1347943e18b15ae5d7a0a8bfb5cfd4cb910cc2fe7e8491",
+    "v16_native_v4.mp4": "c7a0ee03c343521a755c68d9fe90ff9a2a8d97d283dc6a11edcf5f1ed5601918"
+  },
+  "performance": {
+    "before": {
+      "coins": 0,
+      "draw_calls": {
+        "max": 2311.0,
+        "median": 1981.0,
+        "p95": 2221.0
+      },
+      "enemies": 42,
+      "frames": 180,
+      "isolated_player_storage": true,
+      "native_frame_ms": {
+        "max": 47.844,
+        "median": 26.666,
+        "p95": 36.354
+      },
+      "notes": "Native OpenGL, vsync off, fixed 1/60 simulation, no video encoding. Same fixture and seed; end-to-end timings include scheduling, not a hardware guarantee.",
+      "objects": 2192.0,
+      "particles": 200,
+      "pickups": 1507,
+      "projectiles": 0,
+      "seed": 160016,
+      "simulation_ms": {
+        "max": 7.928,
+        "median": 6.35,
+        "p95": 7.137
+      },
+      "subsystem_ms": {
+        "update_armory": {
+          "max": 1.246,
+          "median": 0.488,
+          "p95": 0.841
+        },
+        "update_companions": {
+          "max": 0.335,
+          "median": 0.199,
+          "p95": 0.273
+        },
+        "update_enemies": {
+          "max": 3.963,
+          "median": 3.479,
+          "p95": 3.709
+        },
+        "update_hud": {
+          "max": 0.299,
+          "median": 0.081,
+          "p95": 0.107
+        },
+        "update_pickups": {
+          "max": 1.338,
+          "median": 0.207,
+          "p95": 0.234
+        },
+        "update_projectiles": {
+          "max": 2.062,
+          "median": 0.098,
+          "p95": 1.965
+        },
+        "update_weapons": {
+          "max": 0.23,
+          "median": 0.154,
+          "p95": 0.189
+        }
+      },
+      "tag": "before",
+      "texture_bytes": 101802044.0,
+      "xp": 0.0
+    },
+    "after": {
+      "coins": 0,
+      "draw_calls": {
+        "max": 1632.0,
+        "median": 1541.0,
+        "p95": 1626.0
+      },
+      "enemies": 42,
+      "frames": 180,
+      "isolated_player_storage": true,
+      "native_frame_ms": {
+        "max": 44.019,
+        "median": 20.158,
+        "p95": 35.39
+      },
+      "notes": "Native OpenGL, vsync off, fixed 1/60 simulation, no video encoding. Same fixture and seed; end-to-end timings include scheduling, not a hardware guarantee.",
+      "objects": 2383.0,
+      "particles": 200,
+      "pickups": 1509,
+      "projectiles": 0,
+      "seed": 160016,
+      "simulation_ms": {
+        "max": 9.944,
+        "median": 5.136,
+        "p95": 6.375
+      },
+      "subsystem_ms": {
+        "update_armory": {
+          "max": 1.476,
+          "median": 0.487,
+          "p95": 0.696
+        },
+        "update_companions": {
+          "max": 0.495,
+          "median": 0.186,
+          "p95": 0.276
+        },
+        "update_enemies": {
+          "max": 2.851,
+          "median": 2.125,
+          "p95": 2.442
+        },
+        "update_hud": {
+          "max": 0.258,
+          "median": 0.081,
+          "p95": 0.095
+        },
+        "update_pickups": {
+          "max": 0.364,
+          "median": 0.204,
+          "p95": 0.232
+        },
+        "update_projectiles": {
+          "max": 2.501,
+          "median": 0.105,
+          "p95": 1.977
+        },
+        "update_weapons": {
+          "max": 0.271,
+          "median": 0.166,
+          "p95": 0.22
+        }
+      },
+      "tag": "final",
+      "texture_bytes": 126700782.0,
+      "xp": 0.0
+    },
+    "simulation_median_reduction_pct": 19.118110236220463,
+    "native_frame_median_reduction_pct": 24.405610140253497,
+    "limits": "Local same initial fixture and seed. Support motion intentionally changed; frame timings include OS scheduling. No promise for other hardware or all future scenes."
+  },
+  "old_asset_files_unchanged": 156,
+  "changed_source_files": [
+    "src/companions.gd",
+    "src/dino_view.gd",
+    "src/effects.gd",
+    "src/enemy_art.gd",
+    "src/expanded_weapons.gd",
+    "src/main.gd",
+    "src/support_art.gd",
+    "src/weapon_art.gd",
+    "src/world_map.gd"
+  ],
+  "protected_source_files": [
+    "src/actor_view.gd",
+    "src/actor_view.gd.uid",
+    "src/armory.gd",
+    "src/armory.gd.uid",
+    "src/asset_library.gd",
+    "src/asset_library.gd.uid",
+    "src/audio_pool.gd",
+    "src/audio_pool.gd.uid",
+    "src/battle_visuals.gd",
+    "src/battle_visuals.gd.uid",
+    "src/catalog.gd",
+    "src/catalog.gd.uid",
+    "src/companions.gd.uid",
+    "src/dino_view.gd.uid",
+    "src/economy.gd",
+    "src/economy.gd.uid",
+    "src/effects.gd.uid",
+    "src/enemy_art.gd.uid",
+    "src/enemy_roster.gd",
+    "src/enemy_roster.gd.uid",
+    "src/expanded_weapons.gd.uid",
+    "src/growth.gd",
+    "src/growth.gd.uid",
+    "src/hud.gd",
+    "src/hud.gd.uid",
+    "src/loot_drops.gd",
+    "src/loot_drops.gd.uid",
+    "src/loot_rules.gd",
+    "src/loot_rules.gd.uid",
+    "src/main.gd.uid",
+    "src/music_controller.gd",
+    "src/music_controller.gd.uid",
+    "src/progression.gd",
+    "src/progression.gd.uid",
+    "src/rules.gd",
+    "src/rules.gd.uid",
+    "src/save_store.gd",
+    "src/save_store.gd.uid",
+    "src/session_state.gd",
+    "src/session_state.gd.uid",
+    "src/support_art.gd.uid",
+    "src/ui_audio.gd",
+    "src/ui_audio.gd.uid",
+    "src/ui_battle_hud.gd",
+    "src/ui_battle_hud.gd.uid",
+    "src/ui_battle_paper.gd",
+    "src/ui_battle_paper.gd.uid",
+    "src/ui_button_fx.gd",
+    "src/ui_button_fx.gd.uid",
+    "src/ui_frontend.gd",
+    "src/ui_frontend.gd.uid",
+    "src/ui_home_action.gd",
+    "src/ui_home_action.gd.uid",
+    "src/ui_home_stage.gd",
+    "src/ui_home_stage.gd.uid",
+    "src/ui_ink_button_fx.gd",
+    "src/ui_ink_button_fx.gd.uid",
+    "src/ui_offer_layout.gd",
+    "src/ui_offer_layout.gd.uid",
+    "src/ui_paper.gd",
+    "src/ui_paper.gd.uid",
+    "src/ui_transition.gd",
+    "src/ui_transition.gd.uid",
+    "src/weapon_art.gd.uid",
+    "src/weapon_evolution.gd",
+    "src/weapon_evolution.gd.uid",
+    "src/world_map.gd.uid"
+  ],
+  "new_source_files": [
+    "src/combat_art.gd",
+    "src/support_rig.gd",
+    "src/pickup_renderer.gd"
+  ],
+  "source_sha256": {
+    "src/actor_view.gd": "730ba4e2606bee3593b70bf8a519e7bb63c7588626b581a9df0f166feac0f904",
+    "src/armory.gd": "e875b48e0f38d8c80a994a2b6d0d05959d7ec8dc13fceb31e36ae896cd8ecfcc",
+    "src/asset_library.gd": "122869e8bf06d7f39f2644523167c79c78dadd4ee67e9ca16d7cb2bdfc03e008",
+    "src/audio_pool.gd": "68bec478905c8e7d3d65ab9a4d0ed0d447d7c006643f6803477a1574713a8406",
+    "src/battle_visuals.gd": "d191ce1f8ada671e10b727ffe89c927d138e686600d6dbf46f930c522ec8595d",
+    "src/catalog.gd": "6d28e91514565409c4d895102ce548a9764de401e75e0e3a2f94e4a0012a6d37",
+    "src/combat_art.gd": "921583b1c97cf269ee642a1423efa5aafa699516764f28b5f3ff31e04171813f",
+    "src/companions.gd": "56d13c59ee8e448b71ec5558d2db57398fb8ca9cf2e94f4c46a009f3583841f1",
+    "src/dino_view.gd": "8cecab2a82e84a153961fdfca2eb392752f0ef671de03f16caee2a2fa2acfcc1",
+    "src/economy.gd": "eebc92d957924ead1dfe0fb06cafa619c841899586643addf1f623a658c1e291",
+    "src/effects.gd": "9fbbe53d9683cc1de6c859137911e5ba41b5bab43d12a86a48f6cf63131802ce",
+    "src/enemy_art.gd": "e80bc19e5b8a33ba0e386ced1f8d8969a3e740be8b8398a455118aff49416663",
+    "src/enemy_roster.gd": "e266a2a5e9c098736f5abab5aee54c207b939fc0b3508fd333e54cc683e6ddf3",
+    "src/expanded_weapons.gd": "dda7a66d7d71009702ca7c082f6cbf8d8261f48018c91db01953a8e4417fc76e",
+    "src/growth.gd": "3501d35c24cc37e8293aad0b42efbbab058fb76a7521faecc2802089846ff31c",
+    "src/hud.gd": "bed3c6af2b05050191b1aeadfbf90d82ca4e0ba252a64d0264330fdef2c58245",
+    "src/loot_drops.gd": "0ac14f33fea43733892ac079a8a3b6b1299852a9ffad624484d7e17876192086",
+    "src/loot_rules.gd": "235f1e18951cf9b27fa9bb78146733218ca08026479b3cd38d303aba636dd18d",
+    "src/main.gd": "173bd65ada0411f12243b88cfe940bec0eece73a963742c6fd8c512e082add70",
+    "src/music_controller.gd": "f0ecf48c53e5a8bec6deb557813809d5553952ddc08cb1a35e01a374de72f236",
+    "src/pickup_renderer.gd": "603609f3ff48956039f219233e7d08076d8317948da0fb785d54d21fab931229",
+    "src/progression.gd": "d445f462afb58567e27ca8e4ab7bc7fc02d51b282bbdb0b76e4a67febf292fbb",
+    "src/rules.gd": "5aa6eb2e0ef405b04d440e5e21d32084e51360babf734ac94ba95463a4302a43",
+    "src/save_store.gd": "70da998c30662d81d8481426d10bd8616ca028e415e0f90872fdf887523f95dc",
+    "src/session_state.gd": "b6a49cdbb41f959f7f726a8152dea0380e49992d65f9ea08ad7187f85202b2db",
+    "src/support_art.gd": "5413a6ad8bcb8552192119be64ff1e9ba018aaac4e901073dfb117f962b7e814",
+    "src/support_rig.gd": "0669354d4c72e4afe598bc87258d44aae7c713fe31a758c86e404c43a14f31d9",
+    "src/ui_audio.gd": "61edba7db94ae3b94bffd256e03623266231803d1e2602c6ad5b543e793d5725",
+    "src/ui_battle_hud.gd": "7a262b488b2350eefca01385ec760e71c6ecda140745e4322e2038bf8189b4e4",
+    "src/ui_battle_paper.gd": "39f04b6615b74b22357948014ca1856b879bc2376b7bb4f166bf189178e0db4d",
+    "src/ui_button_fx.gd": "260511594e0598fc6d38f3cd03a4d53cd90b3a55e6b68d5e2a82ebc555dbed3c",
+    "src/ui_frontend.gd": "85c8577be8747da1381130c3e9175e25d0330677e4f4fe55d27062e78a673df0",
+    "src/ui_home_action.gd": "e34112e3a8b48e594be878315fcec37cf688b3963f353c5655770b0c784a6c99",
+    "src/ui_home_stage.gd": "a9589b049beaea4954756388ce3d505aa86c67de4c3a87355cfab74550175de0",
+    "src/ui_ink_button_fx.gd": "6b0461088c127086f0961124a39d4ca897229a9d2acb592bcc8f6fd840c058a7",
+    "src/ui_offer_layout.gd": "8a0941255f8555544b1d6716e462c7a98773814dd65eae6348c0b27dbb1a2778",
+    "src/ui_paper.gd": "6156465f05affc80e463d23d4d4982991f50e67a6b2caac8d06a0dda12d0d785",
+    "src/ui_transition.gd": "2063165df6252e03e46ce361244f014048edd2a64364ee611571583ec4a49b75",
+    "src/weapon_art.gd": "b2847aebaef72bd97937cd23ac9610e6f07b7be9885cb8cfa18e2089dd0fe3bf",
+    "src/weapon_evolution.gd": "ecd8d2b16be7956af35e2a9a9ad74ca6a7681a45563d3fe399cfe1ed67e1f783",
+    "src/world_map.gd": "5a717c58eed03f873f7cca8e2d7e362d78803563d488d1e57cf75ff11c52c5fa"
+  },
+  "latest_player_files": [
+    {
+      "path": "runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\run.backup.json",
+      "sha256": "74da86170a9a436230bf055d0cbf4e2302554db65b5683344ade2f293bb9fda8",
+      "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\v16_latest_player_20261116_022530\\runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\run.backup.json",
+      "same_as_initial": true
+    },
+    {
+      "path": "runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\run.json",
+      "sha256": "c2f19adef16f85d3187f0754902bee7b6b80d4b9994eba622fb086a91111e8d3",
+      "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\v16_latest_player_20261116_022530\\runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\run.json",
+      "same_as_initial": true
+    },
+    {
+      "path": "runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\settings.backup.json",
+      "sha256": "887d9303c58eca53477a35ceaae351e5c112b9e71f5fcc7c7315be6dc2772c90",
+      "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\v16_latest_player_20261116_022530\\runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\settings.backup.json",
+      "same_as_initial": true
+    },
+    {
+      "path": "runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\settings.json",
+      "sha256": "70d0d764a014d4d6d25fe2bf0ef9cf9978ab7498a30abc6265eeef4387cf2dbc",
+      "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\v16_latest_player_20261116_022530\\runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\settings.json",
+      "same_as_initial": true
+    }
+  ],
+  "review": {
+    "remaining_p1_p2": 0,
+    "fixed": [
+      "support contact point at leash boundary",
+      "max-speed follower regroup and actual drone range",
+      "embedded two-stone recovery uses legacy full neighbourhood"
+    ]
+  },
+  "visual_checks": [
+    "14 distinct cached effect families",
+    "14 weapons at level 1/3/5",
+    "8 monster surface comparisons",
+    "articulated ground feet and flying wings",
+    "native melee/ranged/fire-drum combat"
+  ],
+  "test_storage_isolated": true,
+  "user_acceptance_verified": false,
+  "subjective_listening_verified": false
+}

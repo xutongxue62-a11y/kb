@@ -1,0 +1,496 @@
+{
+  "verified_at": "2026-11-16T16:28:37.997631+08:00",
+  "installed": true,
+  "before_snapshot": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\native_ui_v31_before_20261116_162217",
+  "user_visual_approval": "还行吧，那就应用上去就。那就应用上去吧。",
+  "test_groups": [
+    {
+      "group": "rules",
+      "checks": 27,
+      "log_sha256": "3e70a71ac1f376be24c77f9213d2a6bcf663469ac5fab45da1b7de1c409ab795"
+    },
+    {
+      "group": "scene",
+      "checks": 19,
+      "log_sha256": "39b7d0f52d31dcabce2f4b56d4044696e1d73f4f6e8bbf82ab9e51c4da67b9e6"
+    },
+    {
+      "group": "controls",
+      "checks": 10,
+      "log_sha256": "00849374f5eabb7d87b2d02826bbbf3103e5b8d0bb252e33a3c6cd6c0fac6551"
+    },
+    {
+      "group": "attack_links",
+      "checks": 43,
+      "log_sha256": "049fcbf4540bf97f77b4dae33c95e52e04c2d5b26481a7105e7eb7d6fe5c0ea0"
+    },
+    {
+      "group": "growth",
+      "checks": 17,
+      "log_sha256": "5922da8ba12ad42a5cd9555d73b99f9142e61a27475383165a18102d71e3a53f"
+    },
+    {
+      "group": "feedback",
+      "checks": 31,
+      "log_sha256": "17dcccbf5395e398daefbe66eb63374dbfc1263937f2bcc809c22b294c111258"
+    },
+    {
+      "group": "impact",
+      "checks": 46,
+      "log_sha256": "4cacabc2220dae45cd45b9819fb31811fce0c80db21f9fbbee2645bc9ed7f51d"
+    },
+    {
+      "group": "progression",
+      "checks": 19,
+      "log_sha256": "306d628549347332acca74cb9595fc16c216d0f91f57f166b0bb6c59ac937d0f"
+    },
+    {
+      "group": "armory",
+      "checks": 16,
+      "log_sha256": "0f4eff8772745d41856861c6126b989cf43e13dd7d351e0c05e6a8cb4c120cdb"
+    },
+    {
+      "group": "save_store",
+      "checks": 403,
+      "log_sha256": "3c85d2620efbfde51b912372d65465e450fd7649be3ed6a3ec87a8f7e650e3b5"
+    },
+    {
+      "group": "hud_navigation",
+      "checks": 1066,
+      "log_sha256": "601228ba1d099056463f32ed2c5170057b41fbf1dcfdeb75f5789cbaa7b4949f"
+    },
+    {
+      "group": "campaign",
+      "checks": 40,
+      "log_sha256": "bc3e847bb4f0689d20381320fbae0deafc4e038f78c110d5cf5aa3c32c992f55"
+    },
+    {
+      "group": "frontend",
+      "checks": 55,
+      "log_sha256": "be6fd02da7141f4796c4fb16b5c4f38338fdd2fd8a73f8a2a224069a967cf612"
+    },
+    {
+      "group": "ui_motion",
+      "checks": 79,
+      "log_sha256": "4194c89533c133b0ee0ec4098925144e65d9b2d6529ad18bbc6f8d56cc33a292"
+    },
+    {
+      "group": "ui_audio",
+      "checks": 112,
+      "log_sha256": "b32885de7087f691c9abe98039975be183f373c4c092014aa4dc91ab12484d20"
+    },
+    {
+      "group": "home_v09",
+      "checks": 28,
+      "log_sha256": "1ede7f03162b17d6e12e71306cfa930e647baf09765b97bc16e0f2f9d466aa52"
+    },
+    {
+      "group": "chest_pickup",
+      "checks": 89,
+      "log_sha256": "c4328dd1070003351a675de363013800e6b01e9f34a9891519cca6c27967b949"
+    },
+    {
+      "group": "sprite_edges",
+      "checks": 94,
+      "log_sha256": "c890f61cac9024e5259c4ac2f6971b66685c8b397bfcea3b182d4536f5e8e12c"
+    },
+    {
+      "group": "dodge",
+      "checks": 40,
+      "log_sha256": "6ea326f217f12ba01b5effe8ea575d09d5be6d3635058ce04294b4777ca0a418"
+    },
+    {
+      "group": "music",
+      "checks": 33,
+      "log_sha256": "253327c176909277fbb997c8c0009448df3c096c1ac4d10a7a525fab5de4b250"
+    },
+    {
+      "group": "world_camera",
+      "checks": 62,
+      "log_sha256": "796a8c1bd8b50800b97f09761589b3ea1ed54a5ae5756d9a9b42f416fc37f3de"
+    },
+    {
+      "group": "battle_ui_v10",
+      "checks": 6,
+      "log_sha256": "16e7dc6d8cfbd4022a8cd41e3cd96f736d579b0cb5957586ea0cb431cd1782d2"
+    },
+    {
+      "group": "map_chunks",
+      "checks": 10,
+      "log_sha256": "33e297cf86e6cd7c799eb77616a5c5cf4c4455bc80c9505c326c6f476b92b71a"
+    },
+    {
+      "group": "terrain_physics",
+      "checks": 30,
+      "log_sha256": "9bf8a883a3d51b0b61182d9c597cfaaecf1d80aa88ffebf4c297cc0d98a6c4fe"
+    },
+    {
+      "group": "growth_v11",
+      "checks": 2398,
+      "log_sha256": "aba7311aab532034c7f2030b3e49eb27fe21a912bf08e6b9adcb8403bc7d7899"
+    },
+    {
+      "group": "supports_v11",
+      "checks": 16,
+      "log_sha256": "ce58d90472f4195d9e5597ba05bd47bb97d379b3ada70de99161fa628d96bb98"
+    },
+    {
+      "group": "ui_v11",
+      "checks": 27,
+      "log_sha256": "38614eee1b7f87383b3548165c54789fa028f20f181b5a5b6e93686846f51628"
+    },
+    {
+      "group": "resources_v12",
+      "checks": 184,
+      "log_sha256": "96ee268937bc8541c97558580d3cc4290ed385f75fb13397fcd2cec06a7ef527"
+    },
+    {
+      "group": "rounds_v12",
+      "checks": 23,
+      "log_sha256": "e9891bf75a56224d82d475e09d01ddce7abd616d53cb69be3e6bae93afe389f0"
+    },
+    {
+      "group": "weapons_v12",
+      "checks": 69,
+      "log_sha256": "b4884dfcb1da792cabdda41749f013b21cb9faeef37be3d1b9b005159d31711e"
+    },
+    {
+      "group": "enemies_v12",
+      "checks": 99,
+      "log_sha256": "f56d9f3e360e459d4110b4fc8ff519a8df7da3e90d6861ee6304834adb602071"
+    },
+    {
+      "group": "battle_visuals_v12",
+      "checks": 102,
+      "log_sha256": "7a64de33b7515758594202fa35a017439f6c4b4ae65b13ec01cdbac1d599e764"
+    },
+    {
+      "group": "class_egg_loadout",
+      "checks": 113,
+      "log_sha256": "85ad9bc133f422f02362d8c5bd7bc828027fa0dfc823ebfae08a60ae7b3c0be1"
+    },
+    {
+      "group": "character_loot",
+      "checks": 55,
+      "log_sha256": "1227beaa669be41a709e679ace1293a3fe8f5b85cacf2cd7d15b2750821259f8"
+    },
+    {
+      "group": "settlement_v14",
+      "checks": 27,
+      "log_sha256": "562c0c6ffc750970f7bf60013d24876e68739582db21ffd8f62bb93d631b9483"
+    },
+    {
+      "group": "evolution_v14",
+      "checks": 58,
+      "log_sha256": "a55212d9d76273d6b382fd996ab369dfbd2d692ff20b5d9a816d8e556c519163"
+    },
+    {
+      "group": "weapon_presentation_v15",
+      "checks": 1242,
+      "log_sha256": "0d0eeea3636a8361850b71db4b30509702933dc059f00ae78e6a27a0169cc7af"
+    },
+    {
+      "group": "companions_v16",
+      "checks": 199,
+      "log_sha256": "7a10ab02edb01b3302be7385c6fa874fc400aebadabe86b06de1254a393e8256"
+    },
+    {
+      "group": "combat_art_v16",
+      "checks": 75,
+      "log_sha256": "6fadfbc78cc29a7791cdce5219b2087d111598df750bb0a8bf9b03c05b4f24f8"
+    },
+    {
+      "group": "terrain_broadphase_v16",
+      "checks": 165,
+      "log_sha256": "483537c5b7d0c3112d862767a279a771a8ac600e568449abdb89acfa155feeb9"
+    },
+    {
+      "group": "monster_surface_v16",
+      "checks": 48,
+      "log_sha256": "715a1ea0f4f363eaa094e4b21aaaca7fb3c55bd866e178cad21f5449e8b0f437"
+    },
+    {
+      "group": "pickup_renderer_v16",
+      "checks": 12,
+      "log_sha256": "46a94750891c3c3aae851ca528445a7eb7b0b0e2bd3ccf1ac1aa0f9e7a415539"
+    },
+    {
+      "group": "weapon_replace_v20",
+      "checks": 873,
+      "log_sha256": "68115a44e8322eda9bd2ae2ae97414c7f5e90eb0f00af4faaa211eddad2ffd49"
+    },
+    {
+      "group": "ui_brush_v22",
+      "checks": 24,
+      "log_sha256": "3a7b12acace1aa1deacb6015bb26475f9e05138a0aa89d46f94d84b7f71a8cbd"
+    },
+    {
+      "group": "reward_sale_v23",
+      "checks": 26,
+      "log_sha256": "3f6f84b2a8bd384e130dacb64ed1f4ff77562bfbb35e89f6fa9e9a748da245dc"
+    },
+    {
+      "group": "reward_buff_sale_v30",
+      "checks": 17,
+      "log_sha256": "dabf0a122134b25022472b03d9ff9fa4382a145234260bfb3dc79ca57b73912b"
+    }
+  ],
+  "checks": 8227,
+  "failures": 0,
+  "native_checks": 185,
+  "native_captures": {
+    "ui_v31_installed_readability": {
+      "applied_to_formal_game": true,
+      "checks": 137,
+      "failures": 0,
+      "real_player_storage_used": false,
+      "screenshots": [
+        {
+          "name": "buff_rewards",
+          "native_viewport": true
+        },
+        {
+          "name": "shop_readability",
+          "native_viewport": true
+        },
+        {
+          "name": "replace_readability",
+          "native_viewport": true
+        }
+      ]
+    },
+    "ui_v31_installed_incoming": {
+      "applied_to_formal_game": true,
+      "checks": 48,
+      "failures": 0,
+      "real_player_storage_used": false,
+      "screenshots": [
+        {
+          "name": "incoming_weapon_group",
+          "native_viewport": true
+        }
+      ]
+    }
+  },
+  "approved_scene_pixel_comparison": [
+    {
+      "scene": "buff_rewards",
+      "crop": [
+        145,
+        112,
+        1135,
+        585
+      ],
+      "mean_pixel_error_rgb": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "applied_screenshot": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_Godot_v0.1\\previews\\ui_v31_installed_readability\\buff_rewards.png",
+      "screenshot_sha256": "6e8cfe33c7f380dbdcc32cd899d0147cd0673db66790397e56fe5a7169448f07"
+    },
+    {
+      "scene": "shop_readability",
+      "crop": [
+        105,
+        65,
+        1175,
+        730
+      ],
+      "mean_pixel_error_rgb": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "applied_screenshot": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_Godot_v0.1\\previews\\ui_v31_installed_readability\\shop_readability.png",
+      "screenshot_sha256": "a33c44720d68567dcf39c125eb3448ce335dcb2b808778e0b3a43273d6fa7ff3"
+    },
+    {
+      "scene": "incoming_weapon_group",
+      "crop": [
+        105,
+        65,
+        1175,
+        730
+      ],
+      "mean_pixel_error_rgb": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "applied_screenshot": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_Godot_v0.1\\previews\\ui_v31_installed_incoming\\incoming_weapon_group.png",
+      "screenshot_sha256": "5aad665dea4ddec8e47b53e779aebb5fb762d3ce8b57d829300960da20fab0ae"
+    }
+  ],
+  "original_assets_unchanged": 156,
+  "player_files_unchanged": [
+    {
+      "path": "runtime/Godot/app_userdata/原始人大作战 · 战斗样板/saves/run.backup.json",
+      "sha256": "9565a2e217d0ea0dc7caa784c98b77cd6bb0bb4949e4b04e6047575e1be0bfc9",
+      "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\native_ui_v31_before_20261116_162217\\runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\run.backup.json"
+    },
+    {
+      "path": "runtime/Godot/app_userdata/原始人大作战 · 战斗样板/saves/run.json",
+      "sha256": "0f3ab5c3f6374389a21053c9ae8cb216472021fe388f899800f97a226e1b1478",
+      "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\native_ui_v31_before_20261116_162217\\runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\run.json"
+    },
+    {
+      "path": "runtime/Godot/app_userdata/原始人大作战 · 战斗样板/saves/settings.backup.json",
+      "sha256": "6e6bddc336b29dd522802cfee20169ef322862d700a22075eef674f3417f117a",
+      "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\native_ui_v31_before_20261116_162217\\runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\settings.backup.json"
+    },
+    {
+      "path": "runtime/Godot/app_userdata/原始人大作战 · 战斗样板/saves/settings.json",
+      "sha256": "6be3495e9f8041547204756eeb5a3e52a9c22c6d95d5e83e8e8c915a044bd9b6",
+      "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\native_ui_v31_before_20261116_162217\\runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\settings.json"
+    }
+  ],
+  "changed_existing_sources": [
+    "src/economy.gd",
+    "src/hud.gd",
+    "src/main.gd",
+    "src/ui_offer_layout.gd",
+    "src/ui_paper_pattern.gd"
+  ],
+  "new_sources": [
+    "src/ui_buff_details.gd"
+  ],
+  "protected_sources": [
+    "src/actor_view.gd",
+    "src/actor_view.gd.uid",
+    "src/armory.gd",
+    "src/armory.gd.uid",
+    "src/asset_library.gd",
+    "src/asset_library.gd.uid",
+    "src/audio_pool.gd",
+    "src/audio_pool.gd.uid",
+    "src/battle_visuals.gd",
+    "src/battle_visuals.gd.uid",
+    "src/catalog.gd",
+    "src/catalog.gd.uid",
+    "src/combat_art.gd",
+    "src/companions.gd",
+    "src/companions.gd.uid",
+    "src/dino_view.gd",
+    "src/dino_view.gd.uid",
+    "src/economy.gd.uid",
+    "src/effects.gd",
+    "src/effects.gd.uid",
+    "src/enemy_art.gd",
+    "src/enemy_art.gd.uid",
+    "src/enemy_roster.gd",
+    "src/enemy_roster.gd.uid",
+    "src/expanded_weapons.gd",
+    "src/expanded_weapons.gd.uid",
+    "src/growth.gd",
+    "src/growth.gd.uid",
+    "src/hud.gd.uid",
+    "src/loot_drops.gd",
+    "src/loot_drops.gd.uid",
+    "src/loot_rules.gd",
+    "src/loot_rules.gd.uid",
+    "src/main.gd.uid",
+    "src/music_controller.gd",
+    "src/music_controller.gd.uid",
+    "src/pickup_renderer.gd",
+    "src/progression.gd",
+    "src/progression.gd.uid",
+    "src/rules.gd",
+    "src/rules.gd.uid",
+    "src/save_store.gd",
+    "src/save_store.gd.uid",
+    "src/session_state.gd",
+    "src/session_state.gd.uid",
+    "src/support_art.gd",
+    "src/support_art.gd.uid",
+    "src/support_rig.gd",
+    "src/ui_audio.gd",
+    "src/ui_audio.gd.uid",
+    "src/ui_battle_hud.gd",
+    "src/ui_battle_hud.gd.uid",
+    "src/ui_battle_paper.gd",
+    "src/ui_battle_paper.gd.uid",
+    "src/ui_button_fx.gd",
+    "src/ui_button_fx.gd.uid",
+    "src/ui_frontend.gd",
+    "src/ui_frontend.gd.uid",
+    "src/ui_home_action.gd",
+    "src/ui_home_action.gd.uid",
+    "src/ui_home_stage.gd",
+    "src/ui_home_stage.gd.uid",
+    "src/ui_ink_button_fx.gd",
+    "src/ui_ink_button_fx.gd.uid",
+    "src/ui_offer_layout.gd.uid",
+    "src/ui_paper.gd",
+    "src/ui_paper.gd.uid",
+    "src/ui_paper_brush.gd",
+    "src/ui_paper_edge.gd",
+    "src/ui_paper_toggle.gd",
+    "src/ui_reward_scroll_art.gd",
+    "src/ui_transition.gd",
+    "src/ui_transition.gd.uid",
+    "src/ui_weapon_details.gd",
+    "src/weapon_art.gd",
+    "src/weapon_art.gd.uid",
+    "src/weapon_evolution.gd",
+    "src/weapon_evolution.gd.uid",
+    "src/world_map.gd",
+    "src/world_map.gd.uid"
+  ],
+  "all_approved_sources_match": true,
+  "launcher_project_scene_unchanged": true,
+  "source_sha256": {
+    "src/actor_view.gd": "730ba4e2606bee3593b70bf8a519e7bb63c7588626b581a9df0f166feac0f904",
+    "src/armory.gd": "e875b48e0f38d8c80a994a2b6d0d05959d7ec8dc13fceb31e36ae896cd8ecfcc",
+    "src/asset_library.gd": "122869e8bf06d7f39f2644523167c79c78dadd4ee67e9ca16d7cb2bdfc03e008",
+    "src/audio_pool.gd": "68bec478905c8e7d3d65ab9a4d0ed0d447d7c006643f6803477a1574713a8406",
+    "src/battle_visuals.gd": "d191ce1f8ada671e10b727ffe89c927d138e686600d6dbf46f930c522ec8595d",
+    "src/catalog.gd": "6d28e91514565409c4d895102ce548a9764de401e75e0e3a2f94e4a0012a6d37",
+    "src/combat_art.gd": "5fb334e1a9a5b9e40b969c921b68e539cd21dd3514a0d097c583c8b0d69fcd8d",
+    "src/companions.gd": "56d13c59ee8e448b71ec5558d2db57398fb8ca9cf2e94f4c46a009f3583841f1",
+    "src/dino_view.gd": "8cecab2a82e84a153961fdfca2eb392752f0ef671de03f16caee2a2fa2acfcc1",
+    "src/economy.gd": "ad86e731b69c085a78c660ca135525b6a83c1c49be8da6303196a01cf9eaf411",
+    "src/effects.gd": "9550ef7f791c8221a8c3e6e871f3cbdd2b6d4cc0487aae48481ec0b3f9b9840d",
+    "src/enemy_art.gd": "e80bc19e5b8a33ba0e386ced1f8d8969a3e740be8b8398a455118aff49416663",
+    "src/enemy_roster.gd": "e266a2a5e9c098736f5abab5aee54c207b939fc0b3508fd333e54cc683e6ddf3",
+    "src/expanded_weapons.gd": "dda7a66d7d71009702ca7c082f6cbf8d8261f48018c91db01953a8e4417fc76e",
+    "src/growth.gd": "affe36d4c8d869175da66c14e19be7381423d403c239978270783bb289be30d4",
+    "src/hud.gd": "9eee845dec9c361e7cd34143bf27e736141a25d73b7cde06aa607d745a9779fa",
+    "src/loot_drops.gd": "0ac14f33fea43733892ac079a8a3b6b1299852a9ffad624484d7e17876192086",
+    "src/loot_rules.gd": "235f1e18951cf9b27fa9bb78146733218ca08026479b3cd38d303aba636dd18d",
+    "src/main.gd": "68cfae3129a1b046010fbc3c78ee2d611bd96c4c05298ca4643b78b18b8bcef0",
+    "src/music_controller.gd": "f0ecf48c53e5a8bec6deb557813809d5553952ddc08cb1a35e01a374de72f236",
+    "src/pickup_renderer.gd": "576cb9a6349bc910cc499da2a620947020e4e3108f76efeecd6e7b1f864bda6b",
+    "src/progression.gd": "d445f462afb58567e27ca8e4ab7bc7fc02d51b282bbdb0b76e4a67febf292fbb",
+    "src/rules.gd": "51eb889ca54b0996bc2e2cec81a58f1ff736d12afe875f6ea808c3249a505dec",
+    "src/save_store.gd": "30a4bbc354decb09bb6ffb63a8ced39a6cb366c1732138b43a908ad4e5e205eb",
+    "src/session_state.gd": "660c04f1797981d765c42e7cf83248a02224c7d3584feb4c6453732c5a77454c",
+    "src/support_art.gd": "5413a6ad8bcb8552192119be64ff1e9ba018aaac4e901073dfb117f962b7e814",
+    "src/support_rig.gd": "0669354d4c72e4afe598bc87258d44aae7c713fe31a758c86e404c43a14f31d9",
+    "src/ui_audio.gd": "df544d5172ef56bf7537901369480edee79a9d047215d045efe97bf6e8cb78f1",
+    "src/ui_battle_hud.gd": "7a262b488b2350eefca01385ec760e71c6ecda140745e4322e2038bf8189b4e4",
+    "src/ui_battle_paper.gd": "39f04b6615b74b22357948014ca1856b879bc2376b7bb4f166bf189178e0db4d",
+    "src/ui_buff_details.gd": "20479853162b75d5bf702ca2ebceaf0e489991a8ddcc39a523f6e78ae3b529ee",
+    "src/ui_button_fx.gd": "260511594e0598fc6d38f3cd03a4d53cd90b3a55e6b68d5e2a82ebc555dbed3c",
+    "src/ui_frontend.gd": "dafd370092ef5eacdcc9724f2f3dc80b6f94bc95ee592162c033a9b7745ba4c8",
+    "src/ui_home_action.gd": "e038b9ddbbeee1d78527542d91eb4ce1e8254bb15fdf391937ef848c25c1ef9e",
+    "src/ui_home_stage.gd": "a9589b049beaea4954756388ce3d505aa86c67de4c3a87355cfab74550175de0",
+    "src/ui_ink_button_fx.gd": "0df25e183c40e67d7ee668edef251597c36fc3dfa7d645269cc9428135283c0d",
+    "src/ui_offer_layout.gd": "186fbb937b58c12bfa389dfda951eb63a117af85cc4ffe9a3a9de22befa4bd09",
+    "src/ui_paper.gd": "1b8ddb3dd180939e5881f1e2e1ec0b3d149690de8a61a0af96696e329c3f9daa",
+    "src/ui_paper_brush.gd": "c8a6482c5caef4af9478b09cb595abba7310a454095b6865dfdb6373077f29a6",
+    "src/ui_paper_edge.gd": "813ba13e69f40bb9bc02a8e0fc09d78020f4bee141e37d1552a58c5c17617853",
+    "src/ui_paper_pattern.gd": "9321f63e4b0ea4a57e41f38cbb049dcaf99f95f2a08c1db7bff2480377e6e732",
+    "src/ui_paper_toggle.gd": "d27562973682362b1ee24ce70d04ad67192f60291a68f5b53c2541e3be60f0a7",
+    "src/ui_reward_scroll_art.gd": "208d09066ac9911e1a4b4c43b4e3b2d0503aa825443aabfaf3f881d218bf9d04",
+    "src/ui_transition.gd": "2063165df6252e03e46ce361244f014048edd2a64364ee611571583ec4a49b75",
+    "src/ui_weapon_details.gd": "92df60f5ad5e8472fb3decd30cc4264b89d4bf97de2058470060d35ce3886b06",
+    "src/weapon_art.gd": "b2847aebaef72bd97937cd23ac9610e6f07b7be9885cb8cfa18e2089dd0fe3bf",
+    "src/weapon_evolution.gd": "ecd8d2b16be7956af35e2a9a9ad74ca6a7681a45563d3fe399cfe1ed67e1f783",
+    "src/world_map.gd": "5a717c58eed03f873f7cca8e2d7e362d78803563d488d1e57cf75ff11c52c5fa"
+  },
+  "deferred_scope": [
+    "ground chest appearance",
+    "left-to-right character-page burn"
+  ]
+}

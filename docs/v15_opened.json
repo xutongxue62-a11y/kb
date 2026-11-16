@@ -1,0 +1,11 @@
+{
+  "opened_at": "2026-11-16T00:50:02.1093001+08:00",
+  "pid": 9116,
+  "executable": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_Godot_v0.1\\tools\\godot\\Godot_v4.7.2-stable_win64.exe",
+  "title": "原始人大作战 · 荒野交锋 v0.15 (DEBUG)",
+  "native_window_handle": 1443132,
+  "appdata": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_Godot_v0.1\\runtime",
+  "log": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_Godot_v0.1\\logs\\play_v15.log",
+  "check": "fresh process executable, v0.15 title and native window handle",
+  "user_acceptance_verified": false
+}

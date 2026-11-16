@@ -1,0 +1,400 @@
+{
+  "version": "0.9",
+  "sample_rate": 44100,
+  "format": "mono PCM16",
+  "listening_verified": false,
+  "provenance": "Original deterministic procedural synthesis; no external recordings/downloads.",
+  "cues": {
+    "button_press": {
+      "file": "assets/sfx/ui_v09/button_press.wav",
+      "gain_db": -3.0,
+      "min_gap_ms": 90,
+      "design": "One dry small wooden tick; 1.65kHz body with rapidly damped inharmonic modes.",
+      "sha256": "1166d263fa1378ac0b576d26523f3f538c265a78359b1b7feb2350eb13aa608a",
+      "measured": {
+        "duration_ms": 60.0,
+        "source_peak_dbfs": -11.0,
+        "playback_peak_dbfs": -14.0,
+        "playback_rms_dbfs": -30.763,
+        "mean_dc": 1.04e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 7.687,
+        "spectral_centroid_hz": 1828.0,
+        "energy_below_600hz_pct": 0.138
+      },
+      "v08_measured": {
+        "duration_ms": 71.995,
+        "source_peak_dbfs": -19.149,
+        "playback_peak_dbfs": -22.149,
+        "playback_rms_dbfs": -36.807,
+        "mean_dc": 1.44e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 23.175,
+        "spectral_centroid_hz": 729.6,
+        "energy_below_600hz_pct": 55.244
+      }
+    },
+    "paper_popup": {
+      "file": "assets/sfx/ui_v09/paper_popup.wav",
+      "gain_db": -2.0,
+      "min_gap_ms": 170,
+      "design": "Light 1.4kHz pluck, tiny fiber release, higher settling tick at 44ms.",
+      "sha256": "861dd94c2116feca6e9da3d944601c33edce5f0efe4060235780d63927c1a61d",
+      "measured": {
+        "duration_ms": 130.0,
+        "source_peak_dbfs": -12.0,
+        "playback_peak_dbfs": -14.0,
+        "playback_rms_dbfs": -32.512,
+        "mean_dc": 6.4e-08,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 15.533,
+        "spectral_centroid_hz": 1633.3,
+        "energy_below_600hz_pct": 0.183
+      },
+      "v08_measured": {
+        "duration_ms": 220.0,
+        "source_peak_dbfs": -17.497,
+        "playback_peak_dbfs": -19.497,
+        "playback_rms_dbfs": -32.786,
+        "mean_dc": 2.55e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 143.651,
+        "spectral_centroid_hz": 1368.6,
+        "energy_below_600hz_pct": 28.56
+      }
+    },
+    "page_turn": {
+      "file": "assets/sfx/ui_v09/page_turn.wav",
+      "gain_db": -3.0,
+      "min_gap_ms": 240,
+      "design": "Short fiber pickup and two clean fold articulations at 49ms / 107ms; no noise bed.",
+      "sha256": "540e1a843ad0fdd459113924acdb7ee47850621523634bd8d0d425a177315fdb",
+      "measured": {
+        "duration_ms": 200.0,
+        "source_peak_dbfs": -12.0,
+        "playback_peak_dbfs": -15.0,
+        "playback_rms_dbfs": -34.455,
+        "mean_dc": 6.78e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 108.776,
+        "spectral_centroid_hz": 2441.9,
+        "energy_below_600hz_pct": 0.017
+      },
+      "v08_measured": {
+        "duration_ms": 380.0,
+        "source_peak_dbfs": -16.625,
+        "playback_peak_dbfs": -19.625,
+        "playback_rms_dbfs": -33.182,
+        "mean_dc": -3.26e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 267.959,
+        "spectral_centroid_hz": 1367.0,
+        "energy_below_600hz_pct": 30.915
+      }
+    },
+    "scroll_unroll": {
+      "file": "assets/sfx/ui_v09/scroll_unroll.wav",
+      "gain_db": -4.0,
+      "min_gap_ms": 400,
+      "design": "Three spaced spindle ticks at 0 / 69 / 151ms, declining in weight, tiny paper accents.",
+      "sha256": "723eebc80a9e712bd36245c279320001a749b66ed7a8bb5008e0777203f69d7d",
+      "measured": {
+        "duration_ms": 300.0,
+        "source_peak_dbfs": -11.0,
+        "playback_peak_dbfs": -15.0,
+        "playback_rms_dbfs": -35.454,
+        "mean_dc": 5.49e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 151.791,
+        "spectral_centroid_hz": 1702.4,
+        "energy_below_600hz_pct": 0.177
+      },
+      "v08_measured": {
+        "duration_ms": 580.0,
+        "source_peak_dbfs": -14.147,
+        "playback_peak_dbfs": -18.147,
+        "playback_rms_dbfs": -33.002,
+        "mean_dc": 5.51e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 367.166,
+        "spectral_centroid_hz": 1057.5,
+        "energy_below_600hz_pct": 37.494
+      }
+    },
+    "paper_close": {
+      "file": "assets/sfx/ui_v09/paper_close.wav",
+      "gain_db": -2.0,
+      "min_gap_ms": 140,
+      "design": "One slightly lower woody tap, tiny soft paper contact at 13ms.",
+      "sha256": "deb5f3cc9b1ff4ce2abca6d059bdefdbec9dc9896baada4b2696e08c90e5164d",
+      "measured": {
+        "duration_ms": 95.011,
+        "source_peak_dbfs": -13.0,
+        "playback_peak_dbfs": -15.0,
+        "playback_rms_dbfs": -34.123,
+        "mean_dc": -5.8e-08,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 9.546,
+        "spectral_centroid_hz": 1327.3,
+        "energy_below_600hz_pct": 0.49
+      },
+      "v08_measured": {
+        "duration_ms": 163.991,
+        "source_peak_dbfs": -17.807,
+        "playback_peak_dbfs": -19.807,
+        "playback_rms_dbfs": -34.309,
+        "mean_dc": -2.74e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 79.478,
+        "spectral_centroid_hz": 846.1,
+        "energy_below_600hz_pct": 56.718
+      }
+    },
+    "parchment_burn": {
+      "file": "assets/sfx/ui_v09/parchment_burn.wav",
+      "gain_db": -5.0,
+      "min_gap_ms": 800,
+      "design": "Eight irregular, quiet, very short ember snaps; no continuous hiss or sustained tone.",
+      "sha256": "9ad6e7fac2dc5980708b2343ec2238447dce60faa5a1699486b3aa0b61e40329",
+      "measured": {
+        "duration_ms": 460.0,
+        "source_peak_dbfs": -15.0,
+        "playback_peak_dbfs": -20.0,
+        "playback_rms_dbfs": -44.953,
+        "mean_dc": -2.421e-06,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 176.644,
+        "spectral_centroid_hz": 3182.0,
+        "energy_below_600hz_pct": 0.009
+      },
+      "v08_measured": {
+        "duration_ms": 890.0,
+        "source_peak_dbfs": -19.363,
+        "playback_peak_dbfs": -24.363,
+        "playback_rms_dbfs": -41.222,
+        "mean_dc": -3.03e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 510.295,
+        "spectral_centroid_hz": 1525.1,
+        "energy_below_600hz_pct": 27.244
+      }
+    },
+    "choice_confirm": {
+      "file": "assets/sfx/ui_v09/choice_confirm.wav",
+      "gain_db": -1.0,
+      "min_gap_ms": 150,
+      "design": "Two restrained bright modal plucks at 0 / 63ms with a rising interval and fast decay.",
+      "sha256": "011342024aec12e37a8843fe94ff67e57c001d1174543250cf0e09c8d336abc7",
+      "measured": {
+        "duration_ms": 150.0,
+        "source_peak_dbfs": -12.0,
+        "playback_peak_dbfs": -13.0,
+        "playback_rms_dbfs": -29.378,
+        "mean_dc": -5e-09,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 78.39,
+        "spectral_centroid_hz": 2412.4,
+        "energy_below_600hz_pct": 0.013
+      },
+      "v08_measured": {
+        "duration_ms": 168.005,
+        "source_peak_dbfs": -18.303,
+        "playback_peak_dbfs": -19.303,
+        "playback_rms_dbfs": -34.167,
+        "mean_dc": 5.4e-07,
+        "first_sample": 0.0,
+        "last_sample": 0.0,
+        "energy_90pct_ms": 90.658,
+        "spectral_centroid_hz": 704.9,
+        "energy_below_600hz_pct": 62.371
+      }
+    }
+  },
+  "previews": {
+    "ui_v09_preview.wav": [
+      {
+        "cue": "button_press",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/button_press.wav",
+        "gain_db": -3.0,
+        "start_seconds": 0.3,
+        "end_seconds": 0.36
+      },
+      {
+        "cue": "paper_popup",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/paper_popup.wav",
+        "gain_db": -2.0,
+        "start_seconds": 0.91,
+        "end_seconds": 1.04
+      },
+      {
+        "cue": "page_turn",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/page_turn.wav",
+        "gain_db": -3.0,
+        "start_seconds": 1.59,
+        "end_seconds": 1.79
+      },
+      {
+        "cue": "scroll_unroll",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/scroll_unroll.wav",
+        "gain_db": -4.0,
+        "start_seconds": 2.34,
+        "end_seconds": 2.64
+      },
+      {
+        "cue": "paper_close",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/paper_close.wav",
+        "gain_db": -2.0,
+        "start_seconds": 3.19,
+        "end_seconds": 3.285011
+      },
+      {
+        "cue": "parchment_burn",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/parchment_burn.wav",
+        "gain_db": -5.0,
+        "start_seconds": 3.835011,
+        "end_seconds": 4.295011
+      },
+      {
+        "cue": "choice_confirm",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/choice_confirm.wav",
+        "gain_db": -1.0,
+        "start_seconds": 4.845011,
+        "end_seconds": 4.995011
+      }
+    ],
+    "ui_v08_v09_ab_preview.wav": [
+      {
+        "cue": "button_press",
+        "version": "v08",
+        "file": "assets/sfx/ui_v08/button_press.wav",
+        "gain_db": -3.0,
+        "start_seconds": 0.3,
+        "end_seconds": 0.371995
+      },
+      {
+        "cue": "button_press",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/button_press.wav",
+        "gain_db": -3.0,
+        "start_seconds": 0.921995,
+        "end_seconds": 0.981995
+      },
+      {
+        "cue": "paper_popup",
+        "version": "v08",
+        "file": "assets/sfx/ui_v08/paper_popup.wav",
+        "gain_db": -2.0,
+        "start_seconds": 1.531995,
+        "end_seconds": 1.751995
+      },
+      {
+        "cue": "paper_popup",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/paper_popup.wav",
+        "gain_db": -2.0,
+        "start_seconds": 2.301995,
+        "end_seconds": 2.431995
+      },
+      {
+        "cue": "page_turn",
+        "version": "v08",
+        "file": "assets/sfx/ui_v08/page_turn.wav",
+        "gain_db": -3.0,
+        "start_seconds": 2.981995,
+        "end_seconds": 3.361995
+      },
+      {
+        "cue": "page_turn",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/page_turn.wav",
+        "gain_db": -3.0,
+        "start_seconds": 3.911995,
+        "end_seconds": 4.111995
+      },
+      {
+        "cue": "scroll_unroll",
+        "version": "v08",
+        "file": "assets/sfx/ui_v08/scroll_unroll.wav",
+        "gain_db": -4.0,
+        "start_seconds": 4.661995,
+        "end_seconds": 5.241995
+      },
+      {
+        "cue": "scroll_unroll",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/scroll_unroll.wav",
+        "gain_db": -4.0,
+        "start_seconds": 5.791995,
+        "end_seconds": 6.091995
+      },
+      {
+        "cue": "paper_close",
+        "version": "v08",
+        "file": "assets/sfx/ui_v08/paper_close.wav",
+        "gain_db": -2.0,
+        "start_seconds": 6.641995,
+        "end_seconds": 6.805986
+      },
+      {
+        "cue": "paper_close",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/paper_close.wav",
+        "gain_db": -2.0,
+        "start_seconds": 7.355986,
+        "end_seconds": 7.450998
+      },
+      {
+        "cue": "parchment_burn",
+        "version": "v08",
+        "file": "assets/sfx/ui_v08/parchment_burn.wav",
+        "gain_db": -5.0,
+        "start_seconds": 8.000998,
+        "end_seconds": 8.890998
+      },
+      {
+        "cue": "parchment_burn",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/parchment_burn.wav",
+        "gain_db": -5.0,
+        "start_seconds": 9.440998,
+        "end_seconds": 9.900998
+      },
+      {
+        "cue": "choice_confirm",
+        "version": "v08",
+        "file": "assets/sfx/ui_v08/choice_confirm.wav",
+        "gain_db": -1.0,
+        "start_seconds": 10.450998,
+        "end_seconds": 10.619002
+      },
+      {
+        "cue": "choice_confirm",
+        "version": "v09",
+        "file": "assets/sfx/ui_v09/choice_confirm.wav",
+        "gain_db": -1.0,
+        "start_seconds": 11.169002,
+        "end_seconds": 11.319002
+      }
+    ]
+  }
+}

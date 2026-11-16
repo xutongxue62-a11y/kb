@@ -1,0 +1,962 @@
+{
+  "version": "0.12",
+  "recorded_at": "2026-11-15T17:31:48.159352+08:00",
+  "baseline": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\20261115_before_v12_162559",
+  "groups": [
+    {
+      "group": "rules",
+      "checks": 24,
+      "failures": 0,
+      "log": "logs\\v06_rules.log"
+    },
+    {
+      "group": "scene",
+      "checks": 19,
+      "failures": 0,
+      "log": "logs\\v06_scene.log"
+    },
+    {
+      "group": "controls",
+      "checks": 10,
+      "failures": 0,
+      "log": "logs\\v06_controls.log"
+    },
+    {
+      "group": "attack_links",
+      "checks": 31,
+      "failures": 0,
+      "log": "logs\\v06_attack_links.log"
+    },
+    {
+      "group": "growth",
+      "checks": 14,
+      "failures": 0,
+      "log": "logs\\v06_growth.log"
+    },
+    {
+      "group": "feedback",
+      "checks": 31,
+      "failures": 0,
+      "log": "logs\\v06_feedback.log"
+    },
+    {
+      "group": "impact",
+      "checks": 46,
+      "failures": 0,
+      "log": "logs\\v06_impact.log"
+    },
+    {
+      "group": "progression",
+      "checks": 19,
+      "failures": 0,
+      "log": "logs\\v06_progression.log"
+    },
+    {
+      "group": "armory",
+      "checks": 16,
+      "failures": 0,
+      "log": "logs\\v06_armory.log"
+    },
+    {
+      "group": "save_store",
+      "checks": 403,
+      "failures": 0,
+      "log": "logs\\v06_save_store.log"
+    },
+    {
+      "group": "hud_navigation",
+      "checks": 447,
+      "failures": 0,
+      "log": "logs\\v06_hud_navigation.log"
+    },
+    {
+      "group": "campaign",
+      "checks": 40,
+      "failures": 0,
+      "log": "logs\\v06_campaign.log"
+    },
+    {
+      "group": "frontend",
+      "checks": 49,
+      "failures": 0,
+      "log": "logs\\v06_frontend.log"
+    },
+    {
+      "group": "ui_motion",
+      "checks": 79,
+      "failures": 0,
+      "log": "logs\\v06_ui_motion.log"
+    },
+    {
+      "group": "ui_audio",
+      "checks": 112,
+      "failures": 0,
+      "log": "logs\\v06_ui_audio.log"
+    },
+    {
+      "group": "home_v09",
+      "checks": 28,
+      "failures": 0,
+      "log": "logs\\v06_home_v09.log"
+    },
+    {
+      "group": "chest_pickup",
+      "checks": 88,
+      "failures": 0,
+      "log": "logs\\v06_chest_pickup.log"
+    },
+    {
+      "group": "sprite_edges",
+      "checks": 94,
+      "failures": 0,
+      "log": "logs\\v06_sprite_edges.log"
+    },
+    {
+      "group": "dodge",
+      "checks": 40,
+      "failures": 0,
+      "log": "logs\\v06_dodge.log"
+    },
+    {
+      "group": "music",
+      "checks": 33,
+      "failures": 0,
+      "log": "logs\\v06_music.log"
+    },
+    {
+      "group": "world_camera",
+      "checks": 62,
+      "failures": 0,
+      "log": "logs\\v06_world_camera.log"
+    },
+    {
+      "group": "battle_ui_v10",
+      "checks": 6,
+      "failures": 0,
+      "log": "logs\\v06_battle_ui_v10.log"
+    },
+    {
+      "group": "map_chunks",
+      "checks": 10,
+      "failures": 0,
+      "log": "logs\\v06_map_chunks.log"
+    },
+    {
+      "group": "terrain_physics",
+      "checks": 30,
+      "failures": 0,
+      "log": "logs\\v06_terrain_physics.log"
+    },
+    {
+      "group": "growth_v11",
+      "checks": 2395,
+      "failures": 0,
+      "log": "logs\\v06_growth_v11.log"
+    },
+    {
+      "group": "supports_v11",
+      "checks": 17,
+      "failures": 0,
+      "log": "logs\\v06_supports_v11.log"
+    },
+    {
+      "group": "ui_v11",
+      "checks": 27,
+      "failures": 0,
+      "log": "logs\\v06_ui_v11.log"
+    },
+    {
+      "group": "resources_v12",
+      "checks": 180,
+      "failures": 0,
+      "log": "logs\\v06_resources_v12.log"
+    },
+    {
+      "group": "rounds_v12",
+      "checks": 23,
+      "failures": 0,
+      "log": "logs\\v06_rounds_v12.log"
+    },
+    {
+      "group": "weapons_v12",
+      "checks": 69,
+      "failures": 0,
+      "log": "logs\\v06_weapons_v12.log"
+    },
+    {
+      "group": "enemies_v12",
+      "checks": 99,
+      "failures": 0,
+      "log": "logs\\v06_enemies_v12.log"
+    },
+    {
+      "group": "battle_visuals_v12",
+      "checks": 102,
+      "failures": 0,
+      "log": "logs\\v06_battle_visuals_v12.log"
+    }
+  ],
+  "total_checks": 4643,
+  "native": {
+    "checks": 39,
+    "drop_samples": [
+      {
+        "coins": 1,
+        "kind": "hunter",
+        "xp": 1
+      },
+      {
+        "coins": 4,
+        "kind": "tank",
+        "xp": 4
+      },
+      {
+        "coins": 12,
+        "kind": "armored",
+        "xp": 8
+      }
+    ],
+    "failures": 0,
+    "fps": 30,
+    "markers": [
+      {
+        "frame": 143,
+        "music": "battle",
+        "name": "empty_opening_and_player_shadow",
+        "world": [
+          640.0,
+          401.0
+        ]
+      },
+      {
+        "frame": 149,
+        "music": "battle",
+        "name": "actual_sling_source_and_mining",
+        "world": [
+          574.684753417969,
+          407.547729492188
+        ]
+      },
+      {
+        "frame": 308,
+        "music": "battle",
+        "name": "powder_distinct_muzzle_and_projectile",
+        "world": [
+          640.0,
+          401.0
+        ]
+      },
+      {
+        "frame": 348,
+        "music": "battle",
+        "name": "staff_distinct_muzzle_and_projectile",
+        "world": [
+          640.0,
+          401.0
+        ]
+      },
+      {
+        "frame": 388,
+        "music": "battle",
+        "name": "branched_lightning_from_totem",
+        "world": [
+          640.0,
+          401.0
+        ]
+      },
+      {
+        "frame": 424,
+        "music": "battle",
+        "name": "four_new_weapon_mechanisms",
+        "world": [
+          640.0,
+          401.0
+        ]
+      },
+      {
+        "frame": 574,
+        "music": "battle",
+        "name": "three_new_monster_silhouettes_and_AI",
+        "world": [
+          640.0,
+          401.0
+        ]
+      },
+      {
+        "frame": 698,
+        "music": "battle",
+        "name": "differentiated_threat_loot_bands",
+        "world": [
+          640.0,
+          401.0
+        ]
+      },
+      {
+        "frame": 707,
+        "music": "battle",
+        "name": "all_enemies_dismiss_then_frozen_player_and_weapons",
+        "world": [
+          640.0,
+          401.0
+        ]
+      },
+      {
+        "frame": 807,
+        "music": "battle",
+        "name": "next_wave_completely_empty",
+        "world": [
+          640.0,
+          401.0
+        ]
+      }
+    ],
+    "note": "Isolated save. Durable monsters, invulnerability, curated loadouts and an isolated real-rock lane are presentation fixtures. Mouse departure/shop and D pickup/freeze tests use actual input. UI layout and music are unchanged from v0.11. Audio is the real recorded mix, listening is unverified.",
+    "clean_log": true
+  },
+  "media": {
+    "file": "v12_native_v2.mp4",
+    "video_frames": 883,
+    "fps": 30,
+    "size": [
+      1280,
+      800
+    ],
+    "seconds": 29.433333333333334,
+    "audio_samples": 1412800,
+    "input_mix_peak": 0.214996337890625,
+    "input_mix_rms": 0.037135217137236956,
+    "bytes": 6488466,
+    "listening_verified": false
+  },
+  "listening_verified": false,
+  "player_acceptance_verified": false,
+  "preservation": {
+    "assets": [
+      {
+        "file": "assets\\dinosaurs.png",
+        "sha256": "83df73a22baf06aacb9fe94c0198cf963c0a28b80cfc165d8bc791e548834213"
+      },
+      {
+        "file": "assets\\dinosaurs.png.import",
+        "sha256": "5fcbf9c3e94ccb411c55bd73407b2d6e5937d1df5ef2153a55aeb2a17a67c1f6"
+      },
+      {
+        "file": "assets\\generation_prompts.json",
+        "sha256": "7d57880fd576647546dd7b8e25f6c69483a81df885cad7c4093c6fdf720361f0"
+      },
+      {
+        "file": "assets\\hero.png",
+        "sha256": "7cecf28237e9061ae4c708833670b78fa33f3c82ca1272b443dee2281a90396b"
+      },
+      {
+        "file": "assets\\hero.png.import",
+        "sha256": "e2b568a8a0300e5436fdac1e56fdb46ad1517f809124ccac1871f7047128bd4f"
+      },
+      {
+        "file": "assets\\maps\\v10\\grove.png",
+        "sha256": "0b167f87c35d69cba6619832179bee34d8ec7d69ff881014512b3c51206d8f08"
+      },
+      {
+        "file": "assets\\maps\\v10\\grove.png.import",
+        "sha256": "7f5ceae07f7d3ce1405e5de0140de1edc306a710d70679327e7fb63b3f25379b"
+      },
+      {
+        "file": "assets\\maps\\v10\\ochre.png",
+        "sha256": "dead36e14c7aa9600f269a1da47da0221dac0200d7b26bd2b4ed163eb0cff622"
+      },
+      {
+        "file": "assets\\maps\\v10\\ochre.png.import",
+        "sha256": "da2c7876f88e5d0d5e442a43450df4bd292532f0645afe1b69b15196bef251eb"
+      },
+      {
+        "file": "assets\\maps\\v10\\volcano.png",
+        "sha256": "0ee2c10795ac153784954141620c7e4769f1a38d1fa179bff725a3f2c3e75028"
+      },
+      {
+        "file": "assets\\maps\\v10\\volcano.png.import",
+        "sha256": "ddcf4c415d2ad821a899817130be5db2b7f4fc7ad72e797ece0814234603b5a8"
+      },
+      {
+        "file": "assets\\music\\v10\\campfire_trail.wav",
+        "sha256": "a9fd27f2bbacdaf6203becf9975ea12abf02ff98e7e1054a981d4a0433710f1b"
+      },
+      {
+        "file": "assets\\music\\v10\\campfire_trail.wav.import",
+        "sha256": "abcc749dcaf238e7043d5a3e67897886c081cde4f4d61169a47878883277af2b"
+      },
+      {
+        "file": "assets\\music\\v10\\campfire_trail_title_gain_preview.wav",
+        "sha256": "2c3a8d657f55e7bb102d92042d663db75caf4dc57508e2ac35707adde90f00d4"
+      },
+      {
+        "file": "assets\\music\\v10\\campfire_trail_title_gain_preview.wav.import",
+        "sha256": "6f67fe8cf30564e85654398804f417d2c63abc58fc75734f2c66f692bf7094cc"
+      },
+      {
+        "file": "assets\\music\\v10\\manifest.json",
+        "sha256": "6232ab2e6e956d5239d95f6015ddf71742ca1739a6513068f37b9c533deac8a4"
+      },
+      {
+        "file": "assets\\music\\v11\\battle.wav",
+        "sha256": "1f44390f9d0c40319127260230c1e1a19a5bfee15c32091a70144e33a3e058fa"
+      },
+      {
+        "file": "assets\\music\\v11\\battle.wav.import",
+        "sha256": "db5008c62ce99ede55041e20feed8666fb8de28692543999db7515a4fca8f19b"
+      },
+      {
+        "file": "assets\\music\\v11\\grove.wav",
+        "sha256": "5ac3b6ee836ee886361be0a103fa5b5c4ac0d3993617a524f15c0028d8ce49ec"
+      },
+      {
+        "file": "assets\\music\\v11\\grove.wav.import",
+        "sha256": "0ee0327c6b2a75e4fa897e0693fb3e1e4181c7f76047c7158d9aafafe60d6686"
+      },
+      {
+        "file": "assets\\music\\v11\\manifest.json",
+        "sha256": "6b925648939c003956e2e60181dc0c86f9154c6f43de10c8921d8a81d36ce622"
+      },
+      {
+        "file": "assets\\music\\v11\\title.wav",
+        "sha256": "59ebd24c24a8594035b799e71a9b1fe0ff03a4989371bf04f6f37be1a340e88c"
+      },
+      {
+        "file": "assets\\music\\v11\\title.wav.import",
+        "sha256": "7e639f76c3651cd25b6d9764491ebd2029c4f50c984ebeb72d96a8fd712efd15"
+      },
+      {
+        "file": "assets\\music\\v11\\volcano.wav",
+        "sha256": "b6cdc6c0d49e8f7b472ce60a0feb19203417a4889abbf5d7ae55dc36fef07a4c"
+      },
+      {
+        "file": "assets\\music\\v11\\volcano.wav.import",
+        "sha256": "634bf79afd739290aa56ea9a63327d2eb5350fda991a7478ba093ec32c019142"
+      },
+      {
+        "file": "assets\\regions.json",
+        "sha256": "0389e6049c69177fb625717d01092143b516256edc53caba33f3927bf2c24168"
+      },
+      {
+        "file": "assets\\sfx\\blast.wav",
+        "sha256": "4c3e970edb5c58fc0961bd3de6b8e763d4b92391ab29ad42394a36e550f04422"
+      },
+      {
+        "file": "assets\\sfx\\blast.wav.import",
+        "sha256": "9b1f9898cd38c2474bea2d648862a61577e80ce60aaf33b91328f90dbe0ace11"
+      },
+      {
+        "file": "assets\\sfx\\chain_in.wav",
+        "sha256": "0b2215e8140d0e160a05d408aac945324daa4bd019634206fb8cb8bffe7f1f41"
+      },
+      {
+        "file": "assets\\sfx\\chain_in.wav.import",
+        "sha256": "23ba842ff88d7aeec89996e9d8e2db87103ec4ab656f7622d1a8d3da9f67e8b4"
+      },
+      {
+        "file": "assets\\sfx\\chain_out.wav",
+        "sha256": "812df422bf77a9940ecb7fa290fee13a356998fc4c473dc3e17a13947c283bce"
+      },
+      {
+        "file": "assets\\sfx\\chain_out.wav.import",
+        "sha256": "98a59d0948b15ba5195fef48c9a59d24fe3bb87ce978c22eefb4eca1ac612ef4"
+      },
+      {
+        "file": "assets\\sfx\\hurt.wav",
+        "sha256": "99428eb886afeacf654f313f6421bcc490bbea1618c4f36cee617c6a30e61a44"
+      },
+      {
+        "file": "assets\\sfx\\hurt.wav.import",
+        "sha256": "3cab1bedaa7e91c62261cf722b9a60bb602926f43469d881fa24d76cc3cf56b6"
+      },
+      {
+        "file": "assets\\sfx\\magic.wav",
+        "sha256": "933ef59ff397b0c97ef4e69f9f368dcfe922ce411a19ccef53ae5b4cf468c4d9"
+      },
+      {
+        "file": "assets\\sfx\\magic.wav.import",
+        "sha256": "03fd8836cc5dc7abc22176c5518586ae8613e529e32a010d05fa979def6c8603"
+      },
+      {
+        "file": "assets\\sfx\\magic_hit.wav",
+        "sha256": "c48ced14c109cbc1058b40e5686173a643e8ebcd528bbe520004eda3e4d9f86d"
+      },
+      {
+        "file": "assets\\sfx\\magic_hit.wav.import",
+        "sha256": "b1c27e2b9cbe1f36d6797b8f15844d9014ce9971c1c6b954f25706ba929b79f5"
+      },
+      {
+        "file": "assets\\sfx\\powder.wav",
+        "sha256": "59cea90b9c4ad1a0fba899a6314c4520518956b673fba8850d49153ddb62e6af"
+      },
+      {
+        "file": "assets\\sfx\\powder.wav.import",
+        "sha256": "1d147d792c1c02bcd32c6ebc6ff33772d379cfcbdb12790b69aca31291cd96fe"
+      },
+      {
+        "file": "assets\\sfx\\sling.wav",
+        "sha256": "ac77dbf6b7b7e382164be7115faa5ef49e4a4d61108c9bac23572bca4f2ee53b"
+      },
+      {
+        "file": "assets\\sfx\\sling.wav.import",
+        "sha256": "7c32c6b9f415e31592c9e8bb5af06188a9857dd4216d3e01a0c740b2204f2814"
+      },
+      {
+        "file": "assets\\sfx\\step.wav",
+        "sha256": "c9bcd02cd8c00f508e5be2375fcfad51d4d0421a563d7d2ce50c08ff264cd1b6"
+      },
+      {
+        "file": "assets\\sfx\\step.wav.import",
+        "sha256": "e6614d08c9921acdd78b1faffd74ff1cf239044d51bff4bf9f6949fb1458055f"
+      },
+      {
+        "file": "assets\\sfx\\stone_hit.wav",
+        "sha256": "d2978e1729aad12cb959ce89c7cc525beb66b8e5711765bfc8b5761c9e19444f"
+      },
+      {
+        "file": "assets\\sfx\\stone_hit.wav.import",
+        "sha256": "525db55d44b5b3d57f87844c168e5a713d8867d82c2c195853487739d6c886cb"
+      },
+      {
+        "file": "assets\\sfx\\swing.wav",
+        "sha256": "da8f1858078183902f5672d56602add807c14ce9978713dea11703826a29ba91"
+      },
+      {
+        "file": "assets\\sfx\\swing.wav.import",
+        "sha256": "a926bcbb0b376281f56c8c8e932e6c71ad2374046b53673f29ede64716ccac45"
+      },
+      {
+        "file": "assets\\sfx\\ui_back.wav",
+        "sha256": "5398768a850a06a5ccf0406344578b49953b6a761d5a480e59433404fd170d7e"
+      },
+      {
+        "file": "assets\\sfx\\ui_back.wav.import",
+        "sha256": "329bcf11ea2e4f2201dfe6dfdb1ea2f42f244b14aba10750d13a7784b57497f9"
+      },
+      {
+        "file": "assets\\sfx\\ui_click.wav",
+        "sha256": "ba1f53458b0bf89d6d7a12ac595ddc7c815d2660066e2b89258b63333e5e86e1"
+      },
+      {
+        "file": "assets\\sfx\\ui_click.wav.import",
+        "sha256": "e6f33a5a9d6407f8d010e8ba60d54ade405bee349810629e1953e0174ab4fceb"
+      },
+      {
+        "file": "assets\\sfx\\ui_hover.wav",
+        "sha256": "a258f39f11dbb164bfcf35030f219a95b604151bdc2e1068a2764caea783548e"
+      },
+      {
+        "file": "assets\\sfx\\ui_hover.wav.import",
+        "sha256": "ee668d17c591832e33e4e9ec19637a16c1cec189b3df8a1b9ad02ce6988db0cd"
+      },
+      {
+        "file": "assets\\sfx\\ui_open.wav",
+        "sha256": "2318066f6873ee6312b0728f2ffa62009262aafbacdd001853e2c843e13fb610"
+      },
+      {
+        "file": "assets\\sfx\\ui_open.wav.import",
+        "sha256": "eda2e1964bb109aa8755213e3f6299d10541b08b7035eb4809ce7133fa5b2fdf"
+      },
+      {
+        "file": "assets\\sfx\\ui_stamp.wav",
+        "sha256": "f6854487e3ca3f0a2ceb875ac628784f83d130f08b8b56a12bd47cd525fd15c4"
+      },
+      {
+        "file": "assets\\sfx\\ui_stamp.wav.import",
+        "sha256": "cede0f7290821331023fd7a35ddaefe71f16b4a693c2ffacabd7f3dcb08ff502"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\button_press.wav",
+        "sha256": "e242753c85dd83078fbd9ecc5a76d3db769e67ef286f319c52e2877e5762e56c"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\button_press.wav.import",
+        "sha256": "a75c74d7b6e43d995c647a333430d8c3601a7e49e0fc38be0ebf0e4caae66fb3"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\choice_confirm.wav",
+        "sha256": "c77d211cdb1b42cc276d254bb998cfe1379d72bb77ef02f009dc5621034b5f61"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\choice_confirm.wav.import",
+        "sha256": "5bb3b00ee7e82951e9574c5263a1ae89c3f45aae0833e60d9e4d895841b96484"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\page_turn.wav",
+        "sha256": "30054a0a2389a5f80273903d48c01614d9d514e3cf1c73ccd2878f2fc47f6769"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\page_turn.wav.import",
+        "sha256": "04326bcfd8f8b0039b1bb5fd174533c7cca5a04541817815a123270a3c8714e8"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\paper_close.wav",
+        "sha256": "454093263f463a3cb70612ebc9ad496d780a110f8b9a5049bed1279f7b196186"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\paper_close.wav.import",
+        "sha256": "b3811fad1a08e53fb11af76b1f4fd1f3d0078a0529c0ddf1242f28f9c0b02e86"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\paper_popup.wav",
+        "sha256": "454d77d8231276a317fec3e5d199b747fe2ac8fad16e2ad80e28014f49902db9"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\paper_popup.wav.import",
+        "sha256": "2fe4820f9a11c3054c9eb2f747297911f9aac0af9e5394ab153309503b26c8e5"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\parchment_burn.wav",
+        "sha256": "2b29de2ddd3536251541a31afa05678d614a14dbfe7416ef28ca9bb3c7e88f50"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\parchment_burn.wav.import",
+        "sha256": "5e4cc09278252b4f2adfcc8ad1becede066e0df7083f9cdeb25e2bebc289a450"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\README.txt",
+        "sha256": "d27d5049c1c0957592f4ddb380aa26a9e3f347f760cf7d7cb1b03541f1705b81"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\scroll_unroll.wav",
+        "sha256": "7426e3d5b3140851ae46fdee27a1b59cfd1a0f1e6dd85ab03bf078f8e1423071"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\scroll_unroll.wav.import",
+        "sha256": "81abd9ef56567603e9e7308cf275df77af1e547c32508254a4d044fba9b6b48b"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\ui_v08_manifest.json",
+        "sha256": "a632b84620510ca243764b4014c219faafd61748d0873d4ac04d5bfd162b2ae2"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\ui_v08_preview.wav",
+        "sha256": "59120d433b87e83d2d86b0a398d83e1a6dc20a687669b1dad4fa12b804a093e8"
+      },
+      {
+        "file": "assets\\sfx\\ui_v08\\ui_v08_preview.wav.import",
+        "sha256": "822fb7ee00a407aa9cde00d1840e278ba32b3ae58e47fe47f80eceb5143d9764"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\button_press.wav",
+        "sha256": "1166d263fa1378ac0b576d26523f3f538c265a78359b1b7feb2350eb13aa608a"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\button_press.wav.import",
+        "sha256": "c5e5143500569986d93eaa0803519928f945bb57be3945975b1456cda0510b4b"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\choice_confirm.wav",
+        "sha256": "011342024aec12e37a8843fe94ff67e57c001d1174543250cf0e09c8d336abc7"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\choice_confirm.wav.import",
+        "sha256": "c55a3996c674b2b329e90126107fef0ea35440c0a4c585481fd87d9e9bad775b"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\page_turn.wav",
+        "sha256": "540e1a843ad0fdd459113924acdb7ee47850621523634bd8d0d425a177315fdb"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\page_turn.wav.import",
+        "sha256": "487a8bc3ff117d3f9ddafcf969126898f5e8747bc5c4139b032266d620525c2c"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\paper_close.wav",
+        "sha256": "deb5f3cc9b1ff4ce2abca6d059bdefdbec9dc9896baada4b2696e08c90e5164d"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\paper_close.wav.import",
+        "sha256": "3d4a648d900cb54da44351a16b96ee76bfb9a43471827878f85c145a32a694c8"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\paper_popup.wav",
+        "sha256": "861dd94c2116feca6e9da3d944601c33edce5f0efe4060235780d63927c1a61d"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\paper_popup.wav.import",
+        "sha256": "cc199fcb8e334998072018706ef5dc5ff61ee5464d6969ecd12f817d645cccd3"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\parchment_burn.wav",
+        "sha256": "9ad6e7fac2dc5980708b2343ec2238447dce60faa5a1699486b3aa0b61e40329"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\parchment_burn.wav.import",
+        "sha256": "2baed7a6360fe49be11289be6981ee91f39c7bafafe26e3a30e3423235bb3ae9"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\README.txt",
+        "sha256": "260d5d0e263656866dd1e8f861a978c873863f20dd4534891d5fab7a48b2f10b"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\scroll_unroll.wav",
+        "sha256": "723eebc80a9e712bd36245c279320001a749b66ed7a8bb5008e0777203f69d7d"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\scroll_unroll.wav.import",
+        "sha256": "32450136929f114db147b15178ebfa0af5566526dc64e7020b09438b85539d52"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\ui_v08_v09_ab_preview.wav",
+        "sha256": "9aabed47f86fd6b57bd8cca4f6bd1cbed9265106ecfbcd3840b2d1f824c09854"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\ui_v08_v09_ab_preview.wav.import",
+        "sha256": "63288b1c5fba283e651de8fa56121c974932e8bd08d685e991ecfc2b09f07f94"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\ui_v09_manifest.json",
+        "sha256": "b7396a650dd2762810d787cc287add17bdb2820ffbfdc615091549c62bc556c1"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\ui_v09_preview.wav",
+        "sha256": "524a2ad70d43671d7a5f5418d0a08fe92ad1b31ee4b8efbf7960cf53b5705ba7"
+      },
+      {
+        "file": "assets\\sfx\\ui_v09\\ui_v09_preview.wav.import",
+        "sha256": "1693b92923513bcdebe422eb11e5bcf4e242273642fee3fa4c1c7b8e1a4363eb"
+      },
+      {
+        "file": "assets\\sfx\\ui_whoosh.wav",
+        "sha256": "e2803927dd6cf73d7b866c0a250c668cab56aab26222e097e589959840f2a739"
+      },
+      {
+        "file": "assets\\sfx\\ui_whoosh.wav.import",
+        "sha256": "4cad18bfeb93270c000d2ed87a40e5a61a6d4f78de3f1a3fd3af8374eb36fcc8"
+      },
+      {
+        "file": "assets\\sfx\\wood_hit.wav",
+        "sha256": "819c41b059a2225fc65f368d700a57686ce6d5a1e6268a11545d444c2a1afd9a"
+      },
+      {
+        "file": "assets\\sfx\\wood_hit.wav.import",
+        "sha256": "df1a0df4db5c4d8f016c76ed9d0040db023fab7b3d94c9a975e04ab975508ca0"
+      },
+      {
+        "file": "assets\\supports\\v11\\asset_qc.json",
+        "sha256": "23025e94489fa2dfc06586fd846bcb42b149810435595ab9fae30003855a177b"
+      },
+      {
+        "file": "assets\\supports\\v11\\drone_bonewing.png",
+        "sha256": "7c8ba732d8b237a1747792d519d35894c59a17724a5c7c3d4c86007cc8aa134b"
+      },
+      {
+        "file": "assets\\supports\\v11\\drone_bonewing.png.import",
+        "sha256": "81082d5fb32a8cacc992927c6d2ba4946c7ab06fb6ac2e5d1535ed872a7da907"
+      },
+      {
+        "file": "assets\\supports\\v11\\generation_prompts.json",
+        "sha256": "7bcdd0bedf0fbf1dc9fbf81d3d56703f9c1a3cad3c6310ff0117d92ca180ce5b"
+      },
+      {
+        "file": "assets\\supports\\v11\\pet_raptor.png",
+        "sha256": "f361d1de27225656ae251bf88e686d1cbaef016c8141dee56e62d72cb721a57d"
+      },
+      {
+        "file": "assets\\supports\\v11\\pet_raptor.png.import",
+        "sha256": "e95193434a34042d122561d26ef2b4fa10ccfc6afebeb3c24fd508bb664ce685"
+      },
+      {
+        "file": "assets\\ui\\home_bg.png",
+        "sha256": "c216bf784a6b3c09e4548c6449598201685e4c9b87a9b179fdbdd43bb71c19db"
+      },
+      {
+        "file": "assets\\ui\\home_bg.png.import",
+        "sha256": "53bf8a177d4f1d57d416b78eff24d3f9d8a03eb9d707d26a704d1ddf909b0ce1"
+      },
+      {
+        "file": "assets\\ui\\paper_grain_v01.png",
+        "sha256": "89ac821ff0b9fd7a5a0325b5b68c302c9e31050b95296c6285bd7f83a8075a0b"
+      },
+      {
+        "file": "assets\\ui\\paper_grain_v01.png.import",
+        "sha256": "dfc3c40d357645ae7e6602dd7681aa33090a0592893299940da10affb813c424"
+      },
+      {
+        "file": "assets\\ui\\title_arena_clean_v01.png",
+        "sha256": "738cf8fec04deddb7bd383e481353b8beca63f2ec87383d916becee33f40c73e"
+      },
+      {
+        "file": "assets\\ui\\title_arena_clean_v01.png.import",
+        "sha256": "7f24430d13a1a4ccbc9d4c55567357f9bd9e077f1c199cad13f7c5d70b62d66a"
+      },
+      {
+        "file": "assets\\ui\\title_bg.png",
+        "sha256": "274e350d1cc3b430895760bc938524ac77e78bd4d3e3a5912918322f6853798b"
+      },
+      {
+        "file": "assets\\ui\\title_bg.png.import",
+        "sha256": "11ad72ef4f4d0362f774c3166c822df508f16016525f5780fa947f750d098f40"
+      },
+      {
+        "file": "assets\\ui\\title_empty_v09.png",
+        "sha256": "c38c4f1a958ebc244b1fcc4a56e56959f8a03ffef24672fa0469266b93903ecc"
+      },
+      {
+        "file": "assets\\ui\\title_empty_v09.png.import",
+        "sha256": "0bbb3524292eb8e524574246f5014b208450ff9f8a07314fdb13f5992c309e33"
+      },
+      {
+        "file": "assets\\ui\\title_logo_ink_v01.png",
+        "sha256": "85d4468987278a1e2c39cc71dac31133f3a35216ee6b495cbf8a559b5d074cc1"
+      },
+      {
+        "file": "assets\\ui\\title_logo_ink_v01.png.import",
+        "sha256": "77e88e6030f93d806a28607e61aac2efc2f7a7e0f74cfdcee116a172473101f2"
+      },
+      {
+        "file": "assets\\weapons.png",
+        "sha256": "634a7a269e3a74b415ee143feb1011a75d8a018f60b97683128e4620d58815fe"
+      },
+      {
+        "file": "assets\\weapons.png.import",
+        "sha256": "e88b88cbd056be50253eb65d18a5531da48cefac57d816e44cf2870efd4a1f28"
+      }
+    ],
+    "ui_source": [
+      {
+        "file": "src\\hud.gd",
+        "sha256": "7f5711329e5986d0ea573ff90bdde300e3e68bfc943d7d24b939bebbcf89bebc"
+      },
+      {
+        "file": "src\\ui_audio.gd",
+        "sha256": "61edba7db94ae3b94bffd256e03623266231803d1e2602c6ad5b543e793d5725"
+      },
+      {
+        "file": "src\\ui_battle_hud.gd",
+        "sha256": "7a262b488b2350eefca01385ec760e71c6ecda140745e4322e2038bf8189b4e4"
+      },
+      {
+        "file": "src\\ui_battle_paper.gd",
+        "sha256": "39f04b6615b74b22357948014ca1856b879bc2376b7bb4f166bf189178e0db4d"
+      },
+      {
+        "file": "src\\ui_button_fx.gd",
+        "sha256": "260511594e0598fc6d38f3cd03a4d53cd90b3a55e6b68d5e2a82ebc555dbed3c"
+      },
+      {
+        "file": "src\\ui_frontend.gd",
+        "sha256": "4b329350ced0765986b962e88d5b048e5b1bbb44eb9f50ada0c277703a52702c"
+      },
+      {
+        "file": "src\\ui_home_action.gd",
+        "sha256": "e34112e3a8b48e594be878315fcec37cf688b3963f353c5655770b0c784a6c99"
+      },
+      {
+        "file": "src\\ui_home_stage.gd",
+        "sha256": "a9589b049beaea4954756388ce3d505aa86c67de4c3a87355cfab74550175de0"
+      },
+      {
+        "file": "src\\ui_ink_button_fx.gd",
+        "sha256": "6b0461088c127086f0961124a39d4ca897229a9d2acb592bcc8f6fd840c058a7"
+      },
+      {
+        "file": "src\\ui_offer_layout.gd",
+        "sha256": "18fa41485e1a9a45f1fc52cf8395e142d2f4d4a4b7e3d822acbc6c7642f638e6"
+      },
+      {
+        "file": "src\\ui_paper.gd",
+        "sha256": "6156465f05affc80e463d23d4d4982991f50e67a6b2caac8d06a0dda12d0d785"
+      },
+      {
+        "file": "src\\ui_transition.gd",
+        "sha256": "2063165df6252e03e46ce361244f014048edd2a64364ee611571583ec4a49b75"
+      }
+    ],
+    "latest_player_data": [
+      {
+        "file": "runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\run.backup.json",
+        "sha256": "dd968a9a856dfb81336d53a1f0a4c6dac586e8e6d3e9094fa3fde29dd389d237",
+        "same_as_initial_baseline": false,
+        "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\20261115_latest_player_before_v12_173148\\run.backup.json"
+      },
+      {
+        "file": "runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\run.json",
+        "sha256": "dd968a9a856dfb81336d53a1f0a4c6dac586e8e6d3e9094fa3fde29dd389d237",
+        "same_as_initial_baseline": false,
+        "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\20261115_latest_player_before_v12_173148\\run.json"
+      },
+      {
+        "file": "runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\settings.backup.json",
+        "sha256": "70d0d764a014d4d6d25fe2bf0ef9cf9978ab7498a30abc6265eeef4387cf2dbc",
+        "same_as_initial_baseline": false,
+        "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\20261115_latest_player_before_v12_173148\\settings.backup.json"
+      },
+      {
+        "file": "runtime\\Godot\\app_userdata\\原始人大作战 · 战斗样板\\saves\\settings.json",
+        "sha256": "887d9303c58eca53477a35ceaae351e5c112b9e71f5fcc7c7315be6dc2772c90",
+        "same_as_initial_baseline": false,
+        "backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\20261115_latest_player_before_v12_173148\\settings.json"
+      }
+    ],
+    "latest_player_backup": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\20261115_latest_player_before_v12_173148",
+    "player_note": "The normal v11 game remained open and player progress changed during development. Latest files were backed up verbatim, never replaced with the earlier baseline."
+  },
+  "source_sha256": {
+    "src\\actor_view.gd": "fee6971e861efced86cbb2c5ac88dfe5042c92c1e77ddf18fcf9139428fe9db8",
+    "src\\armory.gd": "b7bcb1d5ac41a2021faedfe9ebb6986a6039a065e09b785dd38910fbeb8518e1",
+    "src\\asset_library.gd": "14764f9f2c522ed71a5509b03a6b5fa0bb776d01176a9d2b6db5ceca41fa7e69",
+    "src\\audio_pool.gd": "68bec478905c8e7d3d65ab9a4d0ed0d447d7c006643f6803477a1574713a8406",
+    "src\\battle_visuals.gd": "46355d6186964c0689fa3d61365be85aecdc83cc92b2f54f5dd7f61e24bdcdaf",
+    "src\\catalog.gd": "c74e780edb68ba07eb721eccbe0b33178816683ebb0c30fa2a8b27ee4e317d08",
+    "src\\companions.gd": "953781c8db4ca0b03c7c8580b8394951fa93512e609c64363436983e97b015d5",
+    "src\\dino_view.gd": "cc2284ab6c215f507b5a8de4e100f3228768630e0a59f0b14bca66718f728f0a",
+    "src\\economy.gd": "eebc92d957924ead1dfe0fb06cafa619c841899586643addf1f623a658c1e291",
+    "src\\effects.gd": "1be7a149fae6fc78a28809c3f894f0da9d82ff4411c4891eae663a677451f2d1",
+    "src\\enemy_art.gd": "c1529116e59786b4040a6b3d9e301cf6c78b8e70ed4773cd5d907bc4d1763c2b",
+    "src\\enemy_roster.gd": "e266a2a5e9c098736f5abab5aee54c207b939fc0b3508fd333e54cc683e6ddf3",
+    "src\\expanded_weapons.gd": "7faf865932cc925812bb4720c982061b503390e4352a56230ed6508f8163c315",
+    "src\\growth.gd": "16ec4b4fd5f012e425e620689475d088c649385e9a1cfd1775531c0d73129d40",
+    "src\\hud.gd": "7f5711329e5986d0ea573ff90bdde300e3e68bfc943d7d24b939bebbcf89bebc",
+    "src\\loot_rules.gd": "235f1e18951cf9b27fa9bb78146733218ca08026479b3cd38d303aba636dd18d",
+    "src\\main.gd": "098362809b0e3a6128f45b54734d7fd8f057ab9c6f416856be23c986c2353d9c",
+    "src\\music_controller.gd": "f0ecf48c53e5a8bec6deb557813809d5553952ddc08cb1a35e01a374de72f236",
+    "src\\progression.gd": "d445f462afb58567e27ca8e4ab7bc7fc02d51b282bbdb0b76e4a67febf292fbb",
+    "src\\rules.gd": "515b210860e3ca35ab59a55a4956f79ced4eaec10a6c716b35a01dc5a398640d",
+    "src\\save_store.gd": "a5bf86ef8fb97bbdda9fe556cd1ff94cdb9edeea6a81f3f126925f5e21d18e38",
+    "src\\session_state.gd": "d5dcdedc031a567bd1c9f5f301a12d742c9f38f4dbeb9b3eef6cc3555f1d73d7",
+    "src\\support_art.gd": "bbb3f18358e9c98c81b32d19c1ac7502e6aaed07d4c11ab69b49ea5b485cfd6a",
+    "src\\ui_audio.gd": "61edba7db94ae3b94bffd256e03623266231803d1e2602c6ad5b543e793d5725",
+    "src\\ui_battle_hud.gd": "7a262b488b2350eefca01385ec760e71c6ecda140745e4322e2038bf8189b4e4",
+    "src\\ui_battle_paper.gd": "39f04b6615b74b22357948014ca1856b879bc2376b7bb4f166bf189178e0db4d",
+    "src\\ui_button_fx.gd": "260511594e0598fc6d38f3cd03a4d53cd90b3a55e6b68d5e2a82ebc555dbed3c",
+    "src\\ui_frontend.gd": "4b329350ced0765986b962e88d5b048e5b1bbb44eb9f50ada0c277703a52702c",
+    "src\\ui_home_action.gd": "e34112e3a8b48e594be878315fcec37cf688b3963f353c5655770b0c784a6c99",
+    "src\\ui_home_stage.gd": "a9589b049beaea4954756388ce3d505aa86c67de4c3a87355cfab74550175de0",
+    "src\\ui_ink_button_fx.gd": "6b0461088c127086f0961124a39d4ca897229a9d2acb592bcc8f6fd840c058a7",
+    "src\\ui_offer_layout.gd": "18fa41485e1a9a45f1fc52cf8395e142d2f4d4a4b7e3d822acbc6c7642f638e6",
+    "src\\ui_paper.gd": "6156465f05affc80e463d23d4d4982991f50e67a6b2caac8d06a0dda12d0d785",
+    "src\\ui_transition.gd": "2063165df6252e03e46ce361244f014048edd2a64364ee611571583ec4a49b75",
+    "src\\weapon_art.gd": "ce518709fa364385ee376c6e796ab8bb44787c0efd6e3a93403a77896739bc77",
+    "src\\world_map.gd": "759edeba96c0709775ef40d0be29b2ef292f09cc5b7cd64cb58b63fb6b6032c7"
+  },
+  "review": {
+    "independent_read_only": true,
+    "fixed_p2": [
+      "protect normal save before trial terrain reset",
+      "settle pending chain recipe on round reset"
+    ],
+    "additional_fixed_edge": "bonebow selects within actual mount range",
+    "final_incremental_p1_p2": 0
+  },
+  "normal_launch": {
+    "pid": 24372,
+    "title": "原始人大作战 · 荒野交锋 v0.12 (DEBUG)",
+    "handle": 4980940,
+    "path": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_Godot_v0.1\\tools\\godot\\Godot_v4.7.2-stable_win64.exe",
+    "normal_project_launch": true,
+    "test_save": false,
+    "no_input_after_handoff": true
+  },
+  "latest_player_save_v12_compatibility": {
+    "checks": 1,
+    "log": "logs/v12_latest_player_compat.log",
+    "failures": 0
+  },
+  "previous_window": {
+    "old_pid": 17084,
+    "action": "graceful_close_exact_project_window",
+    "closed": true,
+    "exited": true
+  }
+}

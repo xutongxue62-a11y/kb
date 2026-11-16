@@ -1,0 +1,40 @@
+{
+  "installed_at": "2026-11-16T15:14:59.496861+08:00",
+  "approved_preview_workspace": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_UI预览\\v29_cave_marks",
+  "before_snapshot": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\native_ui_v29_before_20261116_151405",
+  "changed_source_files": [
+    "src/ui_frontend.gd",
+    "src/ui_home_action.gd",
+    "src/ui_ink_button_fx.gd",
+    "src/ui_offer_layout.gd",
+    "src/ui_paper.gd",
+    "src/ui_paper_brush.gd",
+    "src/ui_paper_pattern.gd",
+    "src/ui_paper_toggle.gd",
+    "src/ui_reward_scroll_art.gd",
+    "src/ui_weapon_details.gd"
+  ],
+  "installed_sha256": {
+    "src/ui_paper_brush.gd": "c8a6482c5caef4af9478b09cb595abba7310a454095b6865dfdb6373077f29a6",
+    "src/ui_frontend.gd": "dafd370092ef5eacdcc9724f2f3dc80b6f94bc95ee592162c033a9b7745ba4c8",
+    "src/ui_ink_button_fx.gd": "0df25e183c40e67d7ee668edef251597c36fc3dfa7d645269cc9428135283c0d",
+    "src/ui_reward_scroll_art.gd": "208d09066ac9911e1a4b4c43b4e3b2d0503aa825443aabfaf3f881d218bf9d04",
+    "src/ui_paper_pattern.gd": "cbfe78cd74d196e87969365f158056ca333d68f4ead11fee6bb635d219f9bc16",
+    "src/ui_home_action.gd": "e038b9ddbbeee1d78527542d91eb4ce1e8254bb15fdf391937ef848c25c1ef9e",
+    "src/ui_weapon_details.gd": "92df60f5ad5e8472fb3decd30cc4264b89d4bf97de2058470060d35ce3886b06",
+    "src/ui_paper_toggle.gd": "d27562973682362b1ee24ce70d04ad67192f60291a68f5b53c2541e3be60f0a7",
+    "src/ui_offer_layout.gd": "24c0ebe0680f76cf48c7a6ddfe72acf3225d577118541ae8c07211f7aa583059",
+    "src/ui_paper.gd": "1b8ddb3dd180939e5881f1e2e1ec0b3d149690de8a61a0af96696e329c3f9daa",
+    "tests/capture_ui_v29_controls.gd": "6c0509e10bc06b69a58df6cdc9d63626a55334900076de83ee52898d9247f1dc",
+    "tests/capture_ui_v29.gd": "2e322ac07fee0ebd997c34b2cccdbbc7fce826c4ac10a20fbf5478afd1545ffc",
+    "tests/capture_ui_v29_details.gd": "bd91b5bb89f707ca2723b286f91b2cf6993eb2795f35669ad3ea39c950128606"
+  },
+  "review_copy_clarification": {
+    "path": "src/ui_weapon_details.gd",
+    "from": "石弹飞行命中单个目标。",
+    "to": "石弹沿飞行路径命中敌人。"
+  },
+  "user_visual_approval": "还行，这个改得还可以，把这个加进去吧。",
+  "verification_pending": false,
+  "verification_report": "docs/ui_v29_verification.json"
+}

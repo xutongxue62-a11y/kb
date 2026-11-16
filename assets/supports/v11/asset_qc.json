@@ -1,0 +1,65 @@
+{
+  "provider": "built-in image_gen",
+  "selected_sources_unchanged": true,
+  "import_matte": "SupportArt.texture rejects faint alpha below0.70, smoothstep0.70..0.90, crops used pixels and adds12px symmetric margins",
+  "visual_qa": "explicit RGBA composite inspected on parchment; raw RGB viewer can display colors belonging to fully transparent pixels",
+  "gameplay_visual_acceptance": false,
+  "assets": {
+    "pet": {
+      "file": "pet_raptor.png",
+      "source_dimensions": [
+        1536,
+        1024
+      ],
+      "alpha_extrema": [
+        0,
+        254
+      ],
+      "solid_bbox": [
+        170,
+        64,
+        1368,
+        964
+      ],
+      "sha256": "f361d1de27225656ae251bf88e686d1cbaef016c8141dee56e62d72cb721a57d",
+      "runtime_dimensions": [
+        1223,
+        924
+      ],
+      "runtime_alpha_bbox": [
+        12,
+        12,
+        1211,
+        912
+      ]
+    },
+    "drone": {
+      "file": "drone_bonewing.png",
+      "source_dimensions": [
+        1312,
+        1199
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "solid_bbox": [
+        51,
+        190,
+        1271,
+        937
+      ],
+      "sha256": "7c8ba732d8b237a1747792d519d35894c59a17724a5c7c3d4c86007cc8aa134b",
+      "runtime_dimensions": [
+        1245,
+        772
+      ],
+      "runtime_alpha_bbox": [
+        12,
+        12,
+        1233,
+        760
+      ]
+    }
+  }
+}

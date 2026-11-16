@@ -1,0 +1,25 @@
+# Godot cache and bundled editor
+.godot/
+tools/godot/
+tools/__pycache__/
+__pycache__/
+*.pyc
+
+# Local runtimes, logs, captures
+logs/
+runtime/
+previews/
+.superpowers/
+
+# Secrets and signing private keys
+*.keystore
+*.jks
+export_credentials.cfg
+export_credentials.json
+update_private.pem
+*_private.pem
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store

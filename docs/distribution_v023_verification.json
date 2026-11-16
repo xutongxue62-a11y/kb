@@ -1,0 +1,392 @@
+{
+  "verified_at": "2026-11-16T18:12:23.384738+08:00",
+  "artifacts": [
+    {
+      "platform": "Windows",
+      "file": "PrimitiveWildfrontier-v0.23.0-Windows-x64.zip",
+      "bytes": 77835731,
+      "sha256": "435931d0de86a44e4b4f539f14993e43aec741437ff1c743b83e900f5f76d884"
+    },
+    {
+      "platform": "Linux",
+      "file": "PrimitiveWildfrontier-v0.23.0-Linux-x86_64.tar.gz",
+      "bytes": 68158453,
+      "sha256": "43ae46b358a783a2ccc006595e66896ad417af736c64883c3f3f47e62cc433b1"
+    },
+    {
+      "platform": "Android",
+      "file": "PrimitiveWildfrontier-v0.23.0-Android.apk",
+      "bytes": 92836726,
+      "sha256": "4be23e060e9110260a9c4b645b11007e0fc647264f08aaec5a98b4385c0e6014"
+    }
+  ],
+  "test_groups": [
+    {
+      "group": "rules",
+      "checks": 27,
+      "sha256": "3e70a71ac1f376be24c77f9213d2a6bcf663469ac5fab45da1b7de1c409ab795"
+    },
+    {
+      "group": "scene",
+      "checks": 19,
+      "sha256": "39b7d0f52d31dcabce2f4b56d4044696e1d73f4f6e8bbf82ab9e51c4da67b9e6"
+    },
+    {
+      "group": "controls",
+      "checks": 10,
+      "sha256": "00849374f5eabb7d87b2d02826bbbf3103e5b8d0bb252e33a3c6cd6c0fac6551"
+    },
+    {
+      "group": "attack_links",
+      "checks": 43,
+      "sha256": "049fcbf4540bf97f77b4dae33c95e52e04c2d5b26481a7105e7eb7d6fe5c0ea0"
+    },
+    {
+      "group": "growth",
+      "checks": 17,
+      "sha256": "5922da8ba12ad42a5cd9555d73b99f9142e61a27475383165a18102d71e3a53f"
+    },
+    {
+      "group": "feedback",
+      "checks": 31,
+      "sha256": "17dcccbf5395e398daefbe66eb63374dbfc1263937f2bcc809c22b294c111258"
+    },
+    {
+      "group": "impact",
+      "checks": 46,
+      "sha256": "4cacabc2220dae45cd45b9819fb31811fce0c80db21f9fbbee2645bc9ed7f51d"
+    },
+    {
+      "group": "progression",
+      "checks": 19,
+      "sha256": "306d628549347332acca74cb9595fc16c216d0f91f57f166b0bb6c59ac937d0f"
+    },
+    {
+      "group": "armory",
+      "checks": 16,
+      "sha256": "0f4eff8772745d41856861c6126b989cf43e13dd7d351e0c05e6a8cb4c120cdb"
+    },
+    {
+      "group": "save_store",
+      "checks": 403,
+      "sha256": "beffc3eeb7985306efac73ccd330cae7eeffc2281051f99d95fe9c42910e8b9e"
+    },
+    {
+      "group": "hud_navigation",
+      "checks": 1066,
+      "sha256": "601228ba1d099056463f32ed2c5170057b41fbf1dcfdeb75f5789cbaa7b4949f"
+    },
+    {
+      "group": "campaign",
+      "checks": 40,
+      "sha256": "bc3e847bb4f0689d20381320fbae0deafc4e038f78c110d5cf5aa3c32c992f55"
+    },
+    {
+      "group": "frontend",
+      "checks": 55,
+      "sha256": "be6fd02da7141f4796c4fb16b5c4f38338fdd2fd8a73f8a2a224069a967cf612"
+    },
+    {
+      "group": "ui_motion",
+      "checks": 79,
+      "sha256": "4194c89533c133b0ee0ec4098925144e65d9b2d6529ad18bbc6f8d56cc33a292"
+    },
+    {
+      "group": "ui_audio",
+      "checks": 112,
+      "sha256": "b32885de7087f691c9abe98039975be183f373c4c092014aa4dc91ab12484d20"
+    },
+    {
+      "group": "home_v09",
+      "checks": 28,
+      "sha256": "1ede7f03162b17d6e12e71306cfa930e647baf09765b97bc16e0f2f9d466aa52"
+    },
+    {
+      "group": "chest_pickup",
+      "checks": 89,
+      "sha256": "c4328dd1070003351a675de363013800e6b01e9f34a9891519cca6c27967b949"
+    },
+    {
+      "group": "sprite_edges",
+      "checks": 94,
+      "sha256": "c890f61cac9024e5259c4ac2f6971b66685c8b397bfcea3b182d4536f5e8e12c"
+    },
+    {
+      "group": "dodge",
+      "checks": 40,
+      "sha256": "6ea326f217f12ba01b5effe8ea575d09d5be6d3635058ce04294b4777ca0a418"
+    },
+    {
+      "group": "music",
+      "checks": 33,
+      "sha256": "253327c176909277fbb997c8c0009448df3c096c1ac4d10a7a525fab5de4b250"
+    },
+    {
+      "group": "world_camera",
+      "checks": 62,
+      "sha256": "796a8c1bd8b50800b97f09761589b3ea1ed54a5ae5756d9a9b42f416fc37f3de"
+    },
+    {
+      "group": "battle_ui_v10",
+      "checks": 6,
+      "sha256": "16e7dc6d8cfbd4022a8cd41e3cd96f736d579b0cb5957586ea0cb431cd1782d2"
+    },
+    {
+      "group": "map_chunks",
+      "checks": 10,
+      "sha256": "33e297cf86e6cd7c799eb77616a5c5cf4c4455bc80c9505c326c6f476b92b71a"
+    },
+    {
+      "group": "terrain_physics",
+      "checks": 30,
+      "sha256": "9bf8a883a3d51b0b61182d9c597cfaaecf1d80aa88ffebf4c297cc0d98a6c4fe"
+    },
+    {
+      "group": "growth_v11",
+      "checks": 2398,
+      "sha256": "aba7311aab532034c7f2030b3e49eb27fe21a912bf08e6b9adcb8403bc7d7899"
+    },
+    {
+      "group": "supports_v11",
+      "checks": 16,
+      "sha256": "ce58d90472f4195d9e5597ba05bd47bb97d379b3ada70de99161fa628d96bb98"
+    },
+    {
+      "group": "ui_v11",
+      "checks": 27,
+      "sha256": "38614eee1b7f87383b3548165c54789fa028f20f181b5a5b6e93686846f51628"
+    },
+    {
+      "group": "resources_v12",
+      "checks": 184,
+      "sha256": "96ee268937bc8541c97558580d3cc4290ed385f75fb13397fcd2cec06a7ef527"
+    },
+    {
+      "group": "rounds_v12",
+      "checks": 23,
+      "sha256": "e9891bf75a56224d82d475e09d01ddce7abd616d53cb69be3e6bae93afe389f0"
+    },
+    {
+      "group": "weapons_v12",
+      "checks": 69,
+      "sha256": "b4884dfcb1da792cabdda41749f013b21cb9faeef37be3d1b9b005159d31711e"
+    },
+    {
+      "group": "enemies_v12",
+      "checks": 99,
+      "sha256": "f56d9f3e360e459d4110b4fc8ff519a8df7da3e90d6861ee6304834adb602071"
+    },
+    {
+      "group": "battle_visuals_v12",
+      "checks": 102,
+      "sha256": "7a64de33b7515758594202fa35a017439f6c4b4ae65b13ec01cdbac1d599e764"
+    },
+    {
+      "group": "class_egg_loadout",
+      "checks": 113,
+      "sha256": "85ad9bc133f422f02362d8c5bd7bc828027fa0dfc823ebfae08a60ae7b3c0be1"
+    },
+    {
+      "group": "character_loot",
+      "checks": 55,
+      "sha256": "1227beaa669be41a709e679ace1293a3fe8f5b85cacf2cd7d15b2750821259f8"
+    },
+    {
+      "group": "settlement_v14",
+      "checks": 27,
+      "sha256": "562c0c6ffc750970f7bf60013d24876e68739582db21ffd8f62bb93d631b9483"
+    },
+    {
+      "group": "evolution_v14",
+      "checks": 58,
+      "sha256": "a55212d9d76273d6b382fd996ab369dfbd2d692ff20b5d9a816d8e556c519163"
+    },
+    {
+      "group": "weapon_presentation_v15",
+      "checks": 1242,
+      "sha256": "0d0eeea3636a8361850b71db4b30509702933dc059f00ae78e6a27a0169cc7af"
+    },
+    {
+      "group": "companions_v16",
+      "checks": 199,
+      "sha256": "7a10ab02edb01b3302be7385c6fa874fc400aebadabe86b06de1254a393e8256"
+    },
+    {
+      "group": "combat_art_v16",
+      "checks": 75,
+      "sha256": "6fadfbc78cc29a7791cdce5219b2087d111598df750bb0a8bf9b03c05b4f24f8"
+    },
+    {
+      "group": "terrain_broadphase_v16",
+      "checks": 165,
+      "sha256": "483537c5b7d0c3112d862767a279a771a8ac600e568449abdb89acfa155feeb9"
+    },
+    {
+      "group": "monster_surface_v16",
+      "checks": 48,
+      "sha256": "715a1ea0f4f363eaa094e4b21aaaca7fb3c55bd866e178cad21f5449e8b0f437"
+    },
+    {
+      "group": "pickup_renderer_v16",
+      "checks": 12,
+      "sha256": "46a94750891c3c3aae851ca528445a7eb7b0b0e2bd3ccf1ac1aa0f9e7a415539"
+    },
+    {
+      "group": "weapon_replace_v20",
+      "checks": 873,
+      "sha256": "68115a44e8322eda9bd2ae2ae97414c7f5e90eb0f00af4faaa211eddad2ffd49"
+    },
+    {
+      "group": "ui_brush_v22",
+      "checks": 24,
+      "sha256": "3a7b12acace1aa1deacb6015bb26475f9e05138a0aa89d46f94d84b7f71a8cbd"
+    },
+    {
+      "group": "reward_sale_v23",
+      "checks": 26,
+      "sha256": "3f6f84b2a8bd384e130dacb64ed1f4ff77562bfbb35e89f6fa9e9a748da245dc"
+    },
+    {
+      "group": "reward_buff_sale_v30",
+      "checks": 17,
+      "sha256": "dabf0a122134b25022472b03d9ff9fa4382a145234260bfb3dc79ca57b73912b"
+    },
+    {
+      "group": "distribution_fonts",
+      "checks": 25,
+      "sha256": "dce249916c1f5bc94ddc0289013fb353391456df62547800382a2b12bc7bbf1f"
+    },
+    {
+      "group": "mobile_controls",
+      "checks": 12,
+      "sha256": "6da290f98278ca3ad9a2c21cbf42274b3755b626e7da6d20e60470c099892de6"
+    },
+    {
+      "group": "release_updates",
+      "checks": 27,
+      "sha256": "4e8ceb9b148b3fe898e7a945cd39104222c0f44b4fedbf3340ec9ba510769599"
+    },
+    {
+      "group": "release_startup",
+      "checks": 13,
+      "sha256": "5db4880f5fb1cf49461c8893e77a59c13145845b0b4c2139ac1b2b7310c60e7c"
+    }
+  ],
+  "checks": 8304,
+  "failures": 0,
+  "native_windows": {
+    "desktop": {
+      "build": 2026111601,
+      "cached": false,
+      "game_ready": true,
+      "platform": "windows",
+      "real_player_storage_used": false,
+      "touch_checks": {},
+      "touch_controls": false,
+      "updater_requests": 0,
+      "version": "0.23.0"
+    },
+    "touch": {
+      "build": 2026111601,
+      "cached": false,
+      "game_ready": true,
+      "platform": "windows",
+      "real_player_storage_used": false,
+      "touch_checks": {
+        "dodge": true,
+        "movement": true,
+        "player_moved": true,
+        "released": true
+      },
+      "touch_controls": true,
+      "updater_requests": 0,
+      "version": "0.23.0"
+    }
+  },
+  "pack_inspection": {
+    "Windows": {
+      "files": 279,
+      "report": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_发行准备\\v0.23.0\\verified_20261116_181205\\windows_pack.json"
+    },
+    "Linux": {
+      "files": 279,
+      "report": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_发行准备\\v0.23.0\\verified_20261116_181205\\linux_pack.json"
+    }
+  },
+  "apk_signatures_v2_v3_valid": true,
+  "linux_elf64_x86_64_and_executable_modes_valid": true,
+  "local_https_and_next_boot": {
+    "fixture_root": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_发行准备\\v0.23.0\\transport_20261116_181216",
+    "https_download_test": "passed",
+    "next_start_loaded_verified_patch": true,
+    "smoke": {
+      "build": 2026111602,
+      "cached": true,
+      "game_ready": true,
+      "platform": "windows",
+      "real_player_storage_used": false,
+      "touch_checks": {},
+      "touch_controls": false,
+      "updater_requests": 0,
+      "version": "0.23.1-test"
+    },
+    "requests": [
+      "GET /manifest.json HTTP/1.1",
+      "GET /probe.pck HTTP/1.1",
+      "GET /manifest.json HTTP/1.1"
+    ],
+    "real_player_storage_used": false
+  },
+  "failed_update_recovery": {
+    "fixture_root": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_发行准备\\v0.23.0\\recovery_20261116_181219",
+    "unready_game_never_confirmed": true,
+    "failed_active_then_failed_previous_recovers_builtin": true,
+    "failed_builds": [
+      2026111603,
+      2026111602
+    ],
+    "builtin_smoke": {
+      "build": 2026111601,
+      "cached": false,
+      "game_ready": true,
+      "platform": "windows",
+      "real_player_storage_used": false,
+      "touch_checks": {},
+      "touch_controls": false,
+      "updater_requests": 0,
+      "version": "0.23.0"
+    },
+    "real_player_storage_used": false
+  },
+  "publisher_full_pack_loaded": {
+    "build": 2026111604,
+    "cached": true,
+    "game_ready": true,
+    "platform": "windows",
+    "real_player_storage_used": false,
+    "touch_checks": {},
+    "touch_controls": false,
+    "updater_requests": 0,
+    "version": "0.23.1"
+  },
+  "original_assets_unchanged": 156,
+  "current_player_files_unchanged": 4,
+  "proof_directory": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_发行准备\\v0.23.0\\verified_20261116_181205",
+  "network_updates_enabled": false,
+  "linux_native_run_verified": false,
+  "android_device_run_verified": false,
+  "independent_review": {
+    "blocking_p1_p2_remaining": 0,
+    "reviewed_files": [
+      "release/bootstrap.gd",
+      "release/update_boot_state.gd",
+      "tests/test_release_startup.gd"
+    ],
+    "fixed_regressions": [
+      "failed active then failed previous falls back to builtin",
+      "explicit game readiness required",
+      "failed world and ALWAYS HUD freed before recovery UI"
+    ],
+    "verification_driver_audio_isolated": true
+  }
+}

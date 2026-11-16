@@ -1,0 +1,16 @@
+{
+  "snapshot": "D:\\Codex\\场景建模\\独立游戏\\原始人大作战_快照\\ui_v22_before_20261116_103623",
+  "user_source_changes_since_v16": [
+    "src/combat_art.gd",
+    "src/economy.gd",
+    "src/effects.gd",
+    "src/growth.gd",
+    "src/hud.gd",
+    "src/main.gd",
+    "src/pickup_renderer.gd",
+    "src/rules.gd",
+    "src/save_store.gd",
+    "src/session_state.gd",
+    "src/ui_offer_layout.gd"
+  ]
+}

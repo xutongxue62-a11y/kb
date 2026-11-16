@@ -1,0 +1,28 @@
+config_version=5
+
+[application]
+config/name="原始人大作战 · 战斗样板"
+run/main_scene="res://main.tscn"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=800
+window/size/window_width_override=1280
+window/size/window_height_override=800
+window/size/resizable=true
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.86, 0.85, 0.72, 1)
+
+[debug]
+gdscript/warnings/treat_warnings_as_errors=false
+
+[editor]
+movie_writer/movie_file="res://previews/gameplay.avi"
+movie_writer/fps=30
+movie_writer/video_quality=0.85

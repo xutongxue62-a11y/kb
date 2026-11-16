@@ -1,0 +1,23 @@
+{
+  "characters": {
+    "barbarian": {
+      "body": "res://assets/characters/v13/barbarian_body.png",
+      "body_sha256": "5f5c43f7a66bac30b8aa54f48847f3a8cd4ce91384526ce582e2e4234cf8b772",
+      "portrait": "res://assets/characters/v14/barbarian_portrait.png",
+      "portrait_sha256": "0e57c002b4f97c4717770b637adf1c7dd514a4c571bc7eb85346b1ea318ad257"
+    },
+    "caveman": {
+      "body": "res://assets/characters/v13/caveman_body.png",
+      "body_sha256": "f663fe049926ec4ab2ab0e7e108030997cb61c8bf1fd6efd8452084357de8f61",
+      "portrait": "res://assets/characters/v14/caveman_portrait.png",
+      "portrait_sha256": "96fd8ffb1a95924d9c4fe21b53662110850cc6bc0242fed456cda175a48e45d1"
+    },
+    "chief": {
+      "body": "res://assets/characters/v13/chief_body.png",
+      "body_sha256": "33452c9d14c6d031b846f65c170548f5507701f360e26d6545b14e6c2c4afb2c",
+      "portrait": "res://assets/characters/v14/chief_portrait.png",
+      "portrait_sha256": "49402c07c32f84acd8a3fc51ad0479a42d2074b22f58d42084cee338d70e9c27"
+    }
+  },
+  "method": "Native ActorView render; same body and limb rig as battle"
+}

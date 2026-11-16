@@ -1,0 +1,78 @@
+{
+  "version": "0.7",
+  "groups": [
+    {
+      "group": "rules",
+      "checks": 24,
+      "failures": 0
+    },
+    {
+      "group": "scene",
+      "checks": 19,
+      "failures": 0
+    },
+    {
+      "group": "controls",
+      "checks": 10,
+      "failures": 0
+    },
+    {
+      "group": "attack_links",
+      "checks": 28,
+      "failures": 0
+    },
+    {
+      "group": "growth",
+      "checks": 14,
+      "failures": 0
+    },
+    {
+      "group": "feedback",
+      "checks": 31,
+      "failures": 0
+    },
+    {
+      "group": "impact",
+      "checks": 22,
+      "failures": 0
+    },
+    {
+      "group": "progression",
+      "checks": 19,
+      "failures": 0
+    },
+    {
+      "group": "armory",
+      "checks": 16,
+      "failures": 0
+    },
+    {
+      "group": "save_store",
+      "checks": 390,
+      "failures": 0
+    },
+    {
+      "group": "hud_navigation",
+      "checks": 442,
+      "failures": 0
+    },
+    {
+      "group": "campaign",
+      "checks": 39,
+      "failures": 0
+    },
+    {
+      "group": "frontend",
+      "checks": 49,
+      "failures": 0
+    }
+  ],
+  "total_checks": 1103,
+  "native_captures": 12,
+  "native_log": "logs/ui_native_verified.log",
+  "preserved_original_files": {
+    "assets": 25,
+    "runtime": 2
+  },
+  "player_save_test_isolation": "runtime/tests"
+}
