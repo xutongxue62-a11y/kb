@@ -102,6 +102,12 @@ var damage_numbers_enabled: bool = true
 var fullscreen_enabled: bool = false
 var shop_state: Dictionary = {}
 var shop_confirm_index: int = -1
+var choice_reason: String = ""
+var choice_inventory: Array = []
+var choice_levels: Dictionary = {}
+var choice_offer_levels: Dictionary = {}
+var choice_stage: int = 1
+var choice_confirm_key: String = ""
 var help_in_run: bool = false
 var pending_help_trial: String = ""
 var menu_summary: Dictionary = {}
@@ -1096,6 +1102,12 @@ func show_choices(ids: Array, inventory: Array, levels: Dictionary = {}, reason:
     dim_overlay(false,true)
     screen = "growth"
     choice_ids = ids.duplicate()
+    choice_reason = reason
+    choice_inventory = inventory.duplicate(true)
+    choice_levels = levels.duplicate(true)
+    choice_offer_levels = offer_levels.duplicate(true)
+    choice_stage = stage
+    choice_confirm_key = ""
     OfferUI.growth(self,ids,inventory,levels,reason,offer_levels,stage)
 
 func show_replace(pending: Dictionary, inventory: Array, stage: int = 1) -> void:
@@ -1155,13 +1167,17 @@ func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = 
     play_transition("stats", "ui_open")
 
 func _choose(key: String) -> void:
-    if not ui_busy() and choice_ids.has(key):
-        if can_animate():
-            close_scroll_then(func():
-                play_ui("choice_confirm")
-                choice_selected.emit(key))
-        else:
-            choice_selected.emit(key)
+    if ui_busy() or not choice_ids.has(key) or screen in ["shop_confirm", "choice_confirm"]:
+        return
+    if screen == "growth" and choice_reason == "chest" and Catalog.WEAPONS.has(key):
+        request_choice_confirm(key)
+        return
+    if can_animate():
+        close_scroll_then(func():
+            play_ui("choice_confirm")
+            choice_selected.emit(key))
+    else:
+        choice_selected.emit(key)
 
 func choose_index(index: int) -> void:
     if not ui_busy() and index >= 0 and index < choice_ids.size():
@@ -1184,6 +1200,7 @@ func hide_menu() -> void:
     present_backdrop("none")
     screen = "combat"
     choice_ids.clear()
+    choice_confirm_key = ""
     set_battle_visible(true)
     entered_screen = "combat"
     if closing:
@@ -1264,7 +1281,7 @@ func update_round(stage: int, stage_time: float, is_boss: bool, coins: int, boss
     var remaining: int = maxi(0,ceili(30.0-stage_time))
     timer_label.text = "第 %d 关 · Boss不限时" % stage if is_boss else "第 %d 关  %02d:%02d" % [stage,remaining/60,remaining%60]
     var urgent: bool = not is_boss and remaining <= 10
-    timer_label.add_theme_font_size_override("font_size",25 if urgent else 23)
+    timer_label.add_theme_font_size_override("font_size",18 if urgent else 17)
     timer_label.add_theme_color_override("font_color",Color("#b2362b") if urgent else ink)
     if urgent:
         timer_label.text = "第 %d 关 · 最后 %d 秒" % [stage,remaining]
@@ -1382,6 +1399,32 @@ func request_shop_buy(index: int) -> void:
     shop_confirm_index = index
     screen = "shop_confirm"
     OfferUI.shop_confirm(self, shop_state, index)
+
+func request_choice_confirm(key: String) -> void:
+    if ui_busy() or screen != "growth" or not choice_ids.has(key) or not Catalog.WEAPONS.has(key):
+        return
+    choice_confirm_key = key
+    screen = "choice_confirm"
+    OfferUI.choice_confirm(self, key, choice_inventory, choice_levels, choice_offer_levels, choice_stage)
+
+func confirm_choice_take() -> void:
+    if ui_busy():
+        return
+    var key: String = choice_confirm_key
+    close_shop_confirm_layer()
+    choice_confirm_key = ""
+    screen = "growth"
+    if key.is_empty() or not choice_ids.has(key):
+        return
+    play_ui("choice_confirm")
+    choice_selected.emit(key)
+
+func cancel_choice_confirm() -> void:
+    close_shop_confirm_layer()
+    choice_confirm_key = ""
+    if choice_ids.is_empty():
+        return
+    screen = "growth"
 
 func confirm_shop_buy() -> void:
     if ui_busy():
@@ -1536,6 +1579,9 @@ func handle_front_key(code: int) -> bool:
         return true
     if screen == "shop_confirm" and code == KEY_ESCAPE:
         cancel_shop_buy()
+        return true
+    if screen == "choice_confirm" and code == KEY_ESCAPE:
+        cancel_choice_confirm()
         return true
     if screen == "restart_confirm" and code == KEY_ESCAPE:
         cancel_restart()

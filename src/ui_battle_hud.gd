@@ -55,22 +55,26 @@ static func meter(h, parent: Node, rect: Rect2, color: Color) -> ProgressBar:
     node.size = rect.size
     return node
 static func build(h) -> void:
-    var status: Array = paper(h, Rect2(18, 16, 306, 118))
+    var status: Array = paper(h, Rect2(18, 16, 322, 148))
     h.status_strip = status[0]
+    status[0].name = "VitalStrip"
     status[0].set_meta("vital_hud", true)
-    label(h,status[1],"生命",Rect2(18,8,58,26),17,Color("#a74235"))
-    h.health_label = label(h,status[1],"8 / 8",Rect2(186,8,100,26),18)
+    label(h,status[1],"生命",Rect2(18,6,58,24),17,Color("#a74235"))
+    h.health_label = label(h,status[1],"8 / 8",Rect2(202,6,102,24),18)
     h.health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-    h.hp_bar = meter(h,status[1],Rect2(18,40,270,16),Color("#c25242"))
+    h.hp_bar = meter(h,status[1],Rect2(18,34,286,14),Color("#c25242"))
     h.hp_bar.max_value = 8
     h.hp_bar.value = 8
-    label(h,status[1],"经验",Rect2(18,72,42,24),15,Color("#557758"))
-    h.xp_bar = meter(h,status[1],Rect2(68,79,112,10),Color("#6a9569"))
-    h.xp_label = label(h,status[1],"0 / 8",Rect2(190,70,96,26),15)
+    label(h,status[1],"经验",Rect2(18,56,42,22),15,Color("#557758"))
+    h.xp_bar = meter(h,status[1],Rect2(66,62,122,10),Color("#6a9569"))
+    h.xp_label = label(h,status[1],"0 / 8",Rect2(198,54,106,24),15)
     h.xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-    var time: Array = paper(h,Rect2(350,16,385,72))
-    h.timer_label = label(h,time[1],"第 1 关 00:30",Rect2(20,3,345,38),23)
-    h.map_label = label(h,time[1],"荒草原",Rect2(22,44,338,21),15,Color("#7d6746"))
+    # Wave countdown stays in this same cluster so it remains visible when the HUD is hidden.
+    h.timer_label = label(h,status[1],"第 1 关 00:30",Rect2(18,108,286,32),18)
+    h.timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    h.timer_label.set_meta("vital_hud", true)
+    var map_paper: Array = paper(h,Rect2(356,16,280,44))
+    h.map_label = label(h,map_paper[1],"荒草原",Rect2(14,6,252,32),15,Color("#7d6746"))
     h.title_label = h.map_label
     var wallet: Array = paper(h,Rect2(751,16,280,66))
     h.coin_label = label(h,wallet[1],"金币 0",Rect2(15,7,126,46),17,Color("#956c2f"))

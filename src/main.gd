@@ -952,6 +952,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 cancel_replace()
             elif hud != null and hud.screen == "shop_confirm" and hud.has_method("cancel_shop_buy"):
                 hud.cancel_shop_buy()
+            elif hud != null and hud.screen == "choice_confirm" and hud.has_method("cancel_choice_confirm"):
+                hud.cancel_choice_confirm()
             elif hud != null and hud.screen == "restart_confirm" and hud.has_method("cancel_restart"):
                 hud.cancel_restart()
             elif hud != null and hud.screen == "help_confirm" and hud.has_method("cancel_help_trial"):
