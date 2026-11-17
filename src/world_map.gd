@@ -212,9 +212,9 @@ func _lava(prop: Dictionary) -> void:
                 draw_circle(spark,(1-pop)*2.3,Color("#ffd064"),true,-1,true)
 
 # Sample adjacent chunks as decorations can extend across a chunk boundary.
-func _props_in(bounds: Rect2, kind: String, narrow_stones: bool=true) -> Array:
+func _props_in(bounds: Rect2, kind: String, narrow_stones: bool=true, margin: float = 120.0) -> Array:
     var result: Array = []
-    var area := bounds.grow(120.0)
+    var area := bounds.grow(margin)
     for y in range(floori(area.position.y / CHUNK_SIZE), floori(area.end.y / CHUNK_SIZE)+1):
         for x in range(floori(area.position.x / CHUNK_SIZE), floori(area.end.x / CHUNK_SIZE)+1):
             for prop in chunk_content(Vector2i(x,y)):
@@ -267,7 +267,10 @@ func _resolve_body(at: Vector2, radius: float, polygons: Array) -> Vector2:
 func move_body(from: Vector2, to: Vector2, radius: float) -> Vector2:
     var polygons: Array = []
     var swept: Rect2=Rect2(from,Vector2.ZERO).expand(to).grow(radius)
-    for prop in _props_in(swept,"stone"):
+    # The narrow filter below only keeps stone centres within 32*scale (<=45)
+    # of the swept bounds, so scanning chunks beyond a 48 margin is waste;
+    # the embedded-recovery query further down keeps the full 120 margin.
+    for prop in _props_in(swept,"stone",true,48.0):
         polygons.append(stone_polygon(prop))
     var result := _resolve_body(from,maxf(radius,0.01),polygons)
     if result.distance_squared_to(from)>0.0000001:
@@ -282,7 +285,8 @@ func move_body(from: Vector2, to: Vector2, radius: float) -> Vector2:
     for i in range(steps):
         # Preserve the free component when the other axis hits an obstacle.
         # Binary contact search avoids pushing a dash around/through a corner.
-        for axis_step in [Vector2(step.x,0),Vector2(0,step.y)]:
+        for axis in range(2):
+            var axis_step := Vector2(step.x,0) if axis == 0 else Vector2(0,step.y)
             if axis_step.is_zero_approx(): continue
             var candidate: Vector2 = result+axis_step
             if _resolve_body(candidate,radius,polygons).distance_squared_to(candidate) < 0.0000001:

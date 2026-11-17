@@ -43,10 +43,15 @@ static func spawn_pool(wave: int, elapsed: float, trial: bool, boss_round: bool)
         pool.append("armored")
     return pool
 
+# Shared read-only result for the common "not handled" path: advance() runs
+# once per enemy per physics frame, and a fresh dictionary literal for the
+# four legacy kinds was pure allocation churn. Main only reads the result.
+const NOT_HANDLED := {"handled": false}
+
 static func advance(world, enemy: Dictionary, delta: float) -> Dictionary:
     var kind: String = str(enemy.get("kind", ""))
     if not NEW_DATA.has(kind):
-        return {"handled": false}
+        return NOT_HANDLED
     var difference: Vector2 = world.player_position - enemy["position"]
     var distance: float = difference.length()
     var direction: Vector2 = difference / distance if distance > 0.001 else Vector2.RIGHT
@@ -57,7 +62,7 @@ static func advance(world, enemy: Dictionary, delta: float) -> Dictionary:
             return _thrower(world, enemy, direction, distance)
         "armored":
             return _armored(world, enemy, direction, distance)
-    return {"handled": false}
+    return NOT_HANDLED
 
 static func _motion(velocity: Vector2, pose: String = "walk") -> Dictionary:
     return {"handled": true, "velocity": velocity, "pose": pose}

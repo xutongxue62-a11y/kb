@@ -952,8 +952,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 cancel_replace()
             elif hud != null and hud.screen == "shop_confirm" and hud.has_method("cancel_shop_buy"):
                 hud.cancel_shop_buy()
-            elif hud != null and hud.screen == "choice_confirm" and hud.has_method("cancel_choice_confirm"):
-                hud.cancel_choice_confirm()
             elif hud != null and hud.screen == "restart_confirm" and hud.has_method("cancel_restart"):
                 hud.cancel_restart()
             elif hud != null and hud.screen == "help_confirm" and hud.has_method("cancel_help_trial"):
@@ -1489,9 +1487,14 @@ func update_pickups(delta: float) -> void:
     var remaining: int = 0
     var bursts: int = 0
     var radius_squared: float = pickup_magnet_radius() * pickup_magnet_radius()
+    # Hoisted out of the per-pickup loop (same math as pickup_visible_point).
+    var view_area: Rect2 = visible_world_rect()
+    var reveal_floor_y: float = view_area.position.y + PICKUP_TOP_HUD_PAD
     for index in range(pickups.size()):
         var stone: Dictionary = pickups[index]
-        var revealed: Vector2 = pickup_visible_point(stone["position"])
+        var revealed: Vector2 = stone["position"]
+        if revealed.y < reveal_floor_y and revealed.y >= view_area.position.y - 12.0 and revealed.x >= view_area.position.x - 8.0 and revealed.x <= view_area.end.x + 8.0:
+            revealed.y = reveal_floor_y
         if revealed.y > stone["position"].y:
             stone["position"] = stone["position"].move_toward(revealed, maxf(260.0 * delta, 1.0))
         if stone["position"].distance_squared_to(player_position) <= radius_squared:
@@ -1661,11 +1664,27 @@ func spawn_enemy(kind: String, point: Vector2 = Vector2(INF, INF), wave_spawn: b
 
 func update_enemies(delta: float) -> void:
     recycle_distant_enemies()
-    for enemy in enemies:
+    # Frame snapshots for the separation pass: reading live dictionaries inside
+    # the O(n^2) loop was a late-game hotspot. Positions are the frame-start
+    # ones for every enemy, which also makes the pass order-independent.
+    var sep_positions := PackedVector2Array()
+    var sep_alive := PackedByteArray()
+    sep_positions.resize(enemies.size())
+    sep_alive.resize(enemies.size())
+    for sep_index in range(enemies.size()):
+        sep_positions[sep_index] = enemies[sep_index]["position"]
+        sep_alive[sep_index] = 1 if float(enemies[sep_index]["hp"]) > 0.0 else 0
+    var view_rect: Rect2 = visible_world_rect().grow(160.0)
+    for enemy_index in range(enemies.size()):
+        var enemy: Dictionary = enemies[enemy_index]
         if enemy["hp"] <= 0.0:
             continue
-        enemy["position"] = map_view.move_body(enemy["position"], enemy["position"], enemy["radius"])
         if enemy.get("state", "walk") == "egg":
+            # Only eggs need the settle pass: every other state reaches a real
+            # move_body call below, and move_body already resolves embedding
+            # at its start point. Settling all 84 enemies every frame was a
+            # second full collision solve per enemy for nothing.
+            enemy["position"] = map_view.move_body(enemy["position"], enemy["position"], enemy["radius"])
             enemy["timer"] -= delta
             enemy["velocity"] = Vector2.ZERO
             var egg_view = enemy.get("view")
@@ -1677,7 +1696,8 @@ func update_enemies(delta: float) -> void:
                 egg_view.health_fraction = enemy["hp"] / enemy["max_hp"]
                 if egg_view.has_method("set_crack"):
                     egg_view.set_crack(crack_amount)
-                egg_view.animate(Vector2.ZERO, delta, "egg")
+                if view_rect.has_point(enemy["position"]):
+                    egg_view.animate(Vector2.ZERO, delta, "egg")
             if cracking and not bool(enemy.get("crack_started", false)):
                 enemy["crack_started"] = true
                 if DisplayServer.get_name() != "headless" and effects != null:
@@ -1702,7 +1722,8 @@ func update_enemies(delta: float) -> void:
             if is_instance_valid(enter_view):
                 enter_view.position = enemy["position"]
                 enter_view.health_fraction = enemy["hp"] / enemy["max_hp"]
-                enter_view.animate(enter_velocity, delta, "walk")
+                if view_rect.has_point(enemy["position"]):
+                    enter_view.animate(enter_velocity, delta, "walk")
             if visible_world_rect().grow(-12.0).has_point(enemy["position"]):
                 enemy["state"] = "walk"
                 enemy["timer"] = rng.randf_range(0.35, 1.0)
@@ -1770,20 +1791,33 @@ func update_enemies(delta: float) -> void:
         velocity *= enemy["speed_multiplier"]
         if enemy["state"] == "walk":
             var separation: Vector2 = Vector2.ZERO
-            for other in enemies:
-                if other["id"] == enemy["id"] or other["hp"] <= 0.0:
+            var self_position: Vector2 = enemy["position"]
+            for other_index in range(sep_positions.size()):
+                if other_index == enemy_index or sep_alive[other_index] == 0:
                     continue
-                var offset: Vector2 = enemy["position"] - other["position"]
-                if offset.length_squared() < 1500.0 and offset.length_squared() > 0.01:
+                var offset: Vector2 = self_position - sep_positions[other_index]
+                var offset_length_squared: float = offset.length_squared()
+                if offset_length_squared < 1500.0 and offset_length_squared > 0.01:
                     separation += offset.normalized() * 28.0
             velocity += separation.limit_length(48)
         velocity += enemy["knock"]
         enemy["velocity"] = velocity
         enemy["knock"] = enemy["knock"].move_toward(Vector2.ZERO, delta * 270.0)
-        enemy["position"] = map_view.move_body(enemy["position"], enemy["position"] + velocity * delta, enemy["radius"])
+        # A stationary enemy whose position was already resolved by move_body
+        # cannot become embedded (stones never move), so re-solving it every
+        # frame is pure cost; spitters/throwers/chargers stand still a lot.
+        if velocity.is_zero_approx() and bool(enemy.get("settled", false)):
+            pass
+        else:
+            enemy["position"] = map_view.move_body(enemy["position"], enemy["position"] + velocity * delta, enemy["radius"])
+            enemy["settled"] = true
         enemy["view"].position = enemy["position"]
         enemy["view"].health_fraction = enemy["hp"] / enemy["max_hp"]
-        enemy["view"].animate(velocity, delta, behavior.get("pose",enemy["state"]))
+        # Off-screen enemies skip the walk-cycle update and redraw; their view
+        # position and health stay current, and animation resumes (with the
+        # 160px margin) before they can walk into view.
+        if view_rect.has_point(enemy["position"]):
+            enemy["view"].animate(velocity, delta, behavior.get("pose",enemy["state"]))
         if enemy["position"].distance_to(player_position) < enemy["radius"] + 18.0:
             hurt_player((player_position - enemy["position"]).normalized(), enemy["damage"], enemy["kind"] == "boss")
             if not running:
@@ -2192,8 +2226,14 @@ func update_projectiles(delta: float) -> void:
     var remaining: Array = []
     var targets: Array = combat_targets()
     for projectile in projectiles:
+        # Cached once per projectile: the lambda filters below used to call
+        # projectile.get("hit_ids", []) again for every candidate.
+        var hit_ids: Array = projectile.get("hit_ids", [])
         if projectile["kind"] != "hostile" and stats["homing"] > 0.0:
-            var candidates: Array = targets.filter(func(enemy): return not projectile.get("hit_ids", []).has(enemy["id"]))
+            var candidates: Array = []
+            for enemy in targets:
+                if not hit_ids.has(enemy["id"]):
+                    candidates.append(enemy)
             var target: Dictionary = Rules.choose_target(projectile["position"], 220.0, candidates, prefer_elite)
             if not target.is_empty():
                 var speed: float = projectile["velocity"].length()
@@ -2203,9 +2243,13 @@ func update_projectiles(delta: float) -> void:
         # A distant dinosaur must not make a reachable egg or rock immune.
         # Keep passing through secondary targets when a living target is reachable.
         var remaining_reach: float = projectile["velocity"].length() * maxf(0.0, float(projectile["life"])) + float(projectile["radius"])
-        var priority_targets: Array = targets.filter(func(candidate):
+        var priority_targets: Array = []
+        for candidate in targets:
+            if hit_ids.has(candidate["id"]):
+                continue
             var reach: float = remaining_reach + float(candidate.get("radius", 0.0))
-            return not projectile.get("hit_ids", []).has(candidate["id"]) and previous.distance_squared_to(candidate["position"]) <= reach * reach)
+            if previous.distance_squared_to(candidate["position"]) <= reach * reach:
+                priority_targets.append(candidate)
         projectile["position"] += projectile["velocity"] * delta
         projectile["life"] -= delta
         if projectile["kind"] in ["staff", "powder","sling"]:
@@ -2220,7 +2264,7 @@ func update_projectiles(delta: float) -> void:
                 consumed = true
         else:
             for enemy in targets:
-                if enemy["hp"] <= 0.0 or projectile.get("hit_ids", []).has(enemy["id"]):
+                if enemy["hp"] <= 0.0 or hit_ids.has(enemy["id"]):
                     continue
                 if Rules.should_defer_target(enemy, priority_targets):
                     continue
