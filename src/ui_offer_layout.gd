@@ -250,28 +250,48 @@ static func shop_confirm(h, state: Dictionary, index: int) -> void:
         verb = "购买并强化"
     var kind_label: String = "武器" if weapon else ("属性" if buff else "补给")
     var shown: int = clampi(int(offer.get("level", 1)), 1, Growth.MAX_WEAPON_LEVEL) if weapon and offer.has("level") else (mini(Growth.MAX_WEAPON_LEVEL, owned + 1) if weapon else owned + 1)
-    var body: String = "确定花费 %d 金币%s「%s（%s）」吗？取消返回商店，不扣费。" % [int(offer.get("price", 0)), "购买并更换" if replace_offer else "购买", str(data.get("name", key)), kind_label]
+    var level_text: String = ""
     if weapon:
-        body += " %s · %s" % [Growth.weapon_level_text(shown), Details.stats_line(key, shown)]
+        level_text = Growth.weapon_level_text(shown) if owned <= 0 else "Lv.%d → %s" % [owned, Growth.weapon_level_text(shown)]
     elif buff:
-        body += " 层数 %d → %d。" % [owned, shown]
-    var incoming: String = ""
-    var rows: Array = []
+        level_text = "层数 %d → %d" % [owned, shown]
+    var price: int = int(offer.get("price", 0))
+    var facts: Array = [
+        {"text": str(data.get("name", key)), "kind": "name"},
+        {"text": kind_label, "kind": "type"},
+    ]
+    if not level_text.is_empty():
+        facts.append({"text": level_text, "kind": "level"})
+    facts.append({"text": "花费 %d 金币" % price, "kind": "gold"})
+    var incoming_facts: Array = []
+    var row_items: Array = []
     if replace_offer:
-        incoming = "获得  %s  ·  %s  ·  %s  ·  花费 %d 金币" % [str(data.get("name", key)), Growth.weapon_level_text(shown), Details.stats_line(key, shown), int(offer.get("price", 0))]
+        incoming_facts = [
+            {"text": "获得", "kind": "lead"},
+            {"text": str(data.get("name", key)), "kind": "name"},
+            {"text": Growth.weapon_level_text(shown), "kind": "level"},
+            {"text": Details.stats_line(key, shown), "kind": "damage"},
+            {"text": "花费 %d 金币" % price, "kind": "gold"},
+        ]
         for held in inventory:
             var hid: String = str(held.get("id", ""))
             if not Catalog.WEAPONS.has(hid):
                 continue
             var lv: int = int(held.get("level", 1))
-            rows.append("%s  ·  %s  ·  %s  ·  售回 %d 金币" % [Catalog.WEAPONS[hid]["name"], Growth.weapon_level_text(lv), Details.stats_line(hid, lv), Economy.sell_price(hid, stage, lv)])
+            row_items.append({
+                "name": Catalog.WEAPONS[hid]["name"],
+                "level": Growth.weapon_level_text(lv),
+                "damage": Details.stats_line(hid, lv),
+                "gold": "售回 %d 金币" % Economy.sell_price(hid, stage, lv),
+            })
     centered_confirm(h, {
         "heading": "确认" + verb,
-        "body": body,
+        "facts": facts,
+        "support": "确定要%s这个东西吗？取消返回商店，不扣费。" % verb,
         "replace": replace_offer,
-        "incoming": incoming,
+        "incoming_facts": incoming_facts,
         "hint": "将与现有武器对比后更换；换下的按原价 50% 折价售回。" if replace_offer else "",
-        "rows": rows,
+        "row_items": row_items,
         "wallet": "当前金币 %d · 生命 %.1f / %.0f" % [coins, hp, max_hp],
         "confirm": "确定" + verb,
         "on_cancel": func():
@@ -280,32 +300,63 @@ static func shop_confirm(h, state: Dictionary, index: int) -> void:
             if not h.ui_busy(): h.confirm_shop_buy(),
     })
 
-static func choice_confirm(h, key: String, inventory: Array, levels: Dictionary, offer_levels: Dictionary, stage: int) -> void:
-    if not Catalog.WEAPONS.has(key):
+static func choice_confirm(h, key: String, inventory: Array, levels: Dictionary, offer_levels: Dictionary, stage: int, reason: String = "xp") -> void:
+    var weapon: bool = Catalog.WEAPONS.has(key)
+    var buff: bool = Growth.BUFFS.has(key)
+    if not weapon and not buff:
         return
-    var data: Dictionary = Catalog.WEAPONS[key]
+    var data: Dictionary = Catalog.WEAPONS[key] if weapon else Growth.BUFFS[key]
     var owned: int = Growth.item_level(key, inventory, levels)
-    var shown: int = clampi(int(offer_levels.get(key, 1)), 1, Growth.MAX_WEAPON_LEVEL) if owned <= 0 else mini(Growth.MAX_WEAPON_LEVEL, owned + 1)
-    var replace_offer: bool = owned <= 0 and inventory.size() >= 6
-    var verb: String = "领取并更换" if replace_offer else ("领取并升级" if owned > 0 else "领取武器")
-    var body: String = "确定%s「%s（武器）」吗？取消返回宝箱选择，不会消耗奖励。 %s · %s" % [verb, str(data.get("name", key)), Growth.weapon_level_text(shown), Details.stats_line(key, shown)]
-    var incoming: String = ""
-    var rows: Array = []
+    var shown: int = clampi(int(offer_levels.get(key, 1)), 1, Growth.MAX_WEAPON_LEVEL) if weapon and owned <= 0 else (mini(Growth.MAX_WEAPON_LEVEL, owned + 1) if weapon else owned + 1)
+    var replace_offer: bool = weapon and owned <= 0 and inventory.size() >= 6
+    var from_chest: bool = reason == "chest"
+    var take: String = "领取" if from_chest else "选择"
+    var verb: String = take + "属性"
     if replace_offer:
-        incoming = "获得  %s  ·  %s  ·  %s" % [str(data.get("name", key)), Growth.weapon_level_text(shown), Details.stats_line(key, shown)]
+        verb = take + "并更换"
+    elif weapon and owned > 0:
+        verb = take + "并升级"
+    elif weapon:
+        verb = take + "武器"
+    elif owned > 0:
+        verb = take + "并强化"
+    var kind_label: String = "武器" if weapon else "属性"
+    var level_text: String = Growth.weapon_level_text(shown) if weapon and owned <= 0 else ("Lv.%d → %s" % [owned, Growth.weapon_level_text(shown)] if weapon else "层数 %d → %d" % [owned, shown])
+    var facts: Array = [
+        {"text": str(data.get("name", key)), "kind": "name"},
+        {"text": kind_label, "kind": "type"},
+        {"text": level_text, "kind": "level"},
+    ]
+    var incoming_facts: Array = []
+    var row_items: Array = []
+    if replace_offer:
+        incoming_facts = [
+            {"text": "获得", "kind": "lead"},
+            {"text": str(data.get("name", key)), "kind": "name"},
+            {"text": Growth.weapon_level_text(shown), "kind": "level"},
+            {"text": Details.stats_line(key, shown), "kind": "damage"},
+        ]
         for held in inventory:
             var hid: String = str(held.get("id", ""))
             if not Catalog.WEAPONS.has(hid):
                 continue
             var lv: int = int(held.get("level", 1))
-            rows.append("%s  ·  %s  ·  %s  ·  售回 %d 金币" % [Catalog.WEAPONS[hid]["name"], Growth.weapon_level_text(lv), Details.stats_line(hid, lv), Economy.sell_price(hid, stage, lv)])
+            row_items.append({
+                "name": Catalog.WEAPONS[hid]["name"],
+                "level": Growth.weapon_level_text(lv),
+                "damage": Details.stats_line(hid, lv),
+                "gold": "售回 %d 金币" % Economy.sell_price(hid, stage, lv),
+            })
+    var leave: String = "宝箱选择" if from_chest else "升级选择"
+    var cost: String = "奖励" if from_chest else "这次升级"
     centered_confirm(h, {
         "heading": "确认" + verb,
-        "body": body,
+        "facts": facts,
+        "support": "确定要%s这个东西吗？取消返回%s，不会消耗%s。" % [verb, leave, cost],
         "replace": replace_offer,
-        "incoming": incoming,
+        "incoming_facts": incoming_facts,
         "hint": "将与现有武器对比后更换；换下的按原价 50% 折价售回。" if replace_offer else "",
-        "rows": rows,
+        "row_items": row_items,
         "wallet": "",
         "confirm": "确定" + verb,
         "on_cancel": func():
@@ -313,6 +364,93 @@ static func choice_confirm(h, key: String, inventory: Array, levels: Dictionary,
         "on_confirm": func():
             if not h.ui_busy(): h.confirm_choice_take(),
     })
+
+static func _confirm_fact_style(kind: String) -> Dictionary:
+    match kind:
+        "name":
+            return {"size": 24, "color": Color("#1e2a38")}
+        "type":
+            return {"size": 20, "color": Color("#8a3420")}
+        "level":
+            return {"size": 22, "color": Color("#b03d2a")}
+        "gold":
+            return {"size": 22, "color": Color("#c46a14")}
+        "damage":
+            return {"size": 17, "color": Color("#2f5a38")}
+        _:
+            return {"size": 16, "color": Color("#3e5439")}
+
+static func _confirm_fact_label(h, fact: Dictionary, named: bool = false) -> Label:
+    var kind: String = str(fact.get("kind", "name"))
+    var style: Dictionary = _confirm_fact_style(kind)
+    var node: Label = h.make_display(str(fact.get("text", "")), int(style["size"]), style["color"])
+    node.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    node.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    if named:
+        var names := {"name": "ConfirmFactName", "type": "ConfirmFactType", "level": "ConfirmFactLevel", "gold": "ConfirmFactGold"}
+        if names.has(kind):
+            node.name = str(names[kind])
+    return node
+
+static func _confirm_fact_row(h, parent: Node, facts: Array, named: bool = false) -> void:
+    if facts.is_empty():
+        return
+    var row := HBoxContainer.new()
+    row.alignment = BoxContainer.ALIGNMENT_CENTER
+    row.add_theme_constant_override("separation", 12)
+    row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    parent.add_child(row)
+    for fact in facts:
+        if str(fact.get("text", "")).is_empty():
+            continue
+        row.add_child(_confirm_fact_label(h, fact, named))
+
+static func _confirm_compare_cell(h, parent: Node, item: Dictionary, width: float) -> void:
+    var cell := VBoxContainer.new()
+    cell.add_theme_constant_override("separation", 0)
+    cell.custom_minimum_size = Vector2(width, 0)
+    cell.size_flags_horizontal = Control.SIZE_FILL
+    parent.add_child(cell)
+    var top := HBoxContainer.new()
+    top.add_theme_constant_override("separation", 6)
+    cell.add_child(top)
+    var name_label: Label = h.make_label(str(item.get("name", "")), 14, Color("#1e2a38"))
+    if h.display_font != null:
+        name_label.add_theme_font_override("font", h.display_font)
+    top.add_child(name_label)
+    var level_label: Label = h.make_label(str(item.get("level", "")), 14, Color("#b03d2a"))
+    if h.display_font != null:
+        level_label.add_theme_font_override("font", h.display_font)
+    top.add_child(level_label)
+    var gold_text: String = str(item.get("gold", ""))
+    if not gold_text.is_empty():
+        var gold_label: Label = h.make_label(gold_text, 14, Color("#c46a14"))
+        if h.display_font != null:
+            gold_label.add_theme_font_override("font", h.display_font)
+        top.add_child(gold_label)
+    var damage_text: String = str(item.get("damage", ""))
+    if not damage_text.is_empty():
+        var damage_label: Label = h.make_label(damage_text, 13, Color("#2f5a38"))
+        damage_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        damage_label.custom_minimum_size = Vector2(width, 0)
+        cell.add_child(damage_label)
+
+static func _place_confirm_sheet(sheet: Control, width: float, min_height: float) -> void:
+    var fitted: Vector2 = sheet.get_combined_minimum_size()
+    var height: float = maxf(min_height, fitted.y)
+    sheet.custom_minimum_size = Vector2(width, height)
+    sheet.size = Vector2(width, height)
+    sheet.position = Vector2((1280.0 - width) * 0.5, (800.0 - height) * 0.5)
+
+static func _slim_confirm_button(button: Button, min_width: float) -> void:
+    button.custom_minimum_size = Vector2(min_width, 40)
+    for state in ["normal", "hover", "pressed", "disabled"]:
+        var box: StyleBox = button.get_theme_stylebox(state)
+        if box is StyleBoxFlat:
+            var slim: StyleBoxFlat = (box as StyleBoxFlat).duplicate()
+            slim.content_margin_top = 6
+            slim.content_margin_bottom = 6
+            button.add_theme_stylebox_override(state, slim)
 
 static func centered_confirm(h, config: Dictionary) -> void:
     var replace_offer: bool = bool(config.get("replace", false))
@@ -323,72 +461,78 @@ static func centered_confirm(h, config: Dictionary) -> void:
     dim.color = Color(0.06, 0.04, 0.03, 0.46)
     dim.mouse_filter = Control.MOUSE_FILTER_STOP
     h.overlay.add_child(dim)
-    var sheet_w: float = 620.0
-    var sheet_h: float = 340.0 if replace_offer else 220.0
+    var sheet_w: float = 580.0 if replace_offer else 540.0
+    var sheet_h: float = 268.0 if replace_offer else 188.0
     var sheet := PanelContainer.new()
     sheet.name = "ShopConfirmSheet"
-    sheet.position = Vector2((1280.0 - sheet_w) * 0.5, (800.0 - sheet_h) * 0.5)
-    sheet.size = Vector2(sheet_w, sheet_h)
-    sheet.custom_minimum_size = Vector2(sheet_w, sheet_h)
+    sheet.custom_minimum_size = Vector2(sheet_w, 0)
     var panel: StyleBoxFlat = h.style(Color("#f3e6cc"), Color("#8e714a"))
-    panel.set_corner_radius_all(10)
-    panel.content_margin_left = 16
-    panel.content_margin_right = 16
-    panel.content_margin_top = 12
-    panel.content_margin_bottom = 12
+    panel.set_corner_radius_all(8)
+    panel.content_margin_left = 12
+    panel.content_margin_right = 12
+    panel.content_margin_top = 6
+    panel.content_margin_bottom = 6
     sheet.add_theme_stylebox_override("panel", panel)
     h.overlay.add_child(sheet)
     var column := VBoxContainer.new()
-    column.add_theme_constant_override("separation", 6)
+    column.add_theme_constant_override("separation", 3)
     sheet.add_child(column)
-    var heading: Label = h.make_display(str(config.get("heading", "确认")), 22)
+    var heading: Label = h.make_display(str(config.get("heading", "确认")), 18)
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
-    var body: Label = h.make_label(str(config.get("body", "")), 15, Color("#66705e"))
-    body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    body.custom_minimum_size = Vector2(580, 44 if replace_offer else 56)
-    column.add_child(body)
+    var inner_w: float = sheet_w - 24.0
+    _confirm_fact_row(h, column, config.get("facts", []), true)
+    var support_text: String = str(config.get("support", config.get("body", "")))
+    if not support_text.is_empty() and not replace_offer:
+        var support: Label = h.make_label(support_text, 13, Color("#6a7360"))
+        support.name = "ConfirmSupport"
+        support.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        support.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        support.custom_minimum_size = Vector2(inner_w, 16)
+        column.add_child(support)
     if replace_offer:
         var hint_text: String = str(config.get("hint", ""))
         if not hint_text.is_empty():
-            var hint: Label = h.make_label(hint_text, 13, Color("#704127"))
+            var hint: Label = h.make_label(hint_text, 12, Color("#7a5a3a"))
+            hint.name = "ConfirmSupport"
             hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
             hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-            hint.custom_minimum_size = Vector2(580, 18)
+            hint.custom_minimum_size = Vector2(inner_w, 14)
             column.add_child(hint)
-        var incoming_text: String = str(config.get("incoming", ""))
-        if not incoming_text.is_empty():
-            var incoming: Label = h.make_label(incoming_text, 13, Color("#3e5439"))
-            incoming.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-            incoming.custom_minimum_size = Vector2(580, 20)
-            incoming.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-            column.add_child(incoming)
+        var incoming_facts: Array = config.get("incoming_facts", [])
+        if incoming_facts.is_empty() and not str(config.get("incoming", "")).is_empty():
+            incoming_facts = [{"text": str(config.get("incoming", "")), "kind": "name"}]
+        var incoming_stats: Array = []
+        for fact in incoming_facts:
+            if str(fact.get("kind", "")) == "damage":
+                incoming_stats.append(fact)
+        _confirm_fact_row(h, column, incoming_stats)
         var grid := GridContainer.new()
         grid.columns = 2
         grid.add_theme_constant_override("h_separation", 8)
-        grid.add_theme_constant_override("v_separation", 4)
+        grid.add_theme_constant_override("v_separation", 2)
+        grid.size_flags_horizontal = Control.SIZE_FILL
         column.add_child(grid)
-        for row_text in config.get("rows", []):
-            var row: Label = h.make_label(str(row_text), 12, Color("#59462f"))
-            row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-            row.custom_minimum_size = Vector2(286, 18)
-            grid.add_child(row)
+        var cell_w: float = floor((inner_w - 8.0) * 0.5)
+        var row_items: Array = config.get("row_items", [])
+        if row_items.is_empty():
+            for row_text in config.get("rows", []):
+                row_items.append({"name": str(row_text), "level": "", "damage": "", "gold": ""})
+        for item in row_items:
+            _confirm_compare_cell(h, grid, item, cell_w)
     var wallet_text: String = str(config.get("wallet", ""))
     if not wallet_text.is_empty():
-        var wallet: Label = h.make_label(wallet_text, 14, Color("#704127"))
+        var wallet: Label = h.make_label(wallet_text, 13, Color("#704127"))
         wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         column.add_child(wallet)
-    var spacer := Control.new()
-    spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    column.add_child(spacer)
     var footer := HBoxContainer.new()
-    footer.add_theme_constant_override("separation", 14)
+    footer.add_theme_constant_override("separation", 12)
     column.add_child(footer)
     var cancel: Button = h.action(footer, "ShopBuyCancel", "取消", config.get("on_cancel") as Callable)
-    cancel.custom_minimum_size = Vector2(160, 42)
+    _slim_confirm_button(cancel, 150)
     var confirm: Button = h.action(footer, "ShopBuyConfirm", str(config.get("confirm", "确定")), config.get("on_confirm") as Callable)
-    confirm.custom_minimum_size = Vector2(200, 42)
+    _slim_confirm_button(confirm, 210)
+    _place_confirm_sheet(sheet, sheet_w, sheet_h)
 
 static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void:
     var column: VBoxContainer=h.parchment_column(1172,16)

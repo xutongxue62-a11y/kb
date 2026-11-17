@@ -1169,7 +1169,7 @@ func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = 
 func _choose(key: String) -> void:
     if ui_busy() or not choice_ids.has(key) or screen in ["shop_confirm", "choice_confirm"]:
         return
-    if screen == "growth" and choice_reason == "chest" and Catalog.WEAPONS.has(key):
+    if screen == "growth":
         request_choice_confirm(key)
         return
     if can_animate():
@@ -1223,7 +1223,6 @@ func apply_battle_visibility() -> void:
         if node == null or not is_instance_valid(node):
             continue
         var vital: bool = bool(node.get_meta("vital_hud", false))
-        var toggle: bool = bool(node.get_meta("hud_toggle", false)) or node == hide_ui_button
         if node == boss_bar or node == boss_label:
             if menu_hides_hud:
                 node.visible = false
@@ -1231,13 +1230,13 @@ func apply_battle_visibility() -> void:
         if menu_hides_hud:
             node.visible = false
             continue
-        if vital or toggle:
+        if vital:
             node.visible = true
         else:
             node.visible = not hud_hidden
     if hide_ui_button != null and is_instance_valid(hide_ui_button):
-        hide_ui_button.visible = not menu_hides_hud
-        hide_ui_button.text = ("显示界面 [V]" if hud_hidden and not menu_hides_hud else "隐藏界面 [V]")
+        hide_ui_button.visible = not menu_hides_hud and not hud_hidden
+        hide_ui_button.text = "隐藏界面 [V]"
     refresh_debug_controls()
 
 func configure_save(available: bool, autosave: bool, note: String = "", summary: Dictionary = {}) -> void:
@@ -1401,11 +1400,13 @@ func request_shop_buy(index: int) -> void:
     OfferUI.shop_confirm(self, shop_state, index)
 
 func request_choice_confirm(key: String) -> void:
-    if ui_busy() or screen != "growth" or not choice_ids.has(key) or not Catalog.WEAPONS.has(key):
+    if ui_busy() or screen != "growth" or not choice_ids.has(key):
+        return
+    if not Catalog.WEAPONS.has(key) and not Growth.BUFFS.has(key):
         return
     choice_confirm_key = key
     screen = "choice_confirm"
-    OfferUI.choice_confirm(self, key, choice_inventory, choice_levels, choice_offer_levels, choice_stage)
+    OfferUI.choice_confirm(self, key, choice_inventory, choice_levels, choice_offer_levels, choice_stage, choice_reason)
 
 func confirm_choice_take() -> void:
     if ui_busy():
@@ -1416,8 +1417,13 @@ func confirm_choice_take() -> void:
     screen = "growth"
     if key.is_empty() or not choice_ids.has(key):
         return
-    play_ui("choice_confirm")
-    choice_selected.emit(key)
+    if can_animate():
+        close_scroll_then(func():
+            play_ui("choice_confirm")
+            choice_selected.emit(key))
+    else:
+        play_ui("choice_confirm")
+        choice_selected.emit(key)
 
 func cancel_choice_confirm() -> void:
     close_shop_confirm_layer()

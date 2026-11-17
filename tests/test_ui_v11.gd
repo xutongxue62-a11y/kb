@@ -54,7 +54,11 @@ func run_checks() -> void:
         selections.append(key)
         h.hide_menu())
     h.choose_index(0)
-    expect(h.scroll_closing and selections.is_empty(),"choosing starts a real close without consuming the upgrade early")
+    expect(h.screen == "choice_confirm" and selections.is_empty(),"choosing opens a confirm without consuming the upgrade")
+    h.choose_index(1)
+    expect(h.screen == "choice_confirm" and selections.is_empty() and h.choice_confirm_key == "power", "a second number cannot change or consume the pending confirm")
+    h.confirm_choice_take()
+    expect(h.scroll_closing and selections.is_empty(),"confirming starts a real close without consuming the upgrade early")
     h.choose_index(1)
     await create_timer(0.42).timeout
     expect(selections==["power"] and h.screen=="combat","one upgrade commits only after the scroll has rolled shut")

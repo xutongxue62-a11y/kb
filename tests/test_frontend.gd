@@ -134,7 +134,9 @@ func run_checks() -> void:
     expect(choices.is_empty(), "growth mouse and number input cannot consume a choice during the paper roll")
     hud.input_lock_until = 0
     hud.choose_index(0)
-    expect(choices == ["club"], "growth remains actionable after the paper finishes")
+    expect(choices.is_empty() and hud.screen == "choice_confirm", "growth confirm appears after the paper finishes")
+    hud.confirm_choice_take()
+    expect(choices == ["club"], "growth remains actionable after the paper finishes and confirm")
     hud.show_shop([{"id":"sling","price":1,"sold":false}], 10, 1, [], {}, 8, 8)
     hud.input_lock_until = Time.get_ticks_msec() + 1000
     await press(hud.overlay, "ShopOffer0")
