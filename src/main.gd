@@ -15,6 +15,7 @@ const Progression = preload("res://src/progression.gd")
 const Economy = preload("res://src/economy.gd")
 const SessionState = preload("res://src/session_state.gd")
 const SaveStore = preload("res://src/save_store.gd")
+const KeyBindings = preload("res://src/key_bindings.gd")
 const Armory = preload("res://src/armory.gd")
 const WorldMap = preload("res://src/world_map.gd")
 const Music = preload("res://src/music_controller.gd")
@@ -144,6 +145,7 @@ func _ready() -> void:
     if save_store == null:
         save_store = SaveStore.new()
     settings = save_store.read_settings()
+    KeyBindings.apply_settings(settings)
     music = Music.new()
     music_volume = clampf(float(settings.get("music_volume", 1.0)), 0.0, 1.0)
     sfx_volume = clampf(float(settings.get("sfx_volume", 1.0)), 0.0, 1.0)
@@ -226,6 +228,7 @@ func _ready() -> void:
     hud.volume_changed.connect(set_volume)
     hud.damage_numbers_changed.connect(set_damage_numbers)
     hud.display_mode_changed.connect(set_fullscreen)
+    hud.key_bindings_changed.connect(set_key_bindings)
     hud.configure_music(bool(settings.get("music_enabled",true)))
     hud.configure_volumes(music_volume, sfx_volume)
     hud.configure_display(bool(settings.get("damage_numbers", true)), bool(settings.get("fullscreen", false)))
@@ -923,74 +926,88 @@ func update_hud() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
     if not event is InputEventKey or not event.pressed or event.echo:
         return
-    if departure_left > 0.0 or hud.handle_front_key(event.physical_keycode):
+    var code: int = event.physical_keycode
+    if hud != null and not str(hud.bind_listen_action).is_empty():
+        hud.handle_bind_listen(code)
         return
-    match event.physical_keycode:
-        KEY_F2:
-            if _cheats_allowed():
-                start_run(true,"base")
-        KEY_F3:
-            if _cheats_allowed():
-                start_expanded_trial()
-        KEY_F5:
-            save_game()
-        KEY_SHIFT:
-            request_dodge(read_movement())
-        KEY_SPACE:
-            switch_formation()
-        KEY_Q:
-            switch_combo_mode()
-        KEY_E:
-            switch_elite()
-        KEY_V:
-            toggle_hud_hidden()
-        KEY_R:
-            if _cheats_allowed() or trial_mode:
-                start_run(trial_mode,trial_preset)
-        KEY_ESCAPE:
-            if not replace_pending.is_empty():
-                cancel_replace()
-            elif hud != null and hud.screen == "shop_confirm" and hud.has_method("cancel_shop_buy"):
-                hud.cancel_shop_buy()
-            elif hud != null and hud.screen == "choice_confirm" and hud.has_method("cancel_choice_confirm"):
-                hud.cancel_choice_confirm()
-            elif hud != null and hud.screen == "restart_confirm" and hud.has_method("cancel_restart"):
-                hud.cancel_restart()
-            elif hud != null and hud.screen == "help_confirm" and hud.has_method("cancel_help_trial"):
-                hud.cancel_help_trial()
-            else:
-                toggle_pause()
-        KEY_B:
-            toggle_stats()
-        KEY_G:
-            request_trial_growth()
-        KEY_ENTER, KEY_KP_ENTER:
-            # Confirm with the keyboard: Enter accepts the open dialog, or
-            # triggers the screen's primary action (resume / next round).
-            if hud != null:
-                match hud.screen:
-                    "choice_confirm":
-                        hud.confirm_choice_take()
-                    "shop_confirm":
-                        hud.confirm_shop_buy()
-                    "restart_confirm":
-                        hud.confirm_restart()
-                    "help_confirm":
-                        hud.confirm_help_trial()
-                    "pause":
-                        toggle_pause()
-                    "shop":
-                        hud.next_round_requested.emit()
-        KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6:
-            var slot: int = int(event.physical_keycode) - int(KEY_1)
-            if not replace_pending.is_empty():
-                if slot >= 0 and slot < inventory.size():
-                    confirm_replace(str(inventory[slot]["id"]))
-            elif hud != null and hud.screen == "shop":
-                if hud.shop_index_available(slot):
-                    hud.request_shop_buy(slot)
-            elif slot < hud.choice_ids.size():
-                hud.choose_index(slot)
+    if departure_left > 0.0 or hud.handle_front_key(code):
+        return
+    if code == KEY_F2:
+        if _cheats_allowed():
+            start_run(true, "base")
+        return
+    if code == KEY_F3:
+        if _cheats_allowed():
+            start_expanded_trial()
+        return
+    if code == KEY_R:
+        if _cheats_allowed() or trial_mode:
+            start_run(trial_mode, trial_preset)
+        return
+    if code == KEY_SHIFT:
+        request_dodge(read_movement())
+        return
+    if KeyBindings.matches_code(code, "save"):
+        save_game()
+        return
+    if KeyBindings.matches_code(code, "scatter"):
+        switch_formation()
+        return
+    if KeyBindings.matches_code(code, "link"):
+        switch_combo_mode()
+        return
+    if KeyBindings.matches_code(code, "aim"):
+        switch_elite()
+        return
+    if KeyBindings.matches_code(code, "hide_ui"):
+        toggle_hud_hidden()
+        return
+    if KeyBindings.matches_code(code, "stats"):
+        toggle_stats()
+        return
+    if KeyBindings.matches_code(code, "growth_trial"):
+        request_trial_growth()
+        return
+    if KeyBindings.matches_code(code, "cancel"):
+        if not replace_pending.is_empty():
+            cancel_replace()
+        elif hud != null and hud.screen == "shop_confirm" and hud.has_method("cancel_shop_buy"):
+            hud.cancel_shop_buy()
+        elif hud != null and hud.screen == "choice_confirm" and hud.has_method("cancel_choice_confirm"):
+            hud.cancel_choice_confirm()
+        elif hud != null and hud.screen == "restart_confirm" and hud.has_method("cancel_restart"):
+            hud.cancel_restart()
+        elif hud != null and hud.screen == "help_confirm" and hud.has_method("cancel_help_trial"):
+            hud.cancel_help_trial()
+        else:
+            toggle_pause()
+        return
+    if KeyBindings.matches_code(code, "confirm"):
+        if hud != null:
+            match hud.screen:
+                "choice_confirm":
+                    hud.confirm_choice_take()
+                "shop_confirm":
+                    hud.confirm_shop_buy()
+                "restart_confirm":
+                    hud.confirm_restart()
+                "help_confirm":
+                    hud.confirm_help_trial()
+                "pause":
+                    toggle_pause()
+                "shop":
+                    hud.next_round_requested.emit()
+        return
+    var slot: int = KeyBindings.shop_slot(code)
+    if slot >= 0:
+        if not replace_pending.is_empty():
+            if slot >= 0 and slot < inventory.size():
+                confirm_replace(str(inventory[slot]["id"]))
+        elif hud != null and hud.screen == "shop":
+            if hud.shop_index_available(slot):
+                hud.request_shop_buy(slot)
+        elif slot < hud.choice_ids.size():
+            hud.choose_index(slot)
 
 func read_movement() -> Vector2:
     return Vector2(
@@ -2709,6 +2726,16 @@ func _apply_content_scale() -> void:
     win.content_scale_size = Vector2i(1280, 800)
     win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
     win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+
+func set_key_bindings() -> void:
+    var previous: Dictionary = settings.duplicate(true)
+    settings["key_bindings"] = KeyBindings.export_bindings()
+    var result: Dictionary = save_store.write_settings(settings)
+    if not result.get("ok", false):
+        settings = previous
+        KeyBindings.apply_settings(settings)
+        if hud != null and hud.has_method("refresh_key_hints"):
+            hud.refresh_key_hints()
 
 func set_fullscreen(enabled: bool) -> void:
     var previous: bool = bool(settings.get("fullscreen", false))

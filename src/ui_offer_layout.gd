@@ -6,6 +6,7 @@ const Economy = preload("res://src/economy.gd")
 const SupportArt = preload("res://src/support_art.gd")
 const Details = preload("res://src/ui_weapon_details.gd")
 const BuffDetails = preload("res://src/ui_buff_details.gd")
+const KeyBindings = preload("res://src/key_bindings.gd")
 
 static func text(h, parent: Node, value: String, rect: Rect2, size: int, color: Color = Color("#263546"),bold: bool=false) -> Label:
     var node: Label = h.make_display(value,size,color) if bold else h.make_label(value,size,color)
@@ -50,7 +51,7 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
     var shortcut: String="1–6" if compact else "1 / 2 / 3"
-    var hint: Label = h.make_label("选择 1 份 · 数字键 %s 或点击选择 · 回车确认 · 也可出售该份奖励，保留现有装备" % shortcut,16,Color("#65704f"))
+    var hint: Label = h.make_label("选择 1 份 · 数字键 %s 或点击选择 · 按 %s 确认 · 也可出售该份奖励，保留现有装备" % [shortcut, KeyBindings.caption_for("confirm")],16,Color("#65704f"))
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(hint)
     var grid := GridContainer.new()
@@ -129,7 +130,7 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
     var heading: Label=h.make_display("营地 · 第 %d 关结束" % stage,29)
     heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
-    var wallet: Label=h.make_display("金币 %d · 生命 %.1f / %.0f · 数字键 1–6 选择 · 回车确认" % [coins,hp,max_hp],19,Color("#704127"))
+    var wallet: Label=h.make_display("金币 %d · 生命 %.1f / %.0f · 数字键 1–6 选择 · 按 %s 确认" % [coins,hp,max_hp,KeyBindings.caption_for("confirm")],19,Color("#704127"))
     wallet.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(wallet)
     var grid:=GridContainer.new()
@@ -215,14 +216,14 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
     var footer:=HBoxContainer.new()
     footer.add_theme_constant_override("separation",14)
     column.add_child(footer)
-    h.action(footer,"SaveNow","保存 [F5]",func():h.save_requested.emit())
+    KeyBindings.attach_to_button(h.action(footer,"SaveNow","保存",func():h.save_requested.emit()), "save")
     if reroll_cost >= 0:
         var reroll: Button=h.action(footer,"RerollShop","刷新货物 · %d 金币" % reroll_cost,func():h.reroll_requested.emit())
         if coins < reroll_cost:
             reroll.disabled=true
             reroll.modulate=Color(1,1,1,0.65)
     h.action(footer,"Home","返回首页",func():h.home_requested.emit())
-    h.action(footer,"NextRound","准备好了 · 下一关",func():h.next_round_requested.emit(),Color("#b4583e"))
+    KeyBindings.attach_to_button(h.action(footer,"NextRound","准备好了 · 下一关",func():h.next_round_requested.emit(),Color("#b4583e")), "confirm")
     h.open_parchment(column,animate)
     if highlight>=0 and highlight<grid.get_child_count() and h.can_animate(): h.play_ui("choice_confirm")
 
@@ -532,10 +533,12 @@ static func centered_confirm(h, config: Dictionary) -> void:
     var footer := HBoxContainer.new()
     footer.add_theme_constant_override("separation", 12)
     column.add_child(footer)
-    var cancel: Button = h.action(footer, "ShopBuyCancel", "取消 [Esc]", config.get("on_cancel") as Callable)
+    var cancel: Button = h.action(footer, "ShopBuyCancel", "取消", config.get("on_cancel") as Callable)
     _slim_confirm_button(cancel, 150)
-    var confirm: Button = h.action(footer, "ShopBuyConfirm", str(config.get("confirm", "确定")) + " [回车]", config.get("on_confirm") as Callable)
+    KeyBindings.attach_to_button(cancel, "cancel")
+    var confirm: Button = h.action(footer, "ShopBuyConfirm", str(config.get("confirm", "确定")), config.get("on_confirm") as Callable)
     _slim_confirm_button(confirm, 210)
+    KeyBindings.attach_to_button(confirm, "confirm")
     _place_confirm_sheet(sheet, sheet_w, sheet_h)
 
 static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void:
@@ -596,7 +599,8 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
         text(h,slot,"换下并出售 · +%d 金币" % refund,Rect2(12,203,324,29),19,Color("#983f2b"),true)
     var footer:=HBoxContainer.new()
     column.add_child(footer)
-    var cancel: Button=h.action(footer,"ReplaceCancel","取消 [Esc] · 保留现有六件",func():
+    var cancel: Button=h.action(footer,"ReplaceCancel","取消 · 保留现有六件",func():
         if not h.ui_busy(): h.replace_cancelled.emit())
     cancel.add_theme_font_size_override("font_size",21)
+    KeyBindings.attach_to_button(cancel, "cancel")
     h.open_parchment(column,true)

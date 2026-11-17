@@ -10,6 +10,7 @@ const ButtonFx = preload("res://src/ui_ink_button_fx.gd")
 const UIAudio = preload("res://src/ui_audio.gd")
 const BattleUI = preload("res://src/ui_battle_hud.gd")
 const OfferUI = preload("res://src/ui_offer_layout.gd")
+const KeyBindings = preload("res://src/key_bindings.gd")
 
 signal start_requested(trial: bool)
 signal formation_requested
@@ -37,6 +38,7 @@ signal music_changed(enabled: bool)
 signal volume_changed(kind: String, value: float)
 signal damage_numbers_changed(enabled: bool)
 signal display_mode_changed(fullscreen: bool)
+signal key_bindings_changed
 
 var library
 var root: Control
@@ -109,6 +111,9 @@ var choice_offer_levels: Dictionary = {}
 var choice_stage: int = 1
 var choice_confirm_key: String = ""
 var help_in_run: bool = false
+var settings_in_run: bool = false
+var bind_listen_action: String = ""
+var bind_status: String = ""
 var pending_help_trial: String = ""
 var menu_summary: Dictionary = {}
 var hurt_flash_layer: Control
@@ -797,13 +802,16 @@ func update_state(hp: float, elapsed: float, kills: int, xp: float, xp_needed: i
     var seconds: int = maxi(0, ceili(30.0 - fmod(elapsed, 30.0)))
     timer_label.text = "第 %d 关  %02d:%02d" % [floori(elapsed / 30.0) + 1, seconds / 60, seconds % 60]
     if formation_button != null:
-        formation_button.text = ("收束集火" if collapsed else "展开扫荡") + " [空格]"
+        formation_button.text = "收束集火" if collapsed else "展开扫荡"
+        KeyBindings.attach_to_button(formation_button, "scatter")
     if combo_button != null:
-        combo_button.text = link["name"] + " [Q]"
+        combo_button.text = str(link["name"])
+        KeyBindings.attach_to_button(combo_button, "link")
         combo_button.tooltip_text = link["cost"]
     if elite_button != null:
-        elite_button.text = ("射程内精英优先" if prefer_elite else "最近目标") + " [E]"
-    notice_label.text = "试用：按 G 自选成长" if trial else "绿石经验 · 金币用于营地"
+        elite_button.text = "射程内精英优先" if prefer_elite else "最近目标"
+        KeyBindings.attach_to_button(elite_button, "aim")
+    notice_label.text = ("试用：按 %s 自选成长" % KeyBindings.caption_for("growth_trial")) if trial else "绿石经验 · 金币用于营地"
     growth_button.visible = trial and screen == "combat" and not hud_hidden and not menu_hides_hud
     combo_label.text = str(link["summary"]).replace("\n", " · ")
     xp_bar.max_value = maxf(1.0, float(xp_needed))
@@ -1098,9 +1106,9 @@ func show_menu(kind: String, kills: int, sfx: String = "ui_open", summary: Dicti
         recap.custom_minimum_size = Vector2(560, 48)
         column.add_child(recap)
     if kind == "pause":
-        action(column, "Resume", "继续战斗 [Esc]", func(): pause_requested.emit())
-        action(column, "SaveNow", "保存进度 [F5]", func(): save_requested.emit())
-        action(column, "Stats", "角色属性 [B]", func(): stats_requested.emit())
+        bind_shortcut(action(column, "Resume", "继续战斗", func(): pause_requested.emit()), "cancel")
+        bind_shortcut(action(column, "SaveNow", "保存进度", func(): save_requested.emit()), "save")
+        bind_shortcut(action(column, "Stats", "角色属性", func(): stats_requested.emit()), "stats")
         action(column, "HelpGameplay", "玩法说明", func(): show_help("gameplay", true))
         action(column, "Settings", "设置", func(): show_settings(true))
         action(column, "RestartRun", "重新开始本局", func(): show_restart_confirm())
@@ -1175,13 +1183,14 @@ func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = 
         grid.add_child(entry)
         var label: Label = make_label(("已选  " if level > 0 else "可成长  ") + data["name"] + "  Lv.%d\n" % [level] + data["description"].split("\n")[0], 16, ink if level > 0 else Color("#8b806b"))
         entry.add_child(label)
-    var legend: Label = make_label("B 查看属性 · F5 保存    品红尖刺是敌方攻击    绿石给经验，金币用于营地购买", 16, Color("#78674d"))
+    var legend: Label = make_label("%s 查看属性 · %s 保存    品红尖刺是敌方攻击    绿石给经验，金币用于营地购买" % [KeyBindings.caption_for("stats"), KeyBindings.caption_for("save")], 16, Color("#78674d"))
     legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(legend)
     var in_combat: bool = bool(difficulty.get("in_combat", false))
-    var resume: Button = make_button("继续战斗 [B / Esc]" if in_combat else "返回 [B / Esc]", Color("#d1ddba"))
+    var resume: Button = make_button("继续战斗" if in_combat else "返回", Color("#d1ddba"))
     resume.name = "Back"
     resume.pressed.connect(func(): stats_requested.emit())
+    KeyBindings.attach_to_button(resume, "stats")
     column.add_child(resume)
     play_transition("stats", "ui_open")
 
@@ -1255,7 +1264,8 @@ func apply_battle_visibility() -> void:
             node.visible = not hud_hidden
     if hide_ui_button != null and is_instance_valid(hide_ui_button):
         hide_ui_button.visible = not menu_hides_hud and not hud_hidden
-        hide_ui_button.text = "隐藏界面 [V]"
+        hide_ui_button.text = "隐藏界面"
+        KeyBindings.attach_to_button(hide_ui_button, "hide_ui")
     refresh_debug_controls()
 
 func configure_save(available: bool, autosave: bool, note: String = "", summary: Dictionary = {}) -> void:
@@ -1373,8 +1383,8 @@ func show_restart_confirm() -> void:
     body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     body.custom_minimum_size = Vector2(560, 72)
     column.add_child(body)
-    action(column, "RestartConfirm", "确定重新开始 [回车]", func(): restart_requested.emit())
-    action(column, "RestartCancel", "取消 [Esc]", func(): cancel_restart())
+    bind_shortcut(action(column, "RestartConfirm", "确定重新开始", func(): restart_requested.emit()), "confirm")
+    bind_shortcut(action(column, "RestartCancel", "取消", func(): cancel_restart()), "cancel")
     open_parchment(column, true)
 
 func cancel_restart() -> void:
@@ -1404,7 +1414,10 @@ func shop_index_available(index: int) -> bool:
     return true
 
 func show_settings(in_run: bool) -> void:
-    remember_modal_origin()
+    if screen != "keybindings":
+        remember_modal_origin()
+    settings_in_run = in_run
+    bind_listen_action = ""
     reset_overlay()
     set_battle_visible(in_run)
     screen = "settings"
@@ -1552,7 +1565,7 @@ func page_turn(previous: Texture2D, effect: String = "compose", sound: bool = tr
     veil.play(previous, effect)
 
 func remember_modal_origin() -> void:
-    if screen not in ["settings", "help", "continue"]:
+    if screen not in ["settings", "help", "continue", "keybindings"]:
         front_return_screen = screen
         modal_snapshot = snapshot_ui()
 
@@ -1618,35 +1631,137 @@ func update_departure(seconds: float) -> void:
 func handle_front_key(code: int) -> bool:
     if ui_busy():
         return true
-    if screen in ["settings", "continue", "help"] and code == KEY_ESCAPE:
+    if screen == "keybindings":
+        if KeyBindings.matches_code(code, "cancel"):
+            show_settings(settings_in_run)
+            return true
+        return not bind_listen_action.is_empty()
+    if screen in ["settings", "continue", "help"] and KeyBindings.matches_code(code, "cancel"):
         close_front_modal()
         return true
-    if screen == "help_confirm" and code == KEY_ESCAPE:
-        cancel_help_trial()
-        return true
-    if screen == "shop_confirm" and code == KEY_ESCAPE:
-        cancel_shop_buy()
-        return true
-    if screen == "choice_confirm" and code == KEY_ESCAPE:
-        cancel_choice_confirm()
-        return true
-    if screen == "restart_confirm" and code == KEY_ESCAPE:
-        cancel_restart()
-        return true
+    if screen == "help_confirm":
+        if KeyBindings.matches_code(code, "cancel"):
+            cancel_help_trial()
+            return true
+        if KeyBindings.matches_code(code, "confirm"):
+            confirm_help_trial()
+            return true
+    if screen == "shop_confirm":
+        if KeyBindings.matches_code(code, "cancel"):
+            cancel_shop_buy()
+            return true
+        if KeyBindings.matches_code(code, "confirm"):
+            confirm_shop_buy()
+            return true
+    if screen == "choice_confirm":
+        if KeyBindings.matches_code(code, "cancel"):
+            cancel_choice_confirm()
+            return true
+        if KeyBindings.matches_code(code, "confirm"):
+            confirm_choice_take()
+            return true
+    if screen == "restart_confirm":
+        if KeyBindings.matches_code(code, "cancel"):
+            cancel_restart()
+            return true
+        if KeyBindings.matches_code(code, "confirm"):
+            confirm_restart()
+            return true
     if screen == "cast":
         if code == KEY_LEFT or code == KEY_RIGHT:
             change_character(-1 if code == KEY_LEFT else 1)
             return true
-        if code in [KEY_ENTER, KEY_KP_ENTER]:
+        if KeyBindings.matches_code(code, "confirm"):
             confirm_cast()
             return true
-        if code == KEY_ESCAPE:
+        if KeyBindings.matches_code(code, "cancel"):
             show_title()
             return true
-    elif screen in ["title", "start"] and code in [KEY_ENTER, KEY_KP_ENTER]:
+    elif screen in ["title", "start"] and KeyBindings.matches_code(code, "confirm"):
         show_cast()
         return true
     return false
+
+func bind_shortcut(button: BaseButton, action: String) -> BaseButton:
+    KeyBindings.attach_to_button(button, action)
+    return button
+
+func refresh_key_hints() -> void:
+    KeyBindings.refresh_tree(root)
+    KeyBindings.refresh_tree(overlay)
+
+func show_key_bindings(in_run: bool) -> void:
+    settings_in_run = in_run
+    reset_overlay()
+    set_battle_visible(in_run)
+    screen = "keybindings"
+    FrontUI.key_bindings_page(self, in_run)
+    play_ui("ui_open")
+
+func begin_bind_listen(action: String) -> void:
+    if ui_busy() or not KeyBindings.ACTIONS.has(action):
+        return
+    bind_listen_action = action
+    bind_status = "请按下新按键，Esc 取消本次改键"
+    play_ui("button_press")
+    _refresh_bind_page()
+
+func reset_key_bindings() -> void:
+    if ui_busy():
+        return
+    KeyBindings.reset_defaults()
+    bind_listen_action = ""
+    bind_status = "已恢复默认按键"
+    key_bindings_changed.emit()
+    refresh_key_hints()
+    _refresh_bind_page()
+
+func handle_bind_listen(code: int) -> void:
+    if bind_listen_action.is_empty():
+        return
+    if code == KEY_ESCAPE:
+        bind_listen_action = ""
+        bind_status = "已取消改键"
+        _refresh_bind_page()
+        return
+    var result: Dictionary = KeyBindings.set_binding(bind_listen_action, code)
+    if not bool(result.get("ok", false)):
+        bind_status = str(result.get("error", "请按其他键"))
+        _refresh_bind_page()
+        return
+    bind_listen_action = ""
+    bind_status = "已更新按键"
+    key_bindings_changed.emit()
+    refresh_key_hints()
+    _refresh_bind_page()
+
+func _refresh_bind_page() -> void:
+    if screen != "keybindings":
+        return
+    var keep_in_run: bool = settings_in_run
+    var keep_status: String = bind_status
+    var keep_listen: String = bind_listen_action
+    reset_overlay()
+    set_battle_visible(keep_in_run)
+    screen = "keybindings"
+    FrontUI.key_bindings_page(self, keep_in_run)
+    bind_status = keep_status
+    bind_listen_action = keep_listen
+    var status: Label = overlay.find_child("BindStatus", true, false) as Label
+    if status != null:
+        status.text = bind_status
+    if not bind_listen_action.is_empty():
+        var cap = overlay.find_child("KeycapHint", true, false)
+        # mark listening cap on the matching bind button
+        var button: Node = overlay.find_child(_bind_button_name(bind_listen_action), true, false)
+        if button != null:
+            var hint = button.find_child("KeycapHint", true, false)
+            if hint != null and hint.has_method("set"):
+                hint.listening = true
+                hint.queue_redraw()
+
+func _bind_button_name(action: String) -> String:
+    return str(KeyBindings.BIND_BUTTON.get(action, "Bind" + action.capitalize()))
 
 class HurtVignette extends Control:
     var strength: float = 0.0:
@@ -1972,13 +2087,14 @@ func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: f
     dodge_label.text = "就绪" if dodge_cooldown <= 0 else "%.1fs" % dodge_cooldown
     dodge_bar.value = 1 - clampf(dodge_cooldown / maxf(0.01,dodge_total),0,1)
     if combo_button != null and combo_button.text.begins_with("不联动"):
-        combo_button.text = ("联动可用" if links.size() > 1 else "等待配方") + " [Q]"
+        combo_button.text = "联动可用" if links.size() > 1 else "等待配方"
+        KeyBindings.attach_to_button(combo_button, "link")
     if links.size() <= 1:
         if combo_button != null:
-            combo_button.tooltip_text = "获得火药筒 + 法杖可选符火；火药筒 + 木棒/石斧/骨刃可选锁链。按 Q 切换，保留改造代价。"
+            combo_button.tooltip_text = "获得火药筒 + 法杖可选符火；火药筒 + 木棒/石斧/骨刃可选锁链。按 %s 切换，保留改造代价。" % KeyBindings.caption_for("link")
         # When the player already holds one half of a recipe, main passes a
         # hint naming the missing piece instead of the generic recipe list.
-        combo_label.text = link_hint if link_hint != "" else "联动配方：火药筒 + 法杖 / 近战武器；集齐后按 Q 切换。帮助里有炮口与配方说明。"
+        combo_label.text = link_hint if link_hint != "" else ("联动配方：火药筒 + 法杖 / 近战武器；集齐后按 %s 切换。帮助里有炮口与配方说明。" % KeyBindings.caption_for("link"))
     elif link_hint != "":
         combo_label.text = link_hint
 

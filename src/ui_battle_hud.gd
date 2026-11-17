@@ -1,5 +1,6 @@
 extends RefCounted
 const Paper = preload("res://src/ui_battle_paper.gd")
+const KeyBindings = preload("res://src/key_bindings.gd")
 static func paper(h, rect: Rect2):
     var panel := Paper.new()
     panel.position = rect.position
@@ -79,11 +80,13 @@ static func build(h) -> void:
     var wallet: Array = paper(h,Rect2(751,16,280,66))
     h.coin_label = label(h,wallet[1],"金币 0",Rect2(15,7,126,46),17,Color("#956c2f"))
     h.score_label = label(h,wallet[1],"击败 0",Rect2(145,7,124,46),17)
-    action(h,"BattlePause","暂停 / 设置 [Esc]",Rect2(1050,21,208,48),func():h.pause_requested.emit())
-    h.hide_ui_button = action(h,"HideUI","隐藏界面 [V]",Rect2(350,94,170,42),func():h.toggle_hud_hidden())
+    KeyBindings.attach_to_button(action(h,"BattlePause","暂停 / 设置",Rect2(1050,21,208,48),func():h.pause_requested.emit()), "cancel")
+    h.hide_ui_button = action(h,"HideUI","隐藏界面",Rect2(350,94,170,42),func():h.toggle_hud_hidden())
     h.hide_ui_button.set_meta("hud_toggle", true)
-    action(h,"BattleStats","属性 [B]",Rect2(991,94,126,36),func():h.stats_requested.emit())
-    h.growth_button = action(h,"TrialGrowth","成长 [G]",Rect2(1133,94,124,36),func():h.growth_requested.emit())
+    KeyBindings.attach_to_button(h.hide_ui_button, "hide_ui")
+    KeyBindings.attach_to_button(action(h,"BattleStats","属性",Rect2(991,94,126,36),func():h.stats_requested.emit()), "stats")
+    h.growth_button = action(h,"TrialGrowth","成长",Rect2(1133,94,124,36),func():h.growth_requested.emit())
+    KeyBindings.attach_to_button(h.growth_button, "growth_trial")
     h.growth_button.visible = false
     var notice: Array = paper(h,Rect2(18,661,208,32))
     h.notice_label = label(h,notice[1],"",Rect2(10,3,188,25),13,Color("#5b624d"))

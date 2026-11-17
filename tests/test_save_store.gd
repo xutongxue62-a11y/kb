@@ -36,6 +36,7 @@ func _initialize() -> void:
     check_music_settings()
     check_backups()
     check_corrupt_reads()
+    check_key_bindings()
     check_settings_recovery()
     check_write_failures()
     check_json_limits()
@@ -395,3 +396,20 @@ func check_music_settings() -> void:
     expect(read_text("music_settings", "settings.json") == original_text, "invalid music writes preserve the last valid preferences")
     write_raw("music_settings", "settings.json", "{\"music_enabled\":\"false\"}")
     expect(typeof(store.read_settings().get("music_enabled")) == TYPE_BOOL and not store.read_settings()["music_enabled"], "invalid primary music value falls back to last valid music-off backup")
+
+func check_key_bindings() -> void:
+    var store = make_store("key_bindings")
+    expect(store.write_settings({"autosave": true, "key_bindings": {"confirm": 75}}).get("ok", false), "optional key bindings can be stored")
+    var loaded: Dictionary = make_store("key_bindings").read_settings()
+    expect(int(loaded.get("key_bindings", {}).get("confirm", 0)) == 75, "key binding integers round-trip")
+    expect(bool(loaded.get("autosave", false)), "autosave remains present beside optional bindings")
+    expect(make_store("no_key_bindings").read_settings() == {"autosave": true, "music_enabled": true}, "missing key bindings stay absent and do not become required")
+    var original_text: String = read_text("key_bindings", "settings.json")
+    expect(not store.write_settings({"autosave": true, "key_bindings": "Enter"}).get("ok", true), "key bindings must be an object")
+    expect(not store.write_settings({"autosave": true, "key_bindings": {"confirm": "Enter"}}).get("ok", true), "key binding values must be integer keycodes")
+    expect(not store.write_settings({"autosave": true, "key_bindings": {"confirm": 0}}).get("ok", true), "key binding values must be positive")
+    expect(read_text("key_bindings", "settings.json") == original_text, "invalid key binding writes preserve the last valid preferences")
+    expect(store.write_settings({"autosave": true, "future": 3, "key_bindings": {"confirm": 75, "custom_future": 12}}).get("ok", false), "unknown nested binding keys are optional extras")
+    var again: Dictionary = make_store("key_bindings").read_settings()
+    expect(int(again.get("key_bindings", {}).get("custom_future", 0)) == 12 and again.get("future", 0) == 3, "unknown extras beside and inside key bindings are preserved")
+

@@ -272,6 +272,17 @@ func _validate_settings(settings: Variant) -> String:
         return "全屏设置必须是布尔值"
     if settings.has("seen_link_guide") and typeof(settings["seen_link_guide"]) != TYPE_BOOL:
         return "联动引导记录必须是布尔值"
+    if settings.has("key_bindings"):
+        if typeof(settings["key_bindings"]) != TYPE_DICTIONARY:
+            return "按键设置必须是对象"
+        for action in settings["key_bindings"]:
+            if typeof(action) != TYPE_STRING:
+                return "按键设置的功能名必须是字符串"
+            var bind: Variant = settings["key_bindings"][action]
+            if typeof(bind) != TYPE_INT and typeof(bind) != TYPE_FLOAT:
+                return "按键设置必须是数值键码"
+            if float(bind) != float(int(bind)) or int(bind) <= 0:
+                return "按键设置必须是正整数键码"
     for key in ["music_volume", "sfx_volume"]:
         if settings.has(key) and not _number_in_range(settings[key], 0.0, 1.0):
             return "音量设置必须是 0 到 1 的数值"

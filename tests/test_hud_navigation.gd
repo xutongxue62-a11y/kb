@@ -164,6 +164,25 @@ func check_layout(hud, context: String) -> void:
                     continue
                 expect(not left_rect.intersects(right.get_global_rect().grow(-1.0)), context + " does not let typography, the photo or actions cover each other: " + _block_id(left) + " / " + _block_id(right))
 
+
+func press_key(code: int) -> void:
+    for down in [true, false]:
+        var event := InputEventKey.new()
+        event.pressed = down
+        event.echo = false
+        event.keycode = code
+        event.physical_keycode = code
+        Input.parse_input_event(event)
+        await process_frame
+
+func button_has_keycap(button: Node) -> bool:
+    return button != null and button.find_child("KeycapHint", true, false) != null
+
+func buttons_forbid_enter_word(hud, context: String) -> void:
+    for node in descendents(hud.overlay):
+        if node is BaseButton and node.is_visible_in_tree():
+            expect(not str(node.text).contains("回车"), context + " button hints do not write 回车: " + str(node.name) + " / " + node.text)
+
 func _initialize() -> void:
     call_deferred("run_checks")
 
@@ -377,6 +396,9 @@ func run_checks() -> void:
     var support_label: Label = fact_label(hud, "ConfirmSupport")
     expect(support_label != null and support_label.get_theme_font_size("font_size") <= 14 and fact_label(hud, "ConfirmFactGold").get_theme_color("font_color") != support_label.get_theme_color("font_color"), "supporting confirm copy stays quieter than the gold and name facts")
     await check_layout(hud, "shop confirm")
+    expect(named_button(hud, "ShopBuyConfirm") != null and not named_button(hud, "ShopBuyConfirm").text.contains("回车") and button_has_keycap(named_button(hud, "ShopBuyConfirm")), "shop confirm uses a keycap instead of the word 回车")
+    expect(named_button(hud, "ShopBuyCancel") != null and button_has_keycap(named_button(hud, "ShopBuyCancel")), "shop cancel shows a keycap")
+    buttons_forbid_enter_word(hud, "shop confirm")
     await click(named_button(hud, "ShopBuyCancel"))
     expect(events.is_empty() and hud.screen == "shop" and stock[0]["sold"] == false, "cancel returns to shop with no purchase")
     expect(hud.overlay.find_child("ShopConfirmSheet", true, false) == null, "cancel removes the popup and does not replace the shop")
@@ -493,6 +515,42 @@ func run_checks() -> void:
     expect(hud.screen == "stats" and events == [["stats"]], "stats close through the controller so its previous-screen state remains authoritative")
     events.clear()
     await check_layout(hud, "stats page")
+
+
+    var Bindings = load("res://src/key_bindings.gd")
+    Bindings.reset_defaults()
+    hud.show_title()
+    await click(named_button(hud, "Settings"))
+    expect(named_button(hud, "OpenKeyBindings") != null, "settings expose a 改按键 action")
+    await check_layout(hud, "settings page with remapping entry")
+    await click(named_button(hud, "OpenKeyBindings"))
+    expect(hud.screen == "keybindings", "改按键 opens the remapping page")
+    expect(named_button(hud, "BindConfirm") != null and named_button(hud, "BindCancel") != null, "confirm and cancel are remappable")
+    expect(named_button(hud, "BindHideUI") != null and named_button(hud, "BindShop1") != null and named_button(hud, "BindSave") != null, "hide-UI, save and shop keys are remappable")
+    expect(named_button(hud, "ResetKeyBindings") != null, "the remapping page can restore defaults")
+    await check_layout(hud, "keybindings page")
+    await click(named_button(hud, "BindConfirm"))
+    expect(hud.bind_listen_action == "confirm", "clicking a bind row starts listen mode")
+    hud.handle_bind_listen(KEY_ESCAPE)
+    expect(hud.bind_listen_action == "", "Esc during listen cancels the listen")
+    await click(named_button(hud, "BindConfirm"))
+    hud.handle_bind_listen(KEY_V)
+    expect(hud.bind_listen_action == "confirm" and label_text(hud).contains("占用"), "a conflicting key is rejected and listen continues")
+    hud.handle_bind_listen(KEY_K)
+    expect(hud.bind_listen_action == "" and Bindings.code_of("confirm") == KEY_K, "confirm can be remapped to a free key")
+    await click(named_button(hud, "BackToSettings"))
+    expect(hud.screen == "settings", "the remapping page returns to settings")
+    await click(named_button(hud, "Back"))
+    var remap_stock: Array = [{"id": "sling", "price": 5, "sold": false}]
+    hud.show_shop(remap_stock, 40, 4, [{"id": "sling", "level": 1}], {}, 8.0, 8.0, false)
+    await click(named_button(hud, "ShopOffer0"))
+    expect(hud.screen == "shop_confirm", "shop confirm opens for remap verification")
+    expect(not hud.handle_front_key(KEY_ENTER), "the old Enter key no longer confirms after a remap")
+    expect(hud.screen == "shop_confirm", "Enter does not accept the dialog after confirm was remapped")
+    expect(hud.handle_front_key(KEY_K), "the remapped confirm key is honored")
+    expect(hud.screen == "shop", "the remapped confirm key accepts the shop confirm")
+    Bindings.reset_defaults()
+    expect(Bindings.code_of("confirm") == KEY_ENTER and Bindings.code_of("cancel") == KEY_ESCAPE, "defaults can be restored after a remap test")
 
     hud.hide_menu() # Battle bindings are audited in battle; offer screens now hide the background HUD.
     hud.update_state(4.0, 0.0, 17, 2.0, 6, [{"id": "sling", "level": 1}], false, Catalog.LINKS["none"], false, false)
