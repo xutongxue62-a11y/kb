@@ -490,6 +490,9 @@ func continue_game() -> bool:
     var accepted: bool = SessionState.apply(self,result["state"])
     restoring = false
     if accepted:
+        if hud != null and Catalog.CHARACTERS.has(character_id):
+            hud.selected_character = character_id
+            hud.preview_character = character_id
         map_view.set_view(player_position,wave)
         player_position = map_view.move_body(player_position,player_position,18.0)
         hero.position = player_position
@@ -971,10 +974,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
     if KeyBindings.matches_code(code, "cancel"):
         if not replace_pending.is_empty():
             cancel_replace()
-        elif hud != null and hud.screen == "shop_confirm" and hud.has_method("cancel_shop_buy"):
-            hud.cancel_shop_buy()
-        elif hud != null and hud.screen == "choice_confirm" and hud.has_method("cancel_choice_confirm"):
-            hud.cancel_choice_confirm()
         elif hud != null and hud.screen == "restart_confirm" and hud.has_method("cancel_restart"):
             hud.cancel_restart()
         elif hud != null and hud.screen == "help_confirm" and hud.has_method("cancel_help_trial"):
@@ -985,10 +984,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
     if KeyBindings.matches_code(code, "confirm"):
         if hud != null:
             match hud.screen:
-                "choice_confirm":
-                    hud.confirm_choice_take()
-                "shop_confirm":
-                    hud.confirm_shop_buy()
+                "lose", "win":
+                    hud.confirm_cast()
                 "restart_confirm":
                     hud.confirm_restart()
                 "help_confirm":

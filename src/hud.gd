@@ -103,13 +103,11 @@ var sfx_volume: float = 1.0
 var damage_numbers_enabled: bool = true
 var fullscreen_enabled: bool = false
 var shop_state: Dictionary = {}
-var shop_confirm_index: int = -1
 var choice_reason: String = ""
 var choice_inventory: Array = []
 var choice_levels: Dictionary = {}
 var choice_offer_levels: Dictionary = {}
 var choice_stage: int = 1
-var choice_confirm_key: String = ""
 var help_in_run: bool = false
 var settings_in_run: bool = false
 var bind_listen_action: String = ""
@@ -1115,7 +1113,8 @@ func show_menu(kind: String, kills: int, sfx: String = "ui_open", summary: Dicti
         action(column, "Home", "返回首页", func(): home_requested.emit())
     else:
         var retry: Dictionary = Catalog.character(selected_character)
-        action(column, "StartSling", "再出发 · " + str(retry.get("weapon_label", "弹弓")), func(): confirm_cast())
+        bind_shortcut(action(column, "StartSling", "再出发 · " + str(retry.get("weapon_label", "弹弓")), func(): confirm_cast()), "confirm")
+        action(column, "ChangeCharacter", "重新选择角色", func(): show_cast())
         action(column, "Home", "返回首页", func(): home_requested.emit())
     save_note_label = make_label(save_note, 16, Color("#66705e"))
     save_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1134,7 +1133,6 @@ func show_choices(ids: Array, inventory: Array, levels: Dictionary = {}, reason:
     choice_levels = levels.duplicate(true)
     choice_offer_levels = offer_levels.duplicate(true)
     choice_stage = stage
-    choice_confirm_key = ""
     OfferUI.growth(self,ids,inventory,levels,reason,offer_levels,stage)
 
 func show_replace(pending: Dictionary, inventory: Array, stage: int = 1) -> void:
@@ -1195,10 +1193,7 @@ func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = 
     play_transition("stats", "ui_open")
 
 func _choose(key: String) -> void:
-    if ui_busy() or not choice_ids.has(key) or screen in ["shop_confirm", "choice_confirm"]:
-        return
-    if screen == "growth":
-        request_choice_confirm(key)
+    if ui_busy() or not choice_ids.has(key):
         return
     if can_animate():
         close_scroll_then(func():
@@ -1228,7 +1223,6 @@ func hide_menu() -> void:
     present_backdrop("none")
     screen = "combat"
     choice_ids.clear()
-    choice_confirm_key = ""
     set_battle_visible(true)
     entered_screen = "combat"
     if closing:
@@ -1435,7 +1429,6 @@ func show_shop(stock: Array, coins: int, finished_wave: int, inventory: Array, l
         "max_hp": max_hp,
         "reroll_cost": reroll_cost,
     }
-    shop_confirm_index = -1
     reset_overlay()
     set_battle_visible(false)
     present_backdrop("none")
@@ -1444,83 +1437,15 @@ func show_shop(stock: Array, coins: int, finished_wave: int, inventory: Array, l
     OfferUI.shop(self,stock,coins,finished_wave,inventory,levels,hp,max_hp,animate,highlight,reroll_cost)
 
 func request_shop_buy(index: int) -> void:
-    if ui_busy() or shop_state.is_empty() or screen == "shop_confirm":
+    # One-click purchase: no confirmation sheet. The world validates the
+    # offer again in buy_shop_item, and a full-loadout weapon purchase
+    # still routes through the replace page, which is the confirmation.
+    if ui_busy() or shop_state.is_empty():
         return
     var stock: Array = shop_state.get("stock", [])
     if index < 0 or index >= stock.size():
         return
-    shop_confirm_index = index
-    screen = "shop_confirm"
-    OfferUI.shop_confirm(self, shop_state, index)
-
-func request_choice_confirm(key: String) -> void:
-    if ui_busy() or screen != "growth" or not choice_ids.has(key):
-        return
-    if not Catalog.WEAPONS.has(key) and not Growth.BUFFS.has(key):
-        return
-    choice_confirm_key = key
-    screen = "choice_confirm"
-    OfferUI.choice_confirm(self, key, choice_inventory, choice_levels, choice_offer_levels, choice_stage, choice_reason)
-
-func confirm_choice_take() -> void:
-    if ui_busy():
-        return
-    var key: String = choice_confirm_key
-    close_shop_confirm_layer()
-    choice_confirm_key = ""
-    screen = "growth"
-    if key.is_empty() or not choice_ids.has(key):
-        return
-    if can_animate():
-        close_scroll_then(func():
-            play_ui("choice_confirm")
-            choice_selected.emit(key))
-    else:
-        play_ui("choice_confirm")
-        choice_selected.emit(key)
-
-func cancel_choice_confirm() -> void:
-    close_shop_confirm_layer()
-    choice_confirm_key = ""
-    if choice_ids.is_empty():
-        return
-    screen = "growth"
-
-func confirm_shop_buy() -> void:
-    if ui_busy():
-        return
-    var index: int = shop_confirm_index
-    close_shop_confirm_layer()
-    shop_confirm_index = -1
-    screen = "shop"
-    if index < 0:
-        return
     buy_requested.emit(index)
-
-func cancel_shop_buy() -> void:
-    close_shop_confirm_layer()
-    shop_confirm_index = -1
-    if shop_state.is_empty():
-        return
-    screen = "shop"
-
-func close_shop_confirm_layer() -> void:
-    # Rename and detach immediately so the shop underneath is current even
-    # before queue_free flushes, and so a cancel never frees the sheet while
-    # its own button callback is still running.
-    for node_name in ["ShopConfirmSheet", "ShopConfirmDim"]:
-        var node: Node = overlay.find_child(node_name, true, false)
-        while node != null:
-            node.name = str(node_name) + "Closed"
-            if node is CanvasItem:
-                (node as CanvasItem).visible = false
-            if node is Control:
-                (node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-            var parent: Node = node.get_parent()
-            if parent != null:
-                parent.remove_child(node)
-            node.queue_free()
-            node = overlay.find_child(node_name, true, false)
 
 
 func stage_panel(parent: Node) -> void:
@@ -1645,20 +1570,6 @@ func handle_front_key(code: int) -> bool:
             return true
         if KeyBindings.matches_code(code, "confirm"):
             confirm_help_trial()
-            return true
-    if screen == "shop_confirm":
-        if KeyBindings.matches_code(code, "cancel"):
-            cancel_shop_buy()
-            return true
-        if KeyBindings.matches_code(code, "confirm"):
-            confirm_shop_buy()
-            return true
-    if screen == "choice_confirm":
-        if KeyBindings.matches_code(code, "cancel"):
-            cancel_choice_confirm()
-            return true
-        if KeyBindings.matches_code(code, "confirm"):
-            confirm_choice_take()
             return true
     if screen == "restart_confirm":
         if KeyBindings.matches_code(code, "cancel"):

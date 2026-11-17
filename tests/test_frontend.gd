@@ -134,18 +134,14 @@ func run_checks() -> void:
     expect(choices.is_empty(), "growth mouse and number input cannot consume a choice during the paper roll")
     hud.input_lock_until = 0
     hud.choose_index(0)
-    expect(choices.is_empty() and hud.screen == "choice_confirm", "growth confirm appears after the paper finishes")
-    hud.confirm_choice_take()
-    expect(choices == ["club"], "growth remains actionable after the paper finishes and confirm")
+    expect(choices == ["club"], "growth choice applies immediately after the paper finishes, with no confirm step")
     hud.show_shop([{"id":"sling","price":1,"sold":false}], 10, 1, [], {}, 8, 8)
     hud.input_lock_until = Time.get_ticks_msec() + 1000
     await press(hud.overlay, "ShopOffer0")
     expect(purchases.is_empty(), "shop cards cannot purchase during the paper roll")
     hud.input_lock_until = 0
     await press(hud.overlay, "ShopOffer0")
-    expect(purchases.is_empty() and hud.screen == "shop_confirm", "shop confirm appears after the paper finishes")
-    await press(hud.overlay, "ShopBuyConfirm")
-    expect(purchases == [0], "shop remains actionable after its roll and confirm")
+    expect(purchases == [0], "shop purchase applies immediately after its roll, with no confirm step")
 
     world.queue_free()
     await process_frame
