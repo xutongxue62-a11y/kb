@@ -391,12 +391,17 @@ static func settings(h, in_run: bool) -> void:
     h.autosave_toggle = toggle
     h.press_motion(toggle)
     label(h,body,"结算、购买与返回首页时自动保存",Rect2(48,514,674,24),17,Color("#5c625e"))
-    line(body,Vector2(48,548),674,Color(INK,0.35))
-    h.save_note_label = label(h,body,h.save_note,Rect2(48,558,674,44),16,Color("#586e55"))
+    label(h,body,"手动保存",Rect2(48,544,280,40),25,INK,true)
+    var manual: Button = button(h,body,"SaveNow","保存当前进度",Rect2(400,538,320,52),func():h.save_requested.emit(),false,20)
+    KeyBindings.attach_to_button(manual, "save")
+    manual.disabled = not in_run
+    label(h,body,"按 F5 保存当前旅程" if in_run else "进入游戏后可手动保存",Rect2(48,594,674,24),17,Color("#5c625e"))
+    line(body,Vector2(48,624),674,Color(INK,0.35))
+    h.save_note_label = label(h,body,h.save_note,Rect2(48,634,674,44),16,Color("#586e55"))
     h.save_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    label(h,body,"也可按取消键关闭",Rect2(48,640,190,32),16)
-    button(h,body,"OpenKeyBindings","改按键",Rect2(250,632,200,54),func():h.show_key_bindings(in_run),false,22)
-    button(h,body,"Back","完成",Rect2(540,632,180,54),func():h.close_front_modal(),true,25)
+    label(h,body,"也可按取消键关闭",Rect2(48,688,190,32),16)
+    button(h,body,"OpenKeyBindings","改按键",Rect2(250,680,200,54),func():h.show_key_bindings(in_run),false,22)
+    button(h,body,"Back","完成",Rect2(540,680,180,54),func():h.close_front_modal(),true,25)
 
 static func continued(h) -> void:
     var sheet = modal(h, Rect2(230, 91, 820, 618))
@@ -461,7 +466,7 @@ static func help_page(h, page: String, in_run: bool) -> void:
     line(body, Vector2(40, 100), 904, RED)
     var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后按 %s 切换联动。屏幕下方会提示还差哪一件。\n锁链类联动会从火药筒炮口弹出。详情见「武器联动」。\n按 %s 可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("hide_ui")]
     if page == "keys":
-        text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒（不可改）\n← / → 翻页预览角色，点击画像确认选择\n%s 确认出发 · %s 返回 / 暂停\n%s 角色属性 · %s 手动保存 · %s 隐藏或显示界面\n%s 散射 / 集火切换 · %s 切换武器联动 · %s 切换瞄准目标\n%s / %s / %s 选择成长" % [KeyBindings.caption_for("confirm"), KeyBindings.caption_for("cancel"), KeyBindings.caption_for("stats"), KeyBindings.caption_for("save"), KeyBindings.caption_for("hide_ui"), KeyBindings.caption_for("scatter"), KeyBindings.caption_for("link"), KeyBindings.caption_for("aim"), KeyBindings.caption_for("shop_1"), KeyBindings.caption_for("shop_2"), KeyBindings.caption_for("shop_3")]
+        text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒（不可改）\n← / → 翻页预览角色，点击画像确认选择\n%s 确认出发 · %s 返回 / 暂停\n%s 角色属性 · %s 手动保存 · %s 隐藏或显示界面\n%s 散射 / 集火切换 · %s 切换武器联动 · %s 切换瞄准目标\n%s / %s / %s 选择成长 · 商店按栏位键选货 · %s 确认选择" % [KeyBindings.caption_for("confirm"), KeyBindings.caption_for("cancel"), KeyBindings.caption_for("stats"), KeyBindings.caption_for("save"), KeyBindings.caption_for("hide_ui"), KeyBindings.caption_for("scatter"), KeyBindings.caption_for("link"), KeyBindings.caption_for("aim"), KeyBindings.caption_for("shop_1"), KeyBindings.caption_for("shop_2"), KeyBindings.caption_for("shop_3"), KeyBindings.caption_for("confirm")]
     elif page == "links":
         text = "集齐配对武器后，按 %s 在「不联动」和联动之间切换。下方提示会写还差哪一件。\n\n火药筒 + 木棒 / 石斧 / 骨刃 → 锁链武器。\n锁链从火药筒炮口弹出并弹射往返；木棒不再环绕，火药筒不再发普通炮弹。\n火药筒 + 法杖 → 符火炮弹。火种壶 + 雷鸣图腾等也有各自配方。\n\n每一种联动都有代价，切换前请看说明。战斗界面不再长期放置联动按钮，请用 %s 切换。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("link")]
     var copy: Label = label(h, body, text, Rect2(44, 118, 894, 378), 20)
@@ -492,14 +497,12 @@ static func key_bindings_page(h, in_run: bool) -> void:
     label(h, body, "改按键", Rect2(48, 20, 550, 58), 42, INK, true)
     button(h, body, "CloseModal", "×", Rect2(674, 20, 52, 48), func(): h.show_settings(in_run), false, 30)
     line(body, Vector2(48, 88), 674, RED)
-    var intro: Label = label(h, body, "点击右侧按键格，再按下新键。Esc 取消本次改键，不能把 Esc 改到其他功能；恢复默认可把取消键改回 Esc。两个功能不能用同一按键，冲突时请改选其他键。移动（WASD / 方向键）与闪避、调试键不可改。", Rect2(48, 100, 674, 72), 16, Color("#5c625e"))
+    var intro: Label = label(h, body, "点击右侧按键格，再按下新键；Esc 取消本次改键。\nEsc 不能改到其他功能，恢复默认可改回。\n两个功能不能用同一按键；移动与闪避、调试键不可改。", Rect2(48, 100, 674, 72), 16, Color("#5c625e"))
     intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     var status: Label = label(h, body, h.bind_status if str(h.bind_status) != "" else "默认与目前游戏按键一致", Rect2(48, 174, 674, 28), 17, Color("#704127"))
     status.name = "BindStatus"
-    var visible_actions: Array = KeyBindings.settings_order()
-    var mid: int = int((visible_actions.size() + 1) / 2)
-    var left: Array = visible_actions.slice(0, mid)
-    var right: Array = visible_actions.slice(mid, visible_actions.size())
+    var left: Array = KeyBindings.ORDER.slice(0, 8)
+    var right: Array = KeyBindings.ORDER.slice(8, KeyBindings.ORDER.size())
     for column_index in range(2):
         var actions: Array = left if column_index == 0 else right
         var base_x: float = 48.0 if column_index == 0 else 400.0
@@ -509,6 +512,11 @@ static func key_bindings_page(h, in_run: bool) -> void:
             label(h, body, KeyBindings.display_name(action), Rect2(base_x, y, 150, 44), 20, INK, true)
             var bind: Button = button(h, body, str(KeyBindings.BIND_BUTTON[action]), "", Rect2(base_x + 158, y, 150, 44), func(): h.begin_bind_listen(action), false, 16)
             bind.tooltip_text = "点击后按下新键"
-            KeyBindings.fill_bind_button(bind, action, str(h.bind_listen_action) == action)
+            KeyBindings.attach_to_button(bind, action)
+            if str(h.bind_listen_action) == action:
+                var cap = bind.find_child("KeycapHint", false, false)
+                if cap != null:
+                    cap.listening = true
+                    cap.queue_redraw()
     button(h, body, "ResetKeyBindings", "恢复默认", Rect2(48, 670, 220, 54), func(): h.reset_key_bindings(), false, 22)
     button(h, body, "BackToSettings", "返回设置", Rect2(500, 670, 220, 54), func(): h.show_settings(in_run), true, 24)
