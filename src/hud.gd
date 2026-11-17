@@ -81,6 +81,8 @@ var replace_pending_view: Dictionary = {}
 var replace_inventory_view: Array = []
 var replace_stage_view: int = 1
 var replace_chosen: String = ""
+var replace_confirm_dim: ColorRect = null
+var replace_confirm_column: VBoxContainer = null
 var ink: Color = Color("#17253a")
 var cream: Color = Color("#f4ead6")
 var stamp: Color = Color("#c0453a")
@@ -1156,6 +1158,8 @@ func show_replace(pending: Dictionary, inventory: Array, stage: int = 1) -> void
     replace_inventory_view = inventory.duplicate(true)
     replace_stage_view = stage
     replace_chosen = ""
+    replace_confirm_dim = null
+    replace_confirm_column = null
     reset_overlay()
     set_battle_visible(false)
     present_backdrop("none")
@@ -1174,21 +1178,44 @@ func choose_replace_slot(key: String) -> void:
     if screen != "replace" or replace_pending_view.is_empty():
         return
     replace_chosen = key
-    reset_overlay()
-    set_battle_visible(false)
-    present_backdrop("none")
-    dim_overlay(false,true)
+    # The confirmation is a layer over the replace page: the six weapons stay
+    # visible underneath (dimmed), exactly like the original shop confirm.
+    replace_confirm_dim = ColorRect.new()
+    replace_confirm_dim.name = "ReplaceConfirmDim"
+    replace_confirm_dim.color = Color(0.04, 0.08, 0.13, 0.55)
+    replace_confirm_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+    replace_confirm_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+    overlay.add_child(replace_confirm_dim)
     screen = "replace_confirm"
-    OfferUI.replace_confirm(self, replace_pending_view, _replace_outgoing(key), replace_stage_view)
+    replace_confirm_column = OfferUI.replace_confirm(self, replace_pending_view, _replace_outgoing(key), replace_stage_view)
+    if replace_confirm_column != null:
+        replace_confirm_column.get_meta("scroll_frame").name = "ReplaceConfirmSheet"
+        call_deferred("_center_parchment_vertical", replace_confirm_column)
+
+func _close_replace_confirm_layer() -> void:
+    if replace_confirm_column != null and is_instance_valid(replace_confirm_column):
+        var frame = replace_confirm_column.get_meta("scroll_frame", null)
+        if frame != null and is_instance_valid(frame):
+            frame.queue_free()
+    replace_confirm_column = null
+    if replace_confirm_dim != null and is_instance_valid(replace_confirm_dim):
+        replace_confirm_dim.queue_free()
+    replace_confirm_dim = null
+    replace_chosen = ""
 
 func confirm_replace_choice() -> void:
     if screen == "replace_confirm" and not replace_chosen.is_empty():
-        replace_requested.emit(replace_chosen)
+        var chosen: String = replace_chosen
+        replace_confirm_column = null
+        replace_confirm_dim = null
+        replace_chosen = ""
+        replace_requested.emit(chosen)
 
 func cancel_replace_confirm() -> void:
     if screen != "replace_confirm":
         return
-    show_replace(replace_pending_view, replace_inventory_view, replace_stage_view)
+    _close_replace_confirm_layer()
+    screen = "replace"
 
 func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = {}) -> void:
     reset_overlay()

@@ -502,6 +502,7 @@ func run_checks() -> void:
     await click(named_button(hud, "ReplaceSlot0"))
     expect(events.is_empty(), "choosing a slot no longer swaps at once; the sale needs one confirmation")
     expect(hud.screen == "replace_confirm", "choosing a slot opens the replace confirmation sheet")
+    expect(named_button(hud, "ReplaceSlot0") != null and named_button(hud, "ReplaceCancel") != null, "the six-weapon replace page stays underneath the confirmation sheet")
     expect(label_text(hud).contains("确认出售并更换") and label_text(hud).contains("骨矛") and label_text(hud).contains("木棒"), "the confirmation compares the incoming and outgoing weapons")
     await click(named_button(hud, "CancelReplaceConfirm"))
     expect(hud.screen == "replace" and events.is_empty(), "cancelling the confirmation returns to the replace page without swapping")

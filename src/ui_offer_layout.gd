@@ -307,7 +307,7 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
     h.open_parchment(column,true)
 
 
-static func replace_confirm(h,pending: Dictionary,outgoing: Dictionary,stage: int=1) -> void:
+static func replace_confirm(h,pending: Dictionary,outgoing: Dictionary,stage: int=1) -> VBoxContainer:
     var column: VBoxContainer=h.parchment_column(650,160)
     column.get_meta("scroll_frame").opening_mode="fold"
     column.add_theme_constant_override("separation",10)
@@ -335,6 +335,7 @@ static func replace_confirm(h,pending: Dictionary,outgoing: Dictionary,stage: in
     KeyBindings.attach_to_button(h.action(column,"CancelReplaceConfirm","取消",func():
         if not h.ui_busy(): h.cancel_replace_confirm()), "cancel")
     h.open_parchment(column,true)
+    return column
 
 
 static func _replace_confirm_row(h,column: VBoxContainer,tag: String,weapon_id: String,level: int,tag_color: Color) -> void:
