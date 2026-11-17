@@ -82,7 +82,9 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         text(h,item,top_level,Rect2(12,47,276,27),21,Color("#7d432c"),true)
         art(h,item,key,Rect2(16,79,64,58) if compact else Rect2(106,79,88,72),maxi(1,shown))
         var attack_type: String=Details.attack_type(key) if weapon else BuffDetails.headline(key)
-        text(h,item,attack_type,Rect2(90,73,198,23) if compact else Rect2(12,158,276,27),15 if compact else 19,Color("#704127"),true)
+        var attack_type_label: Label=text(h,item,attack_type,Rect2(90,73,198,23) if compact else Rect2(12,158,276,27),15 if compact else 19,Color("#704127"),true)
+        if compact:
+            attack_type_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         var replace_offer: bool = weapon and level==0 and inventory.size() >= 6
         var status: String
         if weapon and level>0:
@@ -101,16 +103,19 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         var desc: Label = text(h,item,body,desc_rect,16 if compact else 18)
         desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         desc.add_theme_constant_override("line_spacing",3)
+        desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         if weapon:
             if compact:
                 var abilities: Label=text(h,item,Details.stats_line(key,shown)+"\n"+Details.abilities(key,shown,level),Rect2(14,162,272,50),13,Color("#69533b"))
                 abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
                 abilities.add_theme_constant_override("line_spacing",3)
+                abilities.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
             else:
                 text(h,item,Details.stats_line(key,shown),Rect2(15,246,270,24),16,Color("#75442c"),true)
                 var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(15,274,270,42),15,Color("#69533b"))
                 abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
                 abilities.add_theme_constant_override("line_spacing",3)
+                abilities.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         else:
             text(h,item,BuffDetails.limit(key),Rect2(14,176,272,28) if compact else Rect2(14,264,272,29),18,Color("#704127"),true)
         var refund: int=Economy.reward_sell_price(key,stage,shown)
@@ -127,7 +132,7 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
 static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: Dictionary,hp: float,max_hp: float,animate: bool,highlight: int,reroll_cost: int = -1) -> void:
     var column: VBoxContainer=h.parchment_column(1172,8)
     column.add_theme_constant_override("separation",7)
-    var heading: Label=h.make_display("营地 · 第 %d 关结束" % stage,29)
+    var heading: Label=h.make_display("营地商店 · 第 %d 关结束" % stage,29)
     heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
     var wallet: Label=h.make_display("金币 %d · 生命 %.1f / %.0f · 数字键 1–6 或点击直接购买" % [coins,hp,max_hp],19,Color("#704127"))
@@ -159,26 +164,29 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         var shown: int=clampi(int(offer.get("level",1)),1,Growth.MAX_WEAPON_LEVEL) if new_weapon else (mini(Growth.MAX_WEAPON_LEVEL,owned+1) if weapon else owned+1)
         var replace_offer: bool=new_weapon and inventory.size()>=6 and not sold
         var kind_label: String="武器" if weapon else ("属性" if buff else "补给")
-        var kind_tag: Label=text(h,item,kind_label,Rect2(12,6,70,22),14,Color("#983f2b"),true)
+        var kind_tag: Label=text(h,item,kind_label,Rect2(12,5,70,26),17,Color("#983f2b"),true)
         kind_tag.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
         var title: String="%d · %s（%s）" % [i+1,str(data.name), kind_label]
-        text(h,item,title,Rect2(86,4,250,26),20,Color("#263546"),true)
+        text(h,item,title,Rect2(12,4,324,26),20,Color("#263546"),true)
         var top: String=(Growth.weapon_level_text(shown) if new_weapon or owned==0 else "Lv.%d → %d" % [owned,shown]) if weapon else ("层数 %d → %d" % [owned,shown] if buff else "恢复生命")
         text(h,item,top,Rect2(12,32,324,24),18,Color("#75442c"),true)
         var effect: String=Details.attack_type(key) if weapon else (BuffDetails.headline(key) if buff else "生命 +3")
         text(h,item,effect,Rect2(12,56,324,22),16,Color("#704127"),true)
         art(h,item,key,Rect2(16,82,64,56),maxi(1,shown))
         var body: String=Details.attack(key,shown) if weapon else (BuffDetails.detail(key) if buff else data.description)
-        var desc: Label=text(h,item,body,Rect2(88,80,246,46) if weapon else Rect2(51,80,246,58),15)
+        var desc: Label=text(h,item,body,Rect2(88,80,246,46) if weapon else Rect2(88,80,246,58),15)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         desc.add_theme_constant_override("line_spacing",4)
+        desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         desc.vertical_alignment=VERTICAL_ALIGNMENT_TOP if weapon else VERTICAL_ALIGNMENT_CENTER
         if weapon:
-            text(h,item,Details.stats_line(key,shown),Rect2(88,128,246,20),14,Color("#75442c"),true)
+            var stats_label: Label=text(h,item,Details.stats_line(key,shown),Rect2(88,128,246,20),14,Color("#75442c"),true)
+            stats_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         if weapon:
             var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(14,154,320,40),14,Color("#59462f"))
             ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
             ability.add_theme_constant_override("line_spacing",3)
+            ability.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
             ability.vertical_alignment=VERTICAL_ALIGNMENT_TOP
         elif buff:
             text(h,item,BuffDetails.limit(key),Rect2(14,150,320,24),16,Color("#704127"),true)
@@ -213,31 +221,19 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
             action_text="%s · %d 金币" % [verb,int(offer.price)]
         text(h,item,action_text,Rect2(12,204,324,28),18,Color("#983f2b"),true)
         text(h,item,action_hint,Rect2(12,234,324,22),14,Color("#59462f"))
-    var footer:=Control.new()
-    footer.custom_minimum_size=Vector2(0,46)
+    var footer:=HBoxContainer.new()
+    footer.add_theme_constant_override("separation",14)
     column.add_child(footer)
-    var center_box:=CenterContainer.new()
-    center_box.set_anchors_preset(Control.PRESET_FULL_RECT)
-    footer.add_child(center_box)
-    var next_btn: Button=h.action(center_box,"NextRound","下一关",func():h.next_round_requested.emit(),Color("#b4583e"))
-    next_btn.size_flags_horizontal=Control.SIZE_SHRINK_CENTER
-    KeyBindings.attach_to_button(next_btn, "confirm")
-    var side:=HBoxContainer.new()
-    side.add_theme_constant_override("separation",14)
-    side.set_anchors_preset(Control.PRESET_FULL_RECT)
-    side.mouse_filter=Control.MOUSE_FILTER_IGNORE
-    footer.add_child(side)
-    var save_btn: Button=h.action(side,"SaveNow","保存",func():h.save_requested.emit())
-    save_btn.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+    var save_btn: Button=h.action(footer,"SaveNow","保存",func():h.save_requested.emit())
     KeyBindings.attach_to_button(save_btn, "save")
     if reroll_cost >= 0:
-        var reroll: Button=h.action(side,"RerollShop","刷新货物 · %d 金币" % reroll_cost,func():h.reroll_requested.emit())
-        reroll.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+        var reroll: Button=h.action(footer,"RerollShop","刷新货物 · %d 金币" % reroll_cost,func():h.reroll_requested.emit())
         if coins < reroll_cost:
             reroll.disabled=true
             reroll.modulate=Color(1,1,1,0.65)
-    var home_btn: Button=h.action(side,"Home","返回首页",func():h.home_requested.emit())
-    home_btn.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+    var home_btn: Button=h.action(footer,"Home","返回首页",func():h.home_requested.emit())
+    var next_btn: Button=h.action(footer,"NextRound","下一关",func():h.next_round_requested.emit(),Color("#b4583e"))
+    KeyBindings.attach_to_button(next_btn, "confirm")
     h.open_parchment(column,animate)
     if highlight>=0 and highlight<grid.get_child_count() and h.can_animate(): h.play_ui("choice_confirm")
 
@@ -270,9 +266,11 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
     var attack: Label=text(h,incoming,Details.attack(new_id,offered),Rect2(82,68,528,50),17)
     attack.name="IncomingWeaponAttack"
     attack.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    attack.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
     var abilities: Label=text(h,incoming,Details.abilities(new_id,offered,0),Rect2(646,68,352,50),17,Color("#59462f"))
     abilities.name="IncomingWeaponAbilities"
     abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    abilities.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
     var grid:=GridContainer.new()
     grid.columns=3
     grid.add_theme_constant_override("h_separation",14)
@@ -295,8 +293,10 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
         art(h,slot,key,Rect2(14,99,72,62),owned)
         var desc: Label=text(h,slot,Details.attack(key,owned),Rect2(96,99,238,57),17)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         var ability: Label=text(h,slot,Details.abilities(key,owned,owned),Rect2(14,158,320,40),15,Color("#59462f"))
         ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        ability.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         text(h,slot,"换下并出售 · +%d 金币" % refund,Rect2(12,203,324,29),19,Color("#983f2b"),true)
     var footer:=HBoxContainer.new()
     column.add_child(footer)
@@ -347,8 +347,12 @@ static func _replace_confirm_row(h,column: VBoxContainer,tag: String,weapon_id: 
     column.add_child(row)
     text(h,row,tag,Rect2(0,2,76,28),19,tag_color,true)
     art(h,row,weapon_id,Rect2(2,32,56,50),level)
-    text(h,row,"%s · %s" % [str(data.name),Growth.weapon_level_text(level)],Rect2(80,2,470,30),21,Color("#263546"),true)
-    text(h,row,Details.attack_type(weapon_id),Rect2(80,32,470,24),16,Color("#704127"),true)
-    text(h,row,Details.stats_line(weapon_id,level),Rect2(80,56,470,24),16,Color("#75442c"),true)
+    var name_label: Label=text(h,row,"%s · %s" % [str(data.name),Growth.weapon_level_text(level)],Rect2(80,2,470,30),21,Color("#263546"),true)
+    name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+    var type_label: Label=text(h,row,Details.attack_type(weapon_id),Rect2(80,32,470,24),16,Color("#704127"),true)
+    type_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+    var stats_label: Label=text(h,row,Details.stats_line(weapon_id,level),Rect2(80,56,470,24),16,Color("#75442c"),true)
+    stats_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
     var attack: Label=text(h,row,Details.attack(weapon_id,level),Rect2(80,82,470,36),15,Color("#59462f"))
     attack.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    attack.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
