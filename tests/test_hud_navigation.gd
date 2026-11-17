@@ -177,10 +177,14 @@ func press_key(code: int) -> void:
         await process_frame
 
 func button_has_key_hint(button: Node) -> bool:
-    if button == null:
+    if button == null or not (button is BaseButton):
         return false
-    var hint: Node = button.find_child("KeyHint", true, false)
-    return hint is Label and not str((hint as Label).text).is_empty() and not str((hint as Label).text).contains("回车")
+    if not button.has_meta("key_action"):
+        return false
+    var action: String = str(button.get_meta("key_action"))
+    var caption: String = KeyBindings.caption_for(action)
+    var text: String = str((button as BaseButton).text)
+    return text.ends_with(" · " + caption) and not text.contains("回车")
 
 func hint_sits_inside(button: BaseButton, context: String) -> void:
     var hint: Control = button.find_child("KeyHint", true, false) as Control

@@ -267,19 +267,26 @@ static func attach_to_button(button: BaseButton, action: String) -> void:
         fill_bind_button(button, action, false)
         return
     button.set_meta("key_action", action)
-    button.text = strip_legacy_hint(button.text)
-    var hint: KeyHint = button.find_child(HINT_NAME, false, false) as KeyHint
-    if hint == null:
-        hint = make_hint(button, action)
-        button.add_child(hint)
-    else:
-        hint.apply_action(action, code_of(action), caption_for(action))
-        _style_hint(button, hint)
-    _reserve_hint_space(button, hint)
-    _place_hint(button, hint)
-    if not button.has_meta("_keyhint_resized"):
-        button.set_meta("_keyhint_resized", true)
-        button.resized.connect(_on_button_resized.bind(button, hint))
+    # Juniper 指示（2026-11-17）：按键名不要再做成浮在按钮右端的小标签——字体、
+    # 粗细都和按钮正文对不上，还压住按钮的花纹。改为把按键名直接写进按钮
+    # 自己的文字（正文 · 按键名），与正文同字体、同字号、同颜色，长在按钮上。
+    var leftover: Node = button.find_child(HINT_NAME, false, false)
+    if leftover != null:
+        leftover.queue_free()
+    if button.has_meta("_keyhint_margin_normal"):
+        for state in ["normal", "hover", "pressed", "disabled"]:
+            button.remove_theme_stylebox_override(state)
+            button.erase_meta("_keyhint_margin_" + state)
+        button.erase_meta("_keyhint_resized")
+    var text: String = button.text
+    var applied: String = str(button.get_meta("key_hint_suffix", ""))
+    if not applied.is_empty() and text.ends_with(applied):
+        text = text.left(text.length() - applied.length())
+    text = strip_legacy_hint(text)
+    var suffix: String = " · " + caption_for(action)
+    button.set_meta("key_hint_suffix", suffix)
+    button.set_meta("key_base_text", text)
+    button.text = text + suffix
 
 
 static func fill_bind_button(button: BaseButton, action: String, listening: bool = false) -> void:
