@@ -1119,10 +1119,14 @@ func simulate(delta: float, movement: Vector2) -> void:
         _simulating = false
         return
     spawn_clock -= delta
-    var alive_cap: int = 42 + clampi((wave - 5) * 2, 0, 42)
+    # Late game keeps swelling (Juniper, 2026-11-17): past wave 26 the alive cap
+    # grows +3/wave to 126 by wave 40, and the spawn interval keeps falling to
+    # a 0.18 s floor by wave 33, so deep waves feel denser than wave 29 instead
+    # of freezing at the wave-26 density.
+    var alive_cap: int = 42 + clampi((wave - 5) * 2, 0, 42) + clampi((wave - 26) * 3, 0, 42)
     if spawn_clock <= 0.0 and enemies.size() < alive_cap:
-        var spawn_interval: float = 0.62 - (wave - 1) * 0.10 if wave <= 3 else maxf(0.26, 0.42 - (wave - 3) * 0.008)
-        spawn_clock = maxf(3.0, 4.5 - float(maxi(0, wave / 5 - 1)) * 0.3) if boss_round else spawn_interval
+        var spawn_interval: float = 0.62 - (wave - 1) * 0.10 if wave <= 3 else maxf(0.18, 0.42 - (wave - 3) * 0.008)
+        spawn_clock = maxf(2.2, 4.5 - float(maxi(0, wave / 5 - 1)) * 0.35) if boss_round else spawn_interval
         if boss_pending:
             spawn_enemy("boss",offscreen_point(1)+Vector2(48,0),false,"enter")
             var boss: Dictionary=enemies.back()
