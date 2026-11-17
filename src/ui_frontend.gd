@@ -391,17 +391,12 @@ static func settings(h, in_run: bool) -> void:
     h.autosave_toggle = toggle
     h.press_motion(toggle)
     label(h,body,"结算、购买与返回首页时自动保存",Rect2(48,514,674,24),17,Color("#5c625e"))
-    label(h,body,"手动保存",Rect2(48,544,280,40),25,INK,true)
-    var manual: Button = button(h,body,"SaveNow","保存当前进度",Rect2(400,538,320,52),func():h.save_requested.emit(),false,20)
-    KeyBindings.attach_to_button(manual, "save")
-    manual.disabled = not in_run
-    label(h,body,"按 F5 保存当前旅程" if in_run else "进入游戏后可手动保存",Rect2(48,594,674,24),17,Color("#5c625e"))
-    line(body,Vector2(48,624),674,Color(INK,0.35))
-    h.save_note_label = label(h,body,h.save_note,Rect2(48,634,674,44),16,Color("#586e55"))
+    line(body,Vector2(48,548),674,Color(INK,0.35))
+    h.save_note_label = label(h,body,h.save_note,Rect2(48,558,674,44),16,Color("#586e55"))
     h.save_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    label(h,body,"也可按取消键关闭",Rect2(48,688,190,32),16)
-    button(h,body,"OpenKeyBindings","改按键",Rect2(250,680,200,54),func():h.show_key_bindings(in_run),false,22)
-    button(h,body,"Back","完成",Rect2(540,680,180,54),func():h.close_front_modal(),true,25)
+    label(h,body,"也可按取消键关闭",Rect2(48,640,190,32),16)
+    button(h,body,"OpenKeyBindings","改按键",Rect2(250,632,200,54),func():h.show_key_bindings(in_run),false,22)
+    button(h,body,"Back","完成",Rect2(540,632,180,54),func():h.close_front_modal(),true,25)
 
 static func continued(h) -> void:
     var sheet = modal(h, Rect2(230, 91, 820, 618))
@@ -501,8 +496,10 @@ static func key_bindings_page(h, in_run: bool) -> void:
     intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     var status: Label = label(h, body, h.bind_status if str(h.bind_status) != "" else "默认与目前游戏按键一致", Rect2(48, 174, 674, 28), 17, Color("#704127"))
     status.name = "BindStatus"
-    var left: Array = KeyBindings.ORDER.slice(0, 8)
-    var right: Array = KeyBindings.ORDER.slice(8, KeyBindings.ORDER.size())
+    var visible_actions: Array = KeyBindings.settings_order()
+    var mid: int = int((visible_actions.size() + 1) / 2)
+    var left: Array = visible_actions.slice(0, mid)
+    var right: Array = visible_actions.slice(mid, visible_actions.size())
     for column_index in range(2):
         var actions: Array = left if column_index == 0 else right
         var base_x: float = 48.0 if column_index == 0 else 400.0
@@ -512,11 +509,6 @@ static func key_bindings_page(h, in_run: bool) -> void:
             label(h, body, KeyBindings.display_name(action), Rect2(base_x, y, 150, 44), 20, INK, true)
             var bind: Button = button(h, body, str(KeyBindings.BIND_BUTTON[action]), "", Rect2(base_x + 158, y, 150, 44), func(): h.begin_bind_listen(action), false, 16)
             bind.tooltip_text = "点击后按下新键"
-            KeyBindings.attach_to_button(bind, action)
-            if str(h.bind_listen_action) == action:
-                var cap = bind.find_child("KeycapHint", false, false)
-                if cap != null:
-                    cap.listening = true
-                    cap.queue_redraw()
+            KeyBindings.fill_bind_button(bind, action, str(h.bind_listen_action) == action)
     button(h, body, "ResetKeyBindings", "恢复默认", Rect2(48, 670, 220, 54), func(): h.reset_key_bindings(), false, 22)
     button(h, body, "BackToSettings", "返回设置", Rect2(500, 670, 220, 54), func(): h.show_settings(in_run), true, 24)

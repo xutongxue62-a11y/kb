@@ -160,7 +160,7 @@ static func shop_slot(code: int) -> int:
 static func caption(code: int) -> String:
     match code:
         KEY_ENTER, KEY_KP_ENTER:
-            return "ENTER"
+            return "↵"
         KEY_ESCAPE:
             return "Esc"
         KEY_SPACE:
@@ -199,83 +199,152 @@ static func caption_for(action: String) -> String:
     return caption(code_of(action))
 
 
-static func keycap_size(code: int, height: float = 26.0) -> Vector2:
-    if code == KEY_SPACE:
-        return Vector2(maxf(56.0, height * 2.2), height)
-    if code == KEY_ENTER or code == KEY_KP_ENTER or code == KEY_ESCAPE:
-        return Vector2(maxf(40.0, height * 1.55), height)
-    return Vector2(maxf(32.0, height * 1.25), height)
+# 保存进度 / 角色属性 stay off the Settings and 改按键 screens.
+const SETTINGS_HIDDEN := ["save", "stats"]
+const HINT_NAME := "KeyHint"
+const HINT_INSET := 18.0
+const HINT_GAP := 8.0
 
 
-static func make_keycap(action: String, height: float = 26.0) -> Keycap:
-    var cap := Keycap.new()
-    cap.name = "KeycapHint"
-    cap.apply_action(action, code_of(action), caption_for(action))
-    cap.custom_minimum_size = keycap_size(code_of(action), height)
-    cap.size = cap.custom_minimum_size
-    cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    return cap
+static func settings_order() -> Array:
+    var result: Array = []
+    for action in ORDER:
+        if action not in SETTINGS_HIDDEN:
+            result.append(action)
+    return result
+
+
+static func hint_font_size(button: BaseButton) -> int:
+    var base: int = button.get_theme_font_size("font_size")
+    if base <= 0:
+        base = 18
+    return clampi(base - 2, 14, 18)
+
+
+static func measure_hint(button: BaseButton, text: String) -> Vector2:
+    var font: Font = button.get_theme_font("font")
+    var fs: int = hint_font_size(button)
+    if font == null:
+        return Vector2(maxf(18.0, float(text.length()) * 10.0), float(fs) + 2.0)
+    var measured: Vector2 = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+    return Vector2(ceili(measured.x) + 2.0, maxf(measured.y, float(fs) + 2.0))
+
+
+static func make_hint(button: BaseButton, action: String) -> KeyHint:
+    var hint := KeyHint.new()
+    hint.name = HINT_NAME
+    hint.apply_action(action, code_of(action), caption_for(action))
+    _style_hint(button, hint)
+    return hint
+
+
+static func _style_hint(button: BaseButton, hint: KeyHint) -> void:
+    var text: String = "…" if hint.listening else hint.caption
+    hint.text = text
+    var size: Vector2 = measure_hint(button, text)
+    hint.custom_minimum_size = size
+    hint.size = size
+    hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    hint.add_theme_font_size_override("font_size", hint_font_size(button))
+    var font: Font = button.get_theme_font("font")
+    if font != null:
+        hint.add_theme_font_override("font", font)
+    var ink: Color = Color("#3c3328")
+    if button.has_theme_color_override("font_color") or button.get_theme_color("font_color").a > 0.0:
+        ink = button.get_theme_color("font_color")
+    hint.add_theme_color_override("font_color", ink)
+    hint.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 
 
 static func attach_to_button(button: BaseButton, action: String) -> void:
     if button == null or not is_instance_valid(button):
         return
+    if bool(button.get_meta("bind_row", false)):
+        fill_bind_button(button, action, false)
+        return
     button.set_meta("key_action", action)
     button.text = strip_legacy_hint(button.text)
-    var cap: Keycap = button.find_child("KeycapHint", false, false) as Keycap
-    if cap == null:
-        cap = make_keycap(action, 24.0)
-        button.add_child(cap)
+    var hint: KeyHint = button.find_child(HINT_NAME, false, false) as KeyHint
+    if hint == null:
+        hint = make_hint(button, action)
+        button.add_child(hint)
     else:
-        cap.apply_action(action, code_of(action), caption_for(action))
-        cap.custom_minimum_size = keycap_size(code_of(action), 24.0)
-        cap.queue_redraw()
-    _reserve_keycap_space(button, cap)
-    _place_keycap(button, cap)
-    if not button.has_meta("_keycap_resized"):
-        button.set_meta("_keycap_resized", true)
-        button.resized.connect(_on_button_resized.bind(button, cap))
+        hint.apply_action(action, code_of(action), caption_for(action))
+        _style_hint(button, hint)
+    _reserve_hint_space(button, hint)
+    _place_hint(button, hint)
+    if not button.has_meta("_keyhint_resized"):
+        button.set_meta("_keyhint_resized", true)
+        button.resized.connect(_on_button_resized.bind(button, hint))
 
 
-static func _on_button_resized(button: BaseButton, cap: Keycap) -> void:
-    if is_instance_valid(button) and is_instance_valid(cap):
-        _place_keycap(button, cap)
+static func fill_bind_button(button: BaseButton, action: String, listening: bool = false) -> void:
+    if button == null or not is_instance_valid(button):
+        return
+    button.set_meta("key_action", action)
+    button.set_meta("bind_row", true)
+    var leftover: Node = button.find_child(HINT_NAME, false, false)
+    if leftover != null:
+        leftover.queue_free()
+    button.text = "…" if listening else caption_for(action)
 
 
-static func _reserve_keycap_space(button: BaseButton, cap: Keycap) -> void:
-    var extra: float = cap.custom_minimum_size.x + 10.0
+static func _on_button_resized(button: BaseButton, hint: KeyHint) -> void:
+    if is_instance_valid(button) and is_instance_valid(hint):
+        _style_hint(button, hint)
+        _place_hint(button, hint)
+
+
+static func _reserve_hint_space(button: BaseButton, hint: KeyHint) -> void:
+    var extra: float = hint.custom_minimum_size.x + HINT_INSET + HINT_GAP
     for state in ["normal", "hover", "pressed", "disabled"]:
         var box: StyleBox = button.get_theme_stylebox(state)
         if box is StyleBoxFlat:
             var flat: StyleBoxFlat = (box as StyleBoxFlat).duplicate()
-            var base: float = float(button.get_meta("_keycap_margin_" + state, flat.content_margin_right))
-            button.set_meta("_keycap_margin_" + state, base)
+            var base: float = float(button.get_meta("_keyhint_margin_" + state, flat.content_margin_right))
+            button.set_meta("_keyhint_margin_" + state, base)
             flat.content_margin_right = maxf(base, extra)
             button.add_theme_stylebox_override(state, flat)
 
 
-static func _place_keycap(button: BaseButton, cap: Keycap) -> void:
-    var size: Vector2 = cap.custom_minimum_size
-    var right: float = 8.0
-    var box: StyleBox = button.get_theme_stylebox("normal")
-    if box != null:
-        right = maxf(6.0, box.get_margin(SIDE_RIGHT) - size.x - 2.0)
-        if right < 6.0:
-            right = 6.0
-    cap.size = size
-    cap.position = Vector2(button.size.x - size.x - right, (button.size.y - size.y) * 0.5)
+static func _place_hint(button: BaseButton, hint: KeyHint) -> void:
+    var size: Vector2 = hint.custom_minimum_size
+    if size.x < 1.0 or size.y < 1.0:
+        size = measure_hint(button, hint.text)
+        hint.custom_minimum_size = size
+    var inset: float = HINT_INSET
+    var x: float = button.size.x - size.x - inset
+    var y: float = (button.size.y - size.y) * 0.5
+    var min_x: float = 8.0
+    var max_x: float = button.size.x - size.x - 8.0
+    if max_x < min_x:
+        x = maxf(4.0, button.size.x - size.x - 4.0)
+    else:
+        x = clampf(x, min_x, max_x)
+    y = clampf(y, 0.0, maxf(0.0, button.size.y - size.y))
+    hint.position = Vector2(x, y)
+    hint.size = size
 
 
 static func refresh_tree(node: Node) -> void:
     if node == null:
         return
     if node is BaseButton and node.has_meta("key_action"):
-        attach_to_button(node as BaseButton, str(node.get_meta("key_action")))
-    elif node is Keycap:
-        var cap := node as Keycap
-        if not cap.action_id.is_empty():
-            cap.apply_action(cap.action_id, code_of(cap.action_id), caption_for(cap.action_id))
-        cap.queue_redraw()
+        var action: String = str(node.get_meta("key_action"))
+        if bool(node.get_meta("bind_row", false)):
+            fill_bind_button(node as BaseButton, action, false)
+        else:
+            attach_to_button(node as BaseButton, action)
+    elif node is KeyHint:
+        var hint := node as KeyHint
+        if not hint.action_id.is_empty():
+            hint.apply_action(hint.action_id, code_of(hint.action_id), caption_for(hint.action_id))
+        var parent: Node = hint.get_parent()
+        if parent is BaseButton:
+            _style_hint(parent as BaseButton, hint)
+            _place_hint(parent as BaseButton, hint)
     for child in node.get_children():
         refresh_tree(child)
 
@@ -295,7 +364,7 @@ static func contains_forbidden_hint(text: String) -> bool:
     return text.contains("回车")
 
 
-class Keycap extends Control:
+class KeyHint extends Label:
     var action_id: String = ""
     var listening: bool = false
     var code: int = KEY_NONE
@@ -305,72 +374,8 @@ class Keycap extends Control:
         action_id = action
         code = bind_code
         caption = bind_caption
-        queue_redraw()
+        text = "…" if listening else bind_caption
 
     func _ready() -> void:
         mouse_filter = Control.MOUSE_FILTER_IGNORE
-        if custom_minimum_size == Vector2.ZERO:
-            custom_minimum_size = Vector2(32, 24)
-        queue_redraw()
-
-    func _notification(what: int) -> void:
-        if what == NOTIFICATION_RESIZED:
-            queue_redraw()
-
-    func _draw() -> void:
-        var w: float = size.x
-        var h: float = size.y
-        if w < 8.0 or h < 8.0:
-            return
-        var face := Color("#f7efe0")
-        var edge := Color("#3c3328")
-        var lip := Color("#cbb89a")
-        if listening:
-            face = Color("#f3d27a")
-            edge = Color("#7a4a16")
-        var radius: float = 4.0
-        draw_rect(Rect2(1.0, 3.0, w - 2.0, h - 3.0), lip, true)
-        _draw_round_rect(Rect2(1.0, 0.0, w - 2.0, h - 4.0), face, edge, radius)
-        if listening:
-            var font: Font = ThemeDB.fallback_font
-            var fs: int = clampi(int(h * 0.55), 9, 13)
-            draw_string(font, Vector2(0.0, (h - 4.0) * 0.5 + fs * 0.35), "…", HORIZONTAL_ALIGNMENT_CENTER, w, fs, edge)
-            return
-        if code == KEY_ENTER or code == KEY_KP_ENTER:
-            _draw_enter_arrow(Rect2(4.0, 2.0, w - 8.0, h - 7.0), edge)
-        else:
-            var label: String = caption
-            var font: Font = ThemeDB.fallback_font
-            var fs: int = clampi(int(h * (0.46 if label.length() > 2 else 0.58)), 9, 14)
-            var ty: float = (h - 4.0) * 0.5 + fs * 0.35
-            draw_string(font, Vector2(0.0, ty), label, HORIZONTAL_ALIGNMENT_CENTER, w, fs, edge)
-
-    func _draw_round_rect(rect: Rect2, fill: Color, border: Color, radius: float) -> void:
-        draw_rect(rect, fill, true)
-        draw_rect(rect, border, false, 1.4)
-        # Corner ticks so the chip reads as a key, even without rounded primitives.
-        var r: float = minf(radius, minf(rect.size.x, rect.size.y) * 0.25)
-        var pts := PackedVector2Array([
-            rect.position + Vector2(r, 0.0),
-            rect.position + Vector2(rect.size.x - r, 0.0),
-            rect.position + Vector2(rect.size.x, r),
-            rect.position + Vector2(rect.size.x, rect.size.y - r),
-            rect.position + Vector2(rect.size.x - r, rect.size.y),
-            rect.position + Vector2(r, rect.size.y),
-            rect.position + Vector2(0.0, rect.size.y - r),
-            rect.position + Vector2(0.0, r),
-        ])
-        draw_polyline(pts + PackedVector2Array([pts[0]]), border, 1.4, true)
-
-    func _draw_enter_arrow(rect: Rect2, color: Color) -> void:
-        var y: float = rect.position.y + rect.size.y * 0.38
-        var x1: float = rect.position.x + rect.size.x * 0.18
-        var x2: float = rect.position.x + rect.size.x * 0.78
-        var stem: float = rect.size.y * 0.42
-        var mid: float = x1 + (x2 - x1) * 0.22
-        draw_line(Vector2(x2, y), Vector2(mid, y), color, 1.8, true)
-        draw_line(Vector2(mid, y), Vector2(mid, y + stem), color, 1.8, true)
-        var tip := Vector2(mid, y + stem)
-        var left := Vector2(mid - 5.0, y + stem - 4.5)
-        var right := Vector2(mid + 5.0, y + stem - 4.5)
-        draw_colored_polygon(PackedVector2Array([tip, left, right]), color)
+        add_theme_stylebox_override("normal", StyleBoxEmpty.new())

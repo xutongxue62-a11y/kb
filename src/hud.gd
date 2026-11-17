@@ -1750,15 +1750,6 @@ func _refresh_bind_page() -> void:
     var status: Label = overlay.find_child("BindStatus", true, false) as Label
     if status != null:
         status.text = bind_status
-    if not bind_listen_action.is_empty():
-        var cap = overlay.find_child("KeycapHint", true, false)
-        # mark listening cap on the matching bind button
-        var button: Node = overlay.find_child(_bind_button_name(bind_listen_action), true, false)
-        if button != null:
-            var hint = button.find_child("KeycapHint", true, false)
-            if hint != null and hint.has_method("set"):
-                hint.listening = true
-                hint.queue_redraw()
 
 func _bind_button_name(action: String) -> String:
     return str(KeyBindings.BIND_BUTTON.get(action, "Bind" + action.capitalize()))

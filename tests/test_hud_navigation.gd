@@ -140,6 +140,7 @@ func check_layout(hud, context: String) -> void:
             expect(rect.position.x >= 0.0 and rect.position.y >= 0.0 and rect.end.x <= 1280.1 and rect.end.y <= 800.1, context + " keeps actionable controls inside 1280×800: " + str(node.name))
             expect(rect.size.x >= 40.0 and rect.size.y >= 34.0, context + " retains usable target size: " + str(node.name))
             button_label_fits(node, context)
+            hint_sits_inside(node, context)
             for other in buttons:
                 expect(not rect.intersects(other.get_global_rect()), context + " does not overlap navigation targets: " + str(node.name) + " / " + str(other.name))
             buttons.append(node)
@@ -175,13 +176,48 @@ func press_key(code: int) -> void:
         Input.parse_input_event(event)
         await process_frame
 
-func button_has_keycap(button: Node) -> bool:
-    return button != null and button.find_child("KeycapHint", true, false) != null
+func button_has_key_hint(button: Node) -> bool:
+    if button == null:
+        return false
+    var hint: Node = button.find_child("KeyHint", true, false)
+    return hint is Label and not str((hint as Label).text).is_empty() and not str((hint as Label).text).contains("回车")
+
+func hint_sits_inside(button: BaseButton, context: String) -> void:
+    var hint: Control = button.find_child("KeyHint", true, false) as Control
+    if hint == null or not hint.is_visible_in_tree():
+        return
+    var parent_rect: Rect2 = button.get_global_rect()
+    var hint_rect: Rect2 = hint.get_global_rect()
+    expect(hint_rect.position.x >= parent_rect.position.x - 0.1 and hint_rect.position.y >= parent_rect.position.y - 0.1 and hint_rect.end.x <= parent_rect.end.x + 0.1 and hint_rect.end.y <= parent_rect.end.y + 0.1, context + " keeps the key hint inside its button: " + str(button.name))
+    expect(hint_rect.position.x >= 0.0 and hint_rect.position.y >= 0.0 and hint_rect.end.x <= 1280.1 and hint_rect.end.y <= 800.1, context + " keeps the key hint inside 1280×800: " + str(button.name))
+    if hint is Label:
+        expect(not (hint as Label).text.contains("回车"), context + " key hint does not write 回车: " + str(button.name))
+        expect((hint as Label).get_theme_stylebox("normal") is StyleBoxEmpty or (hint as Label).get_theme_stylebox("normal") == null, context + " key hint has no keycap chrome: " + str(button.name))
 
 func buttons_forbid_enter_word(hud, context: String) -> void:
     for node in descendents(hud.overlay):
-        if node is BaseButton and node.is_visible_in_tree():
+        if not (node is Control and node.is_visible_in_tree()):
+            continue
+        if node is BaseButton:
             expect(not str(node.text).contains("回车"), context + " button hints do not write 回车: " + str(node.name) + " / " + node.text)
+            if node.find_child("KeyHint", true, false) != null:
+                hint_sits_inside(node, context)
+        elif node is Label:
+            expect(not str(node.text).contains("回车"), context + " labels do not write 回车: " + str(node.name) + " / " + node.text)
+
+func settings_hides_pause_actions(hud, context: String) -> void:
+    var forbidden := PackedStringArray(["继续战斗", "保存进度", "角色属性", "保存当前进度"])
+    for node in descendents(hud.overlay):
+        if not (node is Control and node.is_visible_in_tree()):
+            continue
+        var text: String = ""
+        if node is BaseButton:
+            text = str(node.text).strip_edges()
+        elif node is Label:
+            text = str(node.text).strip_edges()
+        if text.is_empty():
+            continue
+        expect(text not in forbidden, context + " does not show " + text)
 
 func _initialize() -> void:
     call_deferred("run_checks")
@@ -332,8 +368,9 @@ func run_checks() -> void:
     expect(named_button(hud, "DamageNumbers") != null and named_button(hud, "FullscreenMode") != null, "settings expose damage-number and window mode toggles")
     var autosave: CheckButton = named_button(hud, "Autosave") as CheckButton
     expect(autosave != null and not autosave.button_pressed, "settings reflect persisted autosave")
-    var save_button: BaseButton = named_button(hud, "SaveNow")
-    expect(save_button != null and save_button.disabled, "home settings cannot save an absent run")
+    expect(named_button(hud, "SaveNow") == null, "home settings do not show 保存进度")
+    expect(named_button(hud, "Resume") == null and named_button(hud, "Stats") == null, "home settings do not show 继续战斗 or 角色属性")
+    settings_hides_pause_actions(hud, "home settings")
     await click(autosave)
     expect(events == [["autosave", true]], "autosave emits the new value once")
     events.clear()
@@ -363,13 +400,15 @@ func run_checks() -> void:
     await click(named_button(hud, "Back"))
     expect(hud.screen == "pause", "in-run help returns to pause without resuming simulation")
     await click(named_button(hud, "Settings"))
-    save_button = named_button(hud, "SaveNow")
-    expect(save_button != null and not save_button.disabled, "paused-run settings allow explicit manual save")
-    await click(save_button)
-    expect(events == [["save"]], "manual save in settings reaches the controller")
-    events.clear()
+    expect(named_button(hud, "SaveNow") == null, "paused-run settings do not show 保存进度")
+    expect(named_button(hud, "Resume") == null and named_button(hud, "Stats") == null, "paused-run settings do not show 继续战斗 or 角色属性")
+    settings_hides_pause_actions(hud, "paused-run settings")
+    await check_layout(hud, "settings page from pause")
     await click(named_button(hud, "Back"))
     expect(hud.screen == "pause", "in-run settings preserve pause origin")
+    expect(named_button(hud, "SaveNow") != null and named_button(hud, "Resume") != null and named_button(hud, "Stats") != null, "pause keeps 保存进度, 继续战斗 and 角色属性")
+    expect(named_button(hud, "SaveNow").text.contains("保存进度") and button_has_key_hint(named_button(hud, "SaveNow")), "pause 保存进度 keeps a tucked-in F5 text hint")
+    hint_sits_inside(named_button(hud, "SaveNow"), "pause save")
     await check_layout(hud, "pause page")
 
     var stock: Array = [{"id": "sling", "price": 5, "sold": false}, {"id": "power", "price": 20, "sold": false}, {"id": "pet", "price": 4, "sold": true}, {"id": "heal", "price": 6, "sold": false}]
@@ -396,8 +435,8 @@ func run_checks() -> void:
     var support_label: Label = fact_label(hud, "ConfirmSupport")
     expect(support_label != null and support_label.get_theme_font_size("font_size") <= 14 and fact_label(hud, "ConfirmFactGold").get_theme_color("font_color") != support_label.get_theme_color("font_color"), "supporting confirm copy stays quieter than the gold and name facts")
     await check_layout(hud, "shop confirm")
-    expect(named_button(hud, "ShopBuyConfirm") != null and not named_button(hud, "ShopBuyConfirm").text.contains("回车") and button_has_keycap(named_button(hud, "ShopBuyConfirm")), "shop confirm uses a keycap instead of the word 回车")
-    expect(named_button(hud, "ShopBuyCancel") != null and button_has_keycap(named_button(hud, "ShopBuyCancel")), "shop cancel shows a keycap")
+    expect(named_button(hud, "ShopBuyConfirm") != null and not named_button(hud, "ShopBuyConfirm").text.contains("回车") and button_has_key_hint(named_button(hud, "ShopBuyConfirm")), "shop confirm shows the key name instead of the word 回车")
+    expect(named_button(hud, "ShopBuyCancel") != null and button_has_key_hint(named_button(hud, "ShopBuyCancel")), "shop cancel shows a text key hint")
     buttons_forbid_enter_word(hud, "shop confirm")
     await click(named_button(hud, "ShopBuyCancel"))
     expect(events.is_empty() and hud.screen == "shop" and stock[0]["sold"] == false, "cancel returns to shop with no purchase")
@@ -526,7 +565,9 @@ func run_checks() -> void:
     await click(named_button(hud, "OpenKeyBindings"))
     expect(hud.screen == "keybindings", "改按键 opens the remapping page")
     expect(named_button(hud, "BindConfirm") != null and named_button(hud, "BindCancel") != null, "confirm and cancel are remappable")
-    expect(named_button(hud, "BindHideUI") != null and named_button(hud, "BindShop1") != null and named_button(hud, "BindSave") != null, "hide-UI, save and shop keys are remappable")
+    expect(named_button(hud, "BindHideUI") != null and named_button(hud, "BindShop1") != null, "hide-UI and shop keys are remappable")
+    expect(named_button(hud, "BindSave") == null and named_button(hud, "BindStats") == null, "改按键 does not list 保存进度 or 角色属性")
+    settings_hides_pause_actions(hud, "keybindings page")
     expect(named_button(hud, "ResetKeyBindings") != null, "the remapping page can restore defaults")
     await check_layout(hud, "keybindings page")
     await click(named_button(hud, "BindConfirm"))
