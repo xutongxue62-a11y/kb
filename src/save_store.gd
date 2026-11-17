@@ -266,6 +266,10 @@ func _validate_settings(settings: Variant) -> String:
         return "自动存档设置必须是布尔值"
     if settings.has("music_enabled") and typeof(settings["music_enabled"]) != TYPE_BOOL:
         return "背景音乐设置必须是布尔值"
+    if settings.has("damage_numbers") and typeof(settings["damage_numbers"]) != TYPE_BOOL:
+        return "伤害数字设置必须是布尔值"
+    if settings.has("fullscreen") and typeof(settings["fullscreen"]) != TYPE_BOOL:
+        return "全屏设置必须是布尔值"
     for key in ["music_volume", "sfx_volume"]:
         if settings.has(key) and not _number_in_range(settings[key], 0.0, 1.0):
             return "音量设置必须是 0 到 1 的数值"

@@ -153,6 +153,7 @@ func _ready() -> void:
     if audio != null and audio.has_method("set_volume"):
         audio.set_volume(sfx_volume)
     add_child(music)
+    apply_display_mode(bool(settings.get("fullscreen", false)))
     _fit_playable_window()
     map_view = WorldMap.new()
     map_view.z_index = -50
@@ -206,7 +207,7 @@ func _ready() -> void:
     hud.trial_requested.connect(func(): start_run(true, "base"))
     hud.new_trial_requested.connect(start_expanded_trial)
     hud.pause_requested.connect(toggle_pause)
-    hud.restart_requested.connect(func(): start_run(false))
+    hud.restart_requested.connect(restart_current_run)
     hud.choice_selected.connect(on_choice)
     hud.reward_sell_requested.connect(sell_reward)
     hud.starter_selected.connect(set_start_weapon)
@@ -223,8 +224,11 @@ func _ready() -> void:
     hud.settings_changed.connect(set_autosave)
     hud.music_changed.connect(set_music)
     hud.volume_changed.connect(set_volume)
+    hud.damage_numbers_changed.connect(set_damage_numbers)
+    hud.display_mode_changed.connect(set_fullscreen)
     hud.configure_music(bool(settings.get("music_enabled",true)))
     hud.configure_volumes(music_volume, sfx_volume)
+    hud.configure_display(bool(settings.get("damage_numbers", true)), bool(settings.get("fullscreen", false)))
     refresh_save_status()
     demo_font = GameFonts.create_system(PackedStringArray(["Microsoft YaHei", "Arial"]))
     demo_font.font_names = PackedStringArray(["Microsoft YaHei", "Arial"])
@@ -462,7 +466,11 @@ func save_game(finished: bool = false) -> bool:
     if result.get("ok", false):
         # A finished run is sealed, not continuable; saying 已保存 here made
         # players think they could pick the run back up from the death screen.
-        note = "本局已结束 · 战绩已记录" if finished else "已保存 · 第%d关 · %d金币" % [wave, coins]
+        # During the end-of-wave absorb, pending coins are already flying in and
+        # will appear on the HUD immediately after this save, so the toast uses
+        # the same total the wallet is about to show.
+        var shown_coins: int = coins + (pending_pickup_coins() if wave_closing else 0)
+        note = "本局已结束 · 战绩已记录" if finished else "已保存 · 第%d关 · %d金币" % [wave, shown_coins]
     refresh_save_status(note)
     return result.get("ok",false)
 
@@ -691,6 +699,16 @@ func switch_elite() -> void:
     prefer_elite = not prefer_elite
     update_hud()
 
+func restart_current_run() -> void:
+    start_run(trial_mode, trial_preset if trial_mode else "")
+
+func pending_pickup_coins() -> int:
+    var total: int = 0
+    for drop in pickups:
+        if str(drop.get("kind", "xp")) == "coin":
+            total += int(drop.get("value", 0))
+    return total
+
 func toggle_pause() -> void:
     if departure_left > 0.0 or wave_closing:
         return
@@ -906,6 +924,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
         KEY_ESCAPE:
             if not replace_pending.is_empty():
                 cancel_replace()
+            elif hud != null and hud.screen == "shop_confirm" and hud.has_method("cancel_shop_buy"):
+                hud.cancel_shop_buy()
+            elif hud != null and hud.screen == "restart_confirm" and hud.has_method("cancel_restart"):
+                hud.cancel_restart()
+            elif hud != null and hud.screen == "help_confirm" and hud.has_method("cancel_help_trial"):
+                hud.cancel_help_trial()
             else:
                 toggle_pause()
         KEY_B:
@@ -966,7 +990,12 @@ func simulate(delta: float, movement: Vector2) -> void:
     if hurt_flash > 0.0:
         hurt_flash = maxf(0.0, hurt_flash - delta * 2.6)
     if hud != null and hud.has_method("set_hurt_flash"):
-        hud.set_hurt_flash(hurt_flash)
+        var warning: float = 0.0
+        if running and player_hp > 0.0 and float(stats.get("max_hp", 0.0)) > 0.0:
+            var fraction: float = player_hp / float(stats["max_hp"])
+            if fraction <= 0.5:
+                warning = 0.16 + 0.14 * (1.0 - clampf(fraction / 0.5, 0.0, 1.0))
+        hud.set_hurt_flash(maxf(hurt_flash * 0.62, warning))
     if departure_left > 0.0 and running and not paused:
         departure_left = maxf(0.0, departure_left - delta)
         hud.update_departure(departure_left)
@@ -1429,6 +1458,9 @@ func update_pickups(delta: float) -> void:
     var radius_squared: float = pickup_magnet_radius() * pickup_magnet_radius()
     for index in range(pickups.size()):
         var stone: Dictionary = pickups[index]
+        var revealed: Vector2 = pickup_visible_point(stone["position"])
+        if revealed.y > stone["position"].y:
+            stone["position"] = stone["position"].move_toward(revealed, maxf(260.0 * delta, 1.0))
         if stone["position"].distance_squared_to(player_position) <= radius_squared:
             stone["position"] = stone["position"].move_toward(player_position, 420.0 * delta)
         if stone["position"].distance_squared_to(player_position) < 484.0:
@@ -2170,8 +2202,23 @@ func combat_targets() -> Array:
     _combat_targets_ready = _simulating
     return _combat_targets_cache
 
+const PICKUP_TOP_HUD_PAD: float = 150.0
+
+func pickup_visible_point(point: Vector2) -> Vector2:
+    var area: Rect2 = visible_world_rect()
+    var floor_y: float = area.position.y + PICKUP_TOP_HUD_PAD
+    if point.y < floor_y and point.y >= area.position.y - 12.0 and point.x >= area.position.x - 8.0 and point.x <= area.end.x + 8.0:
+        point.y = floor_y
+    return point
+
+func reveal_recent_pickups(start_index: int) -> void:
+    for index in range(maxi(0, start_index), pickups.size()):
+        pickups[index]["position"] = pickup_visible_point(pickups[index]["position"])
+
 func spawn_loot(reward: Dictionary,at: Vector2) -> void:
+    var start_index: int = pickups.size()
     LootDrops.append_reward(pickups, reward, at)
+    reveal_recent_pickups(start_index)
 
 func hurt_stone(target: Dictionary,damage: float) -> void:
     var result: Dictionary=map_view.damage_stone(target,damage*stats.damage_multiplier)
@@ -2211,7 +2258,8 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
         effects.impact(enemy["position"], direction, weapon_id)
         if slammed:
             effects.slam_cue(enemy["position"], direction)
-        effects.damage_number(enemy["position"],float(enemy.get("lava_feedback_sum",amount)) if neutral else amount,critical,Color("#ffbc65") if neutral else Color("#fffdf4"))
+        if bool(settings.get("damage_numbers", true)):
+            effects.damage_number(enemy["position"],float(enemy.get("lava_feedback_sum",amount)) if neutral else amount,critical,Color("#ffbc65") if neutral else Color("#fffdf4"))
         if neutral:
             enemy["lava_feedback_sum"] = 0.0
             enemy["lava_feedback_next"] = elapsed+0.35
@@ -2241,7 +2289,9 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
             boss_defeated = true
         spawn_loot(LootRules.enemy_reward(enemy.kind,wave,enemy.elite,enemy.view.display_width,rng),enemy.position)
         if not boss and not smashed_egg and LootRules.should_drop_blood_pack(str(enemy.kind), bool(enemy.get("elite", false)), rng):
+            var blood_index: int = pickups.size()
             LootDrops.append_blood_pack(pickups, enemy.position, LootRules.BLOOD_PACK_HEAL)
+            reveal_recent_pickups(blood_index)
         if smashed_egg:
             effects.egg_smash(enemy["position"], enemy["view"].display_width)
         else:
@@ -2308,15 +2358,17 @@ func hurt_player(direction: Vector2, damage: float = 1.0, from_boss: bool = fals
         effects.floating_text(player_position, "闪避", Color("#9ce7f0"), 22)
         return
     var amount: float = damage * (1.0 - stats["reduction"])
-    if from_boss:
-        amount = minf(amount, Progression.BOSS_HIT_CAP_RATIO * float(stats["max_hp"]))
+    # Cap every combat hit (contact, projectiles, quakes, elites, Boss).
+    # Terrain DoT stays on update_terrain_damage and is intentionally uncapped.
+    amount = minf(amount, Progression.HIT_CAP_RATIO * float(stats["max_hp"]))
     player_hp = maxf(0.0, player_hp - amount)
     invulnerable = 0.7
     hero.hurt()
-    hurt_flash = maxf(hurt_flash, 0.55)
+    hurt_flash = maxf(hurt_flash, 0.42)
     audio.play("hurt", -3.0)
     effects.burst(player_position, Color("#bd7356"), 18.0, "ring")
-    effects.floating_text(player_position, "-%.1f" % amount, Color("#ff938a"), 24)
+    if bool(settings.get("damage_numbers", true)):
+        effects.floating_text(player_position, "-%.1f" % amount, Color("#ff938a"), 24)
     player_position = map_view.move_body(player_position, player_position + direction * 8.0, 18.0)
     if player_hp <= 0:
         finish_run(false)
@@ -2455,6 +2507,40 @@ func set_music(enabled: bool) -> void:
         return
     music.set_enabled(enabled)
     hud.configure_music(enabled)
+
+func set_damage_numbers(enabled: bool) -> void:
+    var previous: bool = bool(settings.get("damage_numbers", true))
+    settings["damage_numbers"] = enabled
+    var result: Dictionary = save_store.write_settings(settings)
+    if not result.get("ok", false):
+        settings["damage_numbers"] = previous
+        hud.configure_display(previous, bool(settings.get("fullscreen", false)))
+        hud.save_note = "显示设置未保存：" + str(result.get("error", ""))
+        if is_instance_valid(hud.save_note_label): hud.save_note_label.text = hud.save_note
+        return
+    hud.configure_display(enabled, bool(settings.get("fullscreen", false)))
+
+func apply_display_mode(fullscreen: bool) -> void:
+    if DisplayServer.get_name() == "headless":
+        return
+    if fullscreen:
+        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+    else:
+        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+        _fit_playable_window()
+
+func set_fullscreen(enabled: bool) -> void:
+    var previous: bool = bool(settings.get("fullscreen", false))
+    settings["fullscreen"] = enabled
+    var result: Dictionary = save_store.write_settings(settings)
+    if not result.get("ok", false):
+        settings["fullscreen"] = previous
+        hud.configure_display(bool(settings.get("damage_numbers", true)), previous)
+        hud.save_note = "显示设置未保存：" + str(result.get("error", ""))
+        if is_instance_valid(hud.save_note_label): hud.save_note_label.text = hud.save_note
+        return
+    apply_display_mode(enabled)
+    hud.configure_display(bool(settings.get("damage_numbers", true)), enabled)
 
 func set_volume(kind: String, value: float) -> void:
     var key: String = "music_volume" if kind == "music" else "sfx_volume"

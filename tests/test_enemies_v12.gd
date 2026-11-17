@@ -183,7 +183,7 @@ func check_armored() -> void:
         tick(world, enemy, 0.01, false)
     expect(world.hp == 8.0 and world.hits.is_empty(), "quake has a readable nine-tenths second before any area damage")
     until_state(world, enemy, "recover")
-    expect(world.hits.size() == 1 and is_equal_approx(world.hp, 5.9), "quake deals one physical area hit using the monster damage profile")
+    expect(world.hits.size() == 1 and is_equal_approx(world.hp, 6.25), "quake deals one physical area hit using the monster damage profile")
     tick(world, enemy, 0.2, false)
     expect(world.hits.size() == 1, "quake cannot repeat its hit during recovery")
     world = CombatWorld.new()

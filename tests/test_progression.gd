@@ -95,6 +95,38 @@ func run_checks() -> void:
     world.hurt_player(Vector2.ZERO, damage)
     expect(damage > 1.0 and is_equal_approx(world.player_hp, 8.0 - damage), "later enemy profile damage reaches the real player health calculation")
     world.start_run(false)
+    world.demo = false
+    world.stats["dodge"] = 0.0
+    world.stats["reduction"] = 0.0
+    world.invulnerable = 0.0
+    var cap: float = progression.HIT_CAP_RATIO * float(world.stats["max_hp"])
+    world.player_hp = world.stats["max_hp"]
+    world.hurt_player(Vector2.ZERO, 100.0, false)
+    expect(is_equal_approx(world.player_hp, world.stats["max_hp"] - cap) and world.running, "regular combat hits are capped at 70% of max HP")
+    world.invulnerable = 0.0
+    world.player_hp = world.stats["max_hp"]
+    world.hurt_player(Vector2.ZERO, 100.0, true)
+    expect(is_equal_approx(world.player_hp, world.stats["max_hp"] - cap) and world.running, "Boss hits share the same 70% max-HP combat cap")
+    world.map_view.chunks.clear()
+    for x in range(-2, 5):
+        for y in range(-2, 5):
+            world.map_view.chunks[Vector2i(x, y)] = []
+    var lava_at: Vector2 = world.player_position
+    world.map_view.chunks[Vector2i(1, 0)] = [{"kind": "lava", "point": lava_at, "radius": 100.0, "seed": 0}]
+    world.player_hp = world.stats["max_hp"]
+    world.invulnerable = 0.0
+    world.paused = false
+    world.shop_open = false
+    world.upgrade_pending = false
+    world.stats_open = false
+    world.player_frozen = false
+    world.wave_closing = false
+    world.departure_left = 0.0
+    var before_lava: float = world.player_hp
+    world.update_terrain_damage(3.0)
+    var lava_taken: float = before_lava - world.player_hp
+    expect(lava_taken > cap or is_equal_approx(world.player_hp, 0.0), "lava DoT ticks are not limited by the combat hit cap")
+    world.start_run(false)
     clear_enemies(world)
     world.demo = true
     world.wave = 100

@@ -110,12 +110,12 @@ func check_invalid_writes() -> void:
         ["coins", NAN], ["coins", 9007199254740992], ["xp", -0.1], ["xp", INF],
         ["player_hp", -1.0], ["player_hp", NAN], ["player_hp", 0.0], ["finished", 1],
         ["inventory", {}], ["inventory", []], ["inventory", ["sling"]],
-        ["inventory", [{"id": "club", "level": 0}]], ["inventory", [{"id": "club", "level": 6}]],
+        ["inventory", [{"id": "club", "level": 0}]], ["inventory", [{"id": "club", "level": 8}]],
         ["inventory", [{"id": "club", "level": 1.5}]], ["inventory", [{"id": "unknown", "level": 1}]],
         ["inventory", [{"id": "club"}]], ["inventory", [{"level": 1}]],
         ["inventory", [{"id": "club", "level": 1}, {"id": "club", "level": 2}]],
         ["inventory", [{"id": "club", "level": 1}, {"id": "axe", "level": 1}, {"id": "blade", "level": 1}, {"id": "sling", "level": 1}, {"id": "powder", "level": 1}, {"id": "staff", "level": 1}, {"id": "spear", "level": 1}]],
-        ["buff_levels", []], ["buff_levels", {"power": 21}], ["buff_levels", {"pierce": 3}],
+        ["buff_levels", []], ["buff_levels", {"power": 1000}], ["buff_levels", {"pierce": 1000}],
         ["buff_levels", {"vitality": -1}], ["buff_levels", {"power": 1.5}], ["buff_levels", {"unknown": 1}],
         ["future_field", Vector2(1, 2)], ["future_field", {"deep": [INF]}], ["future_field", {1: "non-string key"}]
     ]
@@ -260,7 +260,7 @@ func check_optional_corruption() -> void:
         ["player_position", "wrong"], ["player_position", [1]], ["player_position", [1, 2, 3]], ["player_position", [true, 2]],
         ["elapsed", -0.1], ["elapsed", "1"], ["wave_elapsed", -1], ["wave_elapsed", true],
         ["shop_open", 1], ["boss_round", "false"], ["boss_defeated", null], ["collapsed", 0], ["prefer_elite", "true"],
-        ["enemy_adaptation", 0.99], ["enemy_adaptation", 1.66], ["enemy_adaptation", "1.5"],
+        ["enemy_adaptation", 0.99], ["enemy_adaptation", 1.76], ["enemy_adaptation", "1.5"],
         ["xp_needed", 0], ["xp_needed", 1.25], ["xp_needed", false],
         ["kills", []], ["kills", false], ["kills", -1], ["kills", 1.5],
         ["enemy_serial", []], ["enemy_serial", false], ["enemy_serial", -1], ["enemy_serial", 1.5],

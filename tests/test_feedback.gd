@@ -125,7 +125,7 @@ func run_checks() -> void:
     world.apply_buff("explorer")
     world.pickups.append({"position": world.player_position + Vector2(130, 0), "value": 1.0})
     world.update_pickups(1.0)
-    expect(world.pickups.is_empty() and is_equal_approx(world.xp, 1.15), "explorer collects a stone outside the base radius and grants bonus XP")
+    expect(world.pickups.is_empty() and float(world.stats["xp_multiplier"]) >= 1.15 and is_equal_approx(world.xp, float(world.stats["xp_multiplier"])), "explorer collects a stone outside the base radius and grants bonus XP")
     world.present_upgrade()
     var buff_choice: String = ""
     for key in world.upgrade_choices:

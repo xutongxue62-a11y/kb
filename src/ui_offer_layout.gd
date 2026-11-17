@@ -149,7 +149,7 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         item.disabled=sold or coins<int(offer.price) or full
         item.modulate=Color(1,1,1,0.65) if item.disabled else Color.WHITE
         item.pressed.connect(func():
-            if not h.ui_busy(): h.buy_requested.emit(i))
+            if not h.ui_busy(): h.request_shop_buy(i))
         var new_weapon: bool=weapon and offer.has("level")
         var owned: int=Growth.item_level(key,inventory,levels)
         if sold and not new_weapon: owned=maxi(0,owned-1)
@@ -215,6 +215,58 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
     h.action(footer,"NextRound","准备好了 · 下一关",func():h.next_round_requested.emit(),Color("#b4583e"))
     h.open_parchment(column,animate)
     if highlight>=0 and highlight<grid.get_child_count() and h.can_animate(): h.play_ui("choice_confirm")
+
+static func shop_confirm(h, state: Dictionary, index: int) -> void:
+    var stock: Array = state.get("stock", [])
+    if index < 0 or index >= stock.size():
+        return
+    var offer: Dictionary = stock[index]
+    var key: String = str(offer.get("id", ""))
+    var coins: int = int(state.get("coins", 0))
+    var hp: float = float(state.get("hp", 0.0))
+    var max_hp: float = float(state.get("max_hp", 8.0))
+    var inventory: Array = state.get("inventory", [])
+    var levels: Dictionary = state.get("levels", {})
+    var weapon: bool = Catalog.WEAPONS.has(key)
+    var buff: bool = Growth.BUFFS.has(key)
+    var data: Dictionary = Catalog.WEAPONS[key] if weapon else (Growth.BUFFS[key] if buff else {"name": "篝火治疗"})
+    var owned: int = Growth.item_level(key, inventory, levels)
+    var replace_offer: bool = weapon and offer.has("level") and inventory.size() >= 6
+    var verb: String = "购买治疗"
+    if replace_offer:
+        verb = "购买并更换"
+    elif weapon and owned > 0:
+        verb = "购买升级"
+    elif weapon:
+        verb = "购买新武器"
+    elif buff:
+        verb = "购买并强化"
+    var column: VBoxContainer = h.parchment_column(760, 140)
+    column.get_meta("scroll_frame").opening_mode = "fold"
+    column.add_theme_constant_override("separation", 12)
+    var heading: Label = h.make_display("确认" + verb, 30)
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(heading)
+    var detail: String = "确定花费 %d 金币%s「%s」吗？\n取消将返回商店，不会扣费。" % [int(offer.get("price", 0)), "购买并更换" if replace_offer else "购买", str(data.get("name", key))]
+    if replace_offer:
+        detail += "\n换下的武器按原价 50% 折价售回。"
+    var body: Label = h.make_label(detail, 18, Color("#66705e"))
+    body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    body.custom_minimum_size = Vector2(640, 90)
+    column.add_child(body)
+    var wallet: Label = h.make_label("当前金币 %d · 生命 %.1f / %.0f" % [coins, hp, max_hp], 17, Color("#704127"))
+    wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(wallet)
+    var footer := HBoxContainer.new()
+    footer.add_theme_constant_override("separation", 16)
+    column.add_child(footer)
+    h.action(footer, "ShopBuyCancel", "取消", func():
+        if not h.ui_busy(): h.cancel_shop_buy())
+    h.action(footer, "ShopBuyConfirm", "确定" + verb, func():
+        if not h.ui_busy():
+            h.confirm_shop_buy())
+    h.open_parchment(column, true)
 
 static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void:
     var column: VBoxContainer=h.parchment_column(1172,16)

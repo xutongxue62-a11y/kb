@@ -165,7 +165,7 @@ static func _armored(world, enemy: Dictionary, direction: Vector2, distance: flo
                     world.effects.burst(center, Color("#df9b54"), QUAKE_RADIUS, "quake")
                 if world.player_position.distance_to(center) <= QUAKE_RADIUS + PLAYER_RADIUS:
                     var hit_direction: Vector2 = (world.player_position - center).normalized()
-                    world.hurt_player(hit_direction, float(enemy.get("damage", base_damage("armored"))) * 1.2)
+                    world.hurt_player(hit_direction, float(enemy.get("damage", base_damage("armored"))))
                 if world.audio != null:
                     world.audio.play("stone_hit", 0.0, 0.72)
                 _begin(enemy, "recover", 1.1)

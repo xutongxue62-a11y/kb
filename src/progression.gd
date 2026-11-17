@@ -38,9 +38,11 @@ const ADAPT_CAP: float = 1.75
 const ADAPT_FULL_WAVE: int = 28
 const BOSS_DYNAMIC_MULT: float = 34.0
 const BOSS_DYNAMIC_CAP: float = 2.4
-# A single boss hit may never remove more than this share of the player's
+# A single combat hit may never remove more than this share of the player's
 # max HP (applied after armor reduction, at the hurt_player funnel).
-const BOSS_HIT_CAP_RATIO: float = 0.70
+# Lava and other terrain DoT ticks do not pass through this cap.
+const HIT_CAP_RATIO: float = 0.70
+const BOSS_HIT_CAP_RATIO: float = HIT_CAP_RATIO
 
 static func cap_boss_hp(formula_hp: float, power: float) -> float:
     var dynamic_hp: float = power * BOSS_DYNAMIC_MULT

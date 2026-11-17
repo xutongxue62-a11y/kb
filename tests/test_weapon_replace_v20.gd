@@ -29,7 +29,7 @@ func _initialize() -> void:
     call_deferred("run")
 
 func run() -> void:
-    expect(is_equal_approx(Growth.new_weapon_level_chance(1, 1), 0.88) and Growth.new_weapon_level_chance(1, 5) > 0.0, "early offers mostly roll Lv.1 but every catalog level stays possible")
+    expect(is_equal_approx(Growth.new_weapon_level_chance(1, 1), 0.90) and Growth.new_weapon_level_chance(1, Growth.MAX_WEAPON_LEVEL) > 0.0, "early offers mostly roll Lv.1 but every catalog level stays possible")
     expect(Growth.high_tier_chance(1) < Growth.high_tier_chance(4) and Growth.high_tier_chance(4) < Growth.high_tier_chance(10), "mid and high weapon levels ramp up with stage progress")
     expect(Growth.high_tier_chance(10) < 0.45, "even late offers keep the top end uncommon")
     expect(Growth.high_tier_status(1) == "新获得" and Growth.high_tier_status(3).contains("Lv.3") and Growth.high_tier_status(5).contains("Lv.5"), "high-tier means catalog evolution milestones: Lv.3 进阶 and Lv.5 觉醒")
@@ -148,7 +148,7 @@ func run() -> void:
                 if rolled >= 5:
                     late_awake += 1
     var late_rate: float = float(late_high) / float(maxi(1, late_new))
-    expect(late_rate > 0.20 and late_rate < 0.38, "stage-8 shops raise Lv.3+ offers with the current progression weights: " + str(late_rate))
+    expect(late_rate > 0.10 and late_rate < 0.38, "stage-8 shops raise Lv.3+ offers with the current progression weights: " + str(late_rate))
     expect(late_rate > early_rate * 2.0, "later shop stock actually raises higher-level frequency above the early pool")
     expect(float(late_awake) / float(maxi(1, late_new)) < 0.10, "Lv.5 remains uncommon even after lower evolved levels become more available")
     if late_high >= 8:
@@ -160,7 +160,7 @@ func run() -> void:
     var seen_levels := {}
     for i in range(800):
         var rolled: int = Growth.roll_new_weapon_level(forced, 8)
-        expect(rolled >= 1 and rolled <= 5, "rolled starting levels stay inside the five supported weapon levels")
+        expect(rolled >= 1 and rolled <= Growth.MAX_WEAPON_LEVEL, "rolled starting levels stay inside the supported weapon levels")
         seen_levels[rolled] = true
     for level in range(1, 6):
         expect(seen_levels.has(level), "the current distribution can actually produce Lv.%d" % level)

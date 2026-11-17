@@ -68,10 +68,10 @@ const CHARACTERS = {
         "portrait": "res://assets/characters/v14/chief_portrait.png",
         "body": "res://assets/characters/v13/chief_body.png",
         "starting_weapon": "spear",
-        "weapon_label": "长枪",
+        "weapon_label": "骨矛",
         "confirm_button": "StartSpear",
         "skills": [
-            {"id": "reach", "name": "枪阵延伸", "description": "武器攻击距离 +20%，长枪更好先手贯刺。"},
+            {"id": "reach", "name": "枪阵延伸", "description": "武器攻击距离 +20%，骨矛更好先手贯刺。"},
             {"id": "command", "name": "部族号令", "description": "攻速 +12%，弹道额外穿透 1 名敌人。"}
         ],
         "modifiers": {
@@ -86,7 +86,7 @@ const CHARACTERS = {
         "portrait": "res://assets/characters/v14/barbarian_portrait.png",
         "body": "res://assets/characters/v13/barbarian_body.png",
         "starting_weapon": "club",
-        "weapon_label": "棒锤",
+        "weapon_label": "木棒",
         "confirm_button": "StartClub",
         "skills": [
             {"id": "tough", "name": "蛮力厚皮", "description": "伤害 +18%，生命 +2，受伤减免 12%。"},

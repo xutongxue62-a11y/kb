@@ -34,7 +34,7 @@ func run_checks() -> void:
     var partial: Dictionary = world.SessionState.capture(world)
     expect(world.save_store.write_run(partial).ok and world.continue_game(),"partial absorption saves and resumes")
     world.simulate(1.0,Vector2.ZERO)
-    expect(world.pickups.is_empty() and world.chest_marks.is_empty() and world.coins==10 and is_equal_approx(world.xp,5.0),"only existing 3 coin / 5 XP drops are fully collected before settlement")
+    expect(world.pickups.is_empty() and world.chest_marks.is_empty() and world.coins==10 and is_equal_approx(world.xp,5.0*float(world.stats["xp_multiplier"])),"only existing 3 coin / 5 XP drops are fully collected before settlement")
     expect(world.upgrade_pending and world.upgrade_reason=="chest" and not world.shop_open,"absorbed chest reward is resolved before opening the shop")
     expect(world.save_store.write_run(world.SessionState.capture(world)).ok and world.continue_game(),"pending end-round chest survives save/continue")
     world.simulate(0.02,Vector2.ZERO)
@@ -50,11 +50,12 @@ func run_checks() -> void:
     world.chest_marks = [{"position":world.player_position+Vector2(0,200),"age":0.0}]
     world.start_wave_closing()
     world.simulate(1.1,Vector2.ZERO)
+    var leftover_xp: float = 14.0 + 4.0 * float(world.stats["xp_multiplier"]) - world.xp_needed
     expect(world.upgrade_pending and world.upgrade_reason=="xp" and world.coins==4 and not world.shop_open,"earned XP level-up is resolved before chest and camp")
     if world.upgrade_pending: world.on_choice(world.upgrade_choices[0])
-    expect(world.player_level==2 and is_equal_approx(world.xp,3.0) and world.upgrade_pending and world.upgrade_reason=="chest","XP is deducted once, then the absorbed chest is presented")
+    expect(world.player_level==2 and is_equal_approx(world.xp,leftover_xp) and world.upgrade_pending and world.upgrade_reason=="chest","XP is deducted once, then the absorbed chest is presented")
     if world.upgrade_pending: world.on_choice(world.upgrade_choices[0])
-    expect(world.shop_open and world.coins==4 and is_equal_approx(world.xp,3.0) and world.chest_queue==0,"final shop totals reflect all rewards and no duplicate payout")
+    expect(world.shop_open and world.coins==4 and is_equal_approx(world.xp,leftover_xp) and world.chest_queue==0,"final shop totals reflect all rewards and no duplicate payout")
     world.queue_free()
     await process_frame
     print("SETTLEMENT V14 RESULT: %d checks, %d failures" % [checks,failures])

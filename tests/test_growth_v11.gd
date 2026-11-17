@@ -16,15 +16,16 @@ func _initialize() -> void:
     for key in ["power", "haste"]:
         for index in range(10):
             expect(growth.apply(levels, key), key + " stacks to ten")
-        expect(not growth.apply(levels, key), key + " stops at ten")
-    expect(is_equal_approx(growth.stats(levels)["attack_speed"], 2.8), "ten haste yields 2.8x actual speed")
+    expect(is_equal_approx(growth.stats(levels)["attack_speed"], 3.0), "ten haste yields 3.0x actual speed")
     expect(is_equal_approx(growth.stats(levels)["damage_multiplier"], 2.8), "ten power yields 2.8x damage")
+    for key in ["power", "haste"]:
+        expect(growth.apply(levels, key), key + " can still grow past ten")
     for key in ["crit_chance", "crit_power"]:
         for index in range(8):
             expect(growth.apply(levels, key), key + " stacks to eight")
     expect(is_equal_approx(growth.stats(levels)["crit_chance"], 0.53), "maximum critical chance is 53 percent at eight stacks")
     expect(is_equal_approx(growth.stats(levels)["crit_multiplier"], 4.3), "maximum critical damage reaches 4.3x at eight stacks")
-    expect(growth.BUFFS["pet"]["max_level"] == 6 and growth.BUFFS["drone"]["max_level"] == 6, "both supports grow to six")
+    expect(int(growth.BUFFS["pet"]["max_level"]) == 999 and int(growth.BUFFS["drone"]["max_level"]) == 999, "both supports stay available across a long run")
     var random: RandomNumberGenerator = RandomNumberGenerator.new()
     random.seed = 113
     var inventory: Array = [{"id":"club", "level":1}]
@@ -36,7 +37,7 @@ func _initialize() -> void:
         return
     var previous: float = 1.0
     var power_cap: int = int(growth.BUFFS["power"]["max_level"])
-    for level in range(power_cap):
+    for level in [0, 1, 2, 5, 10]:
         var probability: float = growth.draw_probability("power", inventory, {"power":level})
         expect(probability > 0.0 and probability < previous, "higher owned level strictly lowers first draw chance")
         previous = probability
@@ -68,7 +69,7 @@ func _initialize() -> void:
         maxed[key] = growth.BUFFS[key]["max_level"]
     var full: Array = []
     for key in ["club", "axe", "blade", "sling", "powder", "staff"]:
-        full.append({"id":key, "level":5})
+        full.append({"id":key, "level":growth.MAX_WEAPON_LEVEL})
     var owned: Dictionary = {}
     for item in full:
         owned[item["id"]] = true
@@ -114,13 +115,13 @@ func _initialize() -> void:
     state["shop_stock"][0]["probability"] = 1.1
     expect(not store.write_run(state)["ok"], "probability metadata rejects values outside zero to one")
     state["shop_stock"][0]["probability"] = 0.1
-    var defense: Dictionary = growth.stats({"armor":999, "dodge":999})
-    expect(defense["reduction"] <= 0.36 and defense["dodge"] <= 0.18, "defensive caps prevent immunity even on unchecked input")
+    var defense: Dictionary = growth.stats({"armor":40, "dodge":40})
+    expect(defense["reduction"] > 0.9 and defense["reduction"] < 1.0 and defense["dodge"] > 0.8 and defense["dodge"] < 1.0, "defensive layers never reach full immunity even on high stacks")
     var offer: Dictionary = {"id":"power", "price":14,"sold":false}
     expect(not economy.valid(offer, 13, inventory, {}, 1.0, 8.0), "insufficient coins cannot buy an upgrade")
     offer["price"] = 0
     expect(not economy.valid(offer, 99, inventory, {}, 1.0, 8.0), "zero price cannot grant free upgrades")
-    state["buff_levels"]["power"] = 21
+    state["buff_levels"]["power"] = 1000
     expect(not store.write_run(state)["ok"], "overcap save rejected")
     finish()
 

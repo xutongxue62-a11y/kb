@@ -4,6 +4,7 @@ const Catalog = preload("res://src/catalog.gd")
 const Rules = preload("res://src/rules.gd")
 const Armory = preload("res://src/armory.gd")
 const WeaponArt = preload("res://src/weapon_art.gd")
+const Growth = preload("res://src/growth.gd")
 const EXPANDED: Array = ["bonebow", "firepot", "wardrum", "crystal"]
 
 var checks: int = 0
@@ -71,10 +72,10 @@ func check_catalog_and_slots() -> void:
     for key in EXPANDED:
         var inventory: Array = []
         expect(Catalog.IDS.has(key) and Rules.equip(inventory, key).get("accepted", false), "new weapon enters the actual equip pool: " + key)
-        for upgrade in range(4):
+        for upgrade in range(Growth.MAX_WEAPON_LEVEL - 1):
             Rules.equip(inventory, key)
         var beyond_cap: Dictionary = Rules.equip(inventory, key)
-        expect(inventory.size() == 1 and inventory[0]["level"] == 5 and not beyond_cap.get("accepted", true), "new weapon upgrades to level five and rejects level six: " + key)
+        expect(inventory.size() == 1 and inventory[0]["level"] == Growth.MAX_WEAPON_LEVEL and not beyond_cap.get("accepted", true), "new weapon upgrades to the cap and rejects the next level: " + key)
     var full: Array = []
     for key in ["club", "staff", "bonebow", "firepot", "wardrum", "crystal"]:
         Rules.equip(full, key)

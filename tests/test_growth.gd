@@ -33,14 +33,14 @@ func _initialize() -> void:
     expect(is_equal_approx(growth.stats(levels)["pickup_radius"], 150.0) and is_equal_approx(growth.stats(levels)["xp_multiplier"], 1.15), "explorer expands collection radius and XP yield")
     growth.apply(levels, "pierce")
     growth.apply(levels, "pierce")
-    expect(not growth.apply(levels, "pierce") and growth.stats(levels)["pierce"] == 2, "piercing caps at two extra targets")
+    expect(growth.stats(levels)["pierce"] == 2 and growth.apply(levels, "pierce") and growth.stats(levels)["pierce"] == 3, "each pierce stack adds one extra target")
     var before: Dictionary = levels.duplicate(true)
     expect(not growth.apply(levels, "invalid") and levels == before, "unknown growth cannot mutate a run")
     var random: RandomNumberGenerator = RandomNumberGenerator.new()
     random.seed = 123
     var inventory: Array = []
     for key in ["club", "axe", "blade", "sling", "powder", "staff"]:
-        inventory.append({"id": key, "level": 5})
+        inventory.append({"id": key, "level": growth.MAX_WEAPON_LEVEL})
     var owned: Dictionary = {}
     for item in inventory:
         owned[item["id"]] = true

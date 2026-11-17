@@ -106,7 +106,7 @@ func test_legacy_buff_save(world) -> void:
     saved.xp = 3.25
     expect(world.save_store.write_run(saved).get("ok", false), "older high-stack Buff saves remain valid data")
     expect(world.continue_game(), "an older high-stack save can continue under the approved new caps")
-    expect(world.buff_levels.power == 10 and world.buff_levels.haste == 10 and world.buff_levels.crit_chance == 8 and world.buff_levels.crit_power == 8, "old Buff stacks load at the newly approved play caps")
+    expect(world.buff_levels.power == 20 and world.buff_levels.haste == 20 and world.buff_levels.crit_chance == 15 and world.buff_levels.crit_power == 15, "older high Buff stacks load without being cut down")
     expect(world.coins == 44 and is_equal_approx(world.player_hp, 7.25) and is_equal_approx(world.xp, 3.25), "cap normalization preserves the save's wallet, exact HP and XP")
 
 func prepare_target(world, state: String) -> Dictionary:

@@ -35,6 +35,8 @@ signal home_requested
 signal settings_changed(autosave: bool)
 signal music_changed(enabled: bool)
 signal volume_changed(kind: String, value: float)
+signal damage_numbers_changed(enabled: bool)
+signal display_mode_changed(fullscreen: bool)
 
 var library
 var root: Control
@@ -94,6 +96,12 @@ var preview_character: String = "caveman"
 var debug_cheats: bool = false
 var music_volume: float = 1.0
 var sfx_volume: float = 1.0
+var damage_numbers_enabled: bool = true
+var fullscreen_enabled: bool = false
+var shop_state: Dictionary = {}
+var shop_confirm_index: int = -1
+var help_in_run: bool = false
+var pending_help_trial: String = ""
 var menu_summary: Dictionary = {}
 var hurt_flash_layer: Control
 var front_return_screen: String = "title"
@@ -1065,6 +1073,7 @@ func show_menu(kind: String, kills: int, sfx: String = "ui_open", summary: Dicti
         action(column, "Stats", "角色属性 [B]", func(): stats_requested.emit())
         action(column, "HelpGameplay", "玩法说明", func(): show_help("gameplay", true))
         action(column, "Settings", "设置", func(): show_settings(true))
+        action(column, "RestartRun", "重新开始本局", func(): show_restart_confirm())
         action(column, "Home", "返回首页", func(): home_requested.emit())
     else:
         var retry: Dictionary = Catalog.character(selected_character)
@@ -1252,7 +1261,60 @@ func show_help(page: String = "gameplay", in_run: bool = false) -> void:
     reset_overlay()
     set_battle_visible(in_run)
     screen = "help"
+    help_in_run = in_run
+    pending_help_trial = ""
     FrontUI.help_page(self, page, in_run)
+
+func request_help_trial(kind: String) -> void:
+    if ui_busy():
+        return
+    pending_help_trial = kind
+    remember_modal_origin()
+    reset_overlay()
+    set_battle_visible(help_in_run)
+    screen = "help_confirm"
+    FrontUI.help_trial_confirm(self, kind, help_in_run)
+
+func confirm_help_trial() -> void:
+    if ui_busy():
+        return
+    var kind: String = pending_help_trial
+    pending_help_trial = ""
+    show_help("gameplay", help_in_run)
+    if kind == "new":
+        new_trial_requested.emit()
+    else:
+        trial_requested.emit()
+
+func cancel_help_trial() -> void:
+    pending_help_trial = ""
+    show_help("gameplay", help_in_run)
+
+func show_restart_confirm() -> void:
+    if ui_busy():
+        return
+    reset_overlay()
+    set_battle_visible(true)
+    present_backdrop("none")
+    overlay.color = Color(0.04, 0.08, 0.13, 0.64)
+    screen = "restart_confirm"
+    var column: VBoxContainer = parchment_column(650, 160)
+    column.get_meta("scroll_frame").opening_mode = "fold"
+    column.add_theme_constant_override("separation", 14)
+    var title: Label = make_display("重新开始本局", 32)
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(title)
+    var body: Label = make_label("将以当前角色从第 1 关重新出发。正式存档与试用存档互不覆盖；取消则返回暂停菜单。", 18, Color("#66705e"))
+    body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    body.custom_minimum_size = Vector2(560, 72)
+    column.add_child(body)
+    action(column, "RestartConfirm", "确定重新开始", func(): restart_requested.emit())
+    action(column, "RestartCancel", "取消", func(): cancel_restart())
+    open_parchment(column, true)
+
+func cancel_restart() -> void:
+    show_menu("pause", menu_kills, "ui_back")
     play_ui("ui_open")
 
 func show_settings(in_run: bool) -> void:
@@ -1264,12 +1326,54 @@ func show_settings(in_run: bool) -> void:
     play_ui("ui_open")
 
 func show_shop(stock: Array, coins: int, finished_wave: int, inventory: Array, levels: Dictionary, hp: float, max_hp: float, animate: bool = true, highlight: int = -1, reroll_cost: int = -1) -> void:
+    shop_state = {
+        "stock": stock,
+        "coins": coins,
+        "wave": finished_wave,
+        "inventory": inventory,
+        "levels": levels,
+        "hp": hp,
+        "max_hp": max_hp,
+        "reroll_cost": reroll_cost,
+    }
+    shop_confirm_index = -1
     reset_overlay()
     set_battle_visible(false)
     present_backdrop("none")
     dim_overlay(false,true)
     screen = "shop"
     OfferUI.shop(self,stock,coins,finished_wave,inventory,levels,hp,max_hp,animate,highlight,reroll_cost)
+
+func request_shop_buy(index: int) -> void:
+    if ui_busy() or shop_state.is_empty():
+        return
+    var stock: Array = shop_state.get("stock", [])
+    if index < 0 or index >= stock.size():
+        return
+    shop_confirm_index = index
+    reset_overlay()
+    set_battle_visible(false)
+    present_backdrop("none")
+    dim_overlay(false, true)
+    screen = "shop_confirm"
+    OfferUI.shop_confirm(self, shop_state, index)
+
+func confirm_shop_buy() -> void:
+    if ui_busy():
+        return
+    var index: int = shop_confirm_index
+    shop_confirm_index = -1
+    if index < 0:
+        cancel_shop_buy()
+        return
+    cancel_shop_buy()
+    buy_requested.emit(index)
+
+func cancel_shop_buy() -> void:
+    shop_confirm_index = -1
+    if shop_state.is_empty():
+        return
+    show_shop(shop_state.get("stock", []), int(shop_state.get("coins", 0)), int(shop_state.get("wave", 1)), shop_state.get("inventory", []), shop_state.get("levels", {}), float(shop_state.get("hp", 0.0)), float(shop_state.get("max_hp", 8.0)), false, -1, int(shop_state.get("reroll_cost", -1)))
 
 
 func stage_panel(parent: Node) -> void:
@@ -1383,6 +1487,15 @@ func handle_front_key(code: int) -> bool:
     if screen in ["settings", "continue", "help"] and code == KEY_ESCAPE:
         close_front_modal()
         return true
+    if screen == "help_confirm" and code == KEY_ESCAPE:
+        cancel_help_trial()
+        return true
+    if screen == "shop_confirm" and code == KEY_ESCAPE:
+        cancel_shop_buy()
+        return true
+    if screen == "restart_confirm" and code == KEY_ESCAPE:
+        cancel_restart()
+        return true
     if screen == "cast":
         if code == KEY_LEFT or code == KEY_RIGHT:
             change_character(-1 if code == KEY_LEFT else 1)
@@ -1414,13 +1527,14 @@ class HurtVignette extends Control:
     func _draw() -> void:
         if strength <= 0.01 or size.x < 8.0 or size.y < 8.0:
             return
-        var band: float = 100.0
-        var steps: int = 12
+        var band: float = 78.0
+        var steps: int = 6
         for index in range(steps):
-            var alpha: float = 0.55 * strength * (1.0 - float(index) / float(steps))
-            var color := Color(0.72, 0.08, 0.09, alpha)
+            var fade: float = 1.0 - float(index) / float(steps)
+            var alpha: float = 0.28 * strength * fade * fade
+            var color := Color(0.62, 0.10, 0.11, alpha)
             var t: float = band * float(index) / float(steps)
-            var thick: float = band / float(steps) + 1.2
+            var thick: float = band / float(steps) + 2.0
             draw_rect(Rect2(0, t, size.x, thick), color, true)
             draw_rect(Rect2(0, size.y - t - thick, size.x, thick), color, true)
             draw_rect(Rect2(t, 0, thick, size.y), color, true)
@@ -1684,6 +1798,29 @@ func configure_volumes(music_value: float, sfx_value: float) -> void:
         music_slider.set_value_no_signal(music_volume)
     if sfx_slider != null:
         sfx_slider.set_value_no_signal(sfx_volume)
+    var music_value_label: Label = overlay.find_child("MusicVolumeValue", true, false) as Label if overlay != null else null
+    var sfx_value_label: Label = overlay.find_child("SfxVolumeValue", true, false) as Label if overlay != null else null
+    if music_value_label != null:
+        music_value_label.text = volume_percent(music_volume)
+    if sfx_value_label != null:
+        sfx_value_label.text = volume_percent(sfx_volume)
+
+func volume_percent(value: float) -> String:
+    return "%d%%" % int(round(clampf(value, 0.0, 1.0) * 100.0))
+
+func configure_display(show_numbers: bool, fullscreen: bool) -> void:
+    damage_numbers_enabled = show_numbers
+    fullscreen_enabled = fullscreen
+    if overlay == null:
+        return
+    var numbers: BaseButton = overlay.find_child("DamageNumbers", true, false) as BaseButton
+    if numbers != null:
+        numbers.set_pressed_no_signal(damage_numbers_enabled)
+        numbers.text = "开启" if damage_numbers_enabled else "关闭"
+    var mode: BaseButton = overlay.find_child("FullscreenMode", true, false) as BaseButton
+    if mode != null:
+        mode.set_pressed_no_signal(fullscreen_enabled)
+        mode.text = "全屏" if fullscreen_enabled else "窗口"
 
 func set_hurt_flash(amount: float) -> void:
     if hurt_flash_layer == null or not is_instance_valid(hurt_flash_layer):

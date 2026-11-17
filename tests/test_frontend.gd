@@ -54,9 +54,9 @@ func run_checks() -> void:
     expect(find(hud.overlay, "StartSling") is BaseButton and find(hud.overlay, "StartClub") is BaseButton and find(hud.overlay, "StartSpear") is BaseButton, "all three class confirm buttons are present")
     expect(copy(hud.overlay).contains("1 / 3") and copy(hud.overlay).contains("原始人") and copy(hud.overlay).contains("弹弓"), "the arrow page shows the default hunter and the page count")
     await press(hud.overlay, "NextCharacter")
-    expect(hud.preview_character == "chief" and hud.selected_character == "caveman" and copy(hud.overlay).contains("酋长") and copy(hud.overlay).contains("长枪") and copy(hud.overlay).contains("2 / 3"), "arrows switch to the chieftain page")
+    expect(hud.preview_character == "chief" and hud.selected_character == "caveman" and copy(hud.overlay).contains("酋长") and copy(hud.overlay).contains("骨矛") and copy(hud.overlay).contains("2 / 3"), "arrows switch to the chieftain page")
     await press(hud.overlay, "NextCharacter")
-    expect(hud.preview_character == "barbarian" and hud.selected_character == "caveman" and copy(hud.overlay).contains("野蛮人") and copy(hud.overlay).contains("棒锤") and copy(hud.overlay).contains("3 / 3"), "arrows switch to the barbarian page")
+    expect(hud.preview_character == "barbarian" and hud.selected_character == "caveman" and copy(hud.overlay).contains("野蛮人") and copy(hud.overlay).contains("木棒") and copy(hud.overlay).contains("3 / 3"), "arrows switch to the barbarian page")
     await press(hud.overlay, "NextCharacter")
     expect(hud.preview_character == "caveman" and hud.selected_character == "caveman" and copy(hud.overlay).contains("1 / 3"), "arrows wrap back to the default hunter")
     await press(hud.overlay, "Settings")
@@ -141,7 +141,9 @@ func run_checks() -> void:
     expect(purchases.is_empty(), "shop cards cannot purchase during the paper roll")
     hud.input_lock_until = 0
     await press(hud.overlay, "ShopOffer0")
-    expect(purchases == [0], "shop remains actionable after its roll")
+    expect(purchases.is_empty() and hud.screen == "shop_confirm", "shop confirm appears after the paper finishes")
+    await press(hud.overlay, "ShopBuyConfirm")
+    expect(purchases == [0], "shop remains actionable after its roll and confirm")
 
     world.queue_free()
     await process_frame

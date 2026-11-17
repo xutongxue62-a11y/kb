@@ -220,8 +220,6 @@ static func cast(h) -> void:
     count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     if shown == h.selected_character:
         label(h, body, "✓ 已选择", Rect2(216, 454, 220, 38), 24, RED, true)
-    else:
-        label(h, body, "预览中", Rect2(216, 454, 220, 38), 24, Color("#506071"), true)
     label(h, body, str(profile.get("name", "原始人")), Rect2(620, 28, 500, 88), 58, INK, true)
     label(h, body, "初始武器", Rect2(620, 132, 400, 32), 21, INK, true)
     weapon(h, body, Vector2(664, 212), starter, 76)
@@ -282,11 +280,14 @@ static func volume_slider(h, node_name: String, kind: String, value: float, rect
             h.music_volume = amount
         else:
             h.sfx_volume = amount
+        var value_label: Label = slider.get_parent().find_child("MusicVolumeValue" if kind == "music" else "SfxVolumeValue", false, false) as Label if slider.get_parent() != null else null
+        if value_label != null and h.has_method("volume_percent"):
+            value_label.text = h.volume_percent(amount)
         h.volume_changed.emit(kind, amount))
     return slider
 
 static func settings(h, in_run: bool) -> void:
-    var sheet = modal(h, Rect2(254, 48, 772, 704))
+    var sheet = modal(h, Rect2(254, 12, 772, 776))
     var body: Control = sheet.content
     label(h, body, "设置", Rect2(48, 25, 550, 73), 50, INK, true)
     button(h, body, "CloseModal", "×", Rect2(674, 24, 52, 48), func(): h.close_front_modal(), false, 30)
@@ -315,15 +316,62 @@ static func settings(h, in_run: bool) -> void:
     h.press_motion(music_switch)
     label(h,body,"关闭后淡出背景音乐，保留战斗音效",Rect2(48,210,674,26),17,Color("#5c625e"))
     label(h, body, "音乐音量", Rect2(48, 244, 220, 40), 22, INK, true)
-    body.add_child(volume_slider(h, "MusicVolume", "music", h.music_volume, Rect2(280, 246, 440, 40)))
+    body.add_child(volume_slider(h, "MusicVolume", "music", h.music_volume, Rect2(280, 246, 360, 40)))
+    var music_value: Label = label(h, body, h.volume_percent(h.music_volume) if h.has_method("volume_percent") else "100%", Rect2(650, 246, 80, 40), 20, INK, true)
+    music_value.name = "MusicVolumeValue"
+    music_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
     label(h, body, "音效音量", Rect2(48, 292, 220, 40), 22, INK, true)
-    body.add_child(volume_slider(h, "SfxVolume", "sfx", h.sfx_volume, Rect2(280, 294, 440, 40)))
+    body.add_child(volume_slider(h, "SfxVolume", "sfx", h.sfx_volume, Rect2(280, 294, 360, 40)))
+    var sfx_value: Label = label(h, body, h.volume_percent(h.sfx_volume) if h.has_method("volume_percent") else "100%", Rect2(650, 294, 80, 40), 20, INK, true)
+    sfx_value.name = "SfxVolumeValue"
+    sfx_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
     line(body,Vector2(48,344),674,Color(INK,0.35))
-    label(h, body, "自动存档", Rect2(48, 354, 400, 42), 25, INK, true)
+    label(h, body, "伤害数字", Rect2(48, 354, 400, 42), 25, INK, true)
+    var numbers := PaperToggle.new()
+    numbers.name = "DamageNumbers"
+    numbers.position = Vector2(552, 348)
+    numbers.size = Vector2(168, 50)
+    numbers.button_pressed = h.damage_numbers_enabled
+    numbers.text = "开启" if h.damage_numbers_enabled else "关闭"
+    numbers.add_theme_font_size_override("font_size",21)
+    numbers.add_theme_stylebox_override("normal",action_style(IVORY,Color(INK,0.6)))
+    numbers.add_theme_stylebox_override("pressed",action_style(RED,IVORY))
+    numbers.toggled.connect(func(value: bool):
+        if h.ui_busy():
+            numbers.set_pressed_no_signal(h.damage_numbers_enabled)
+            return
+        h.damage_numbers_enabled = value
+        numbers.text = "开启" if value else "关闭"
+        h.play_ui("button_press")
+        h.damage_numbers_changed.emit(value))
+    body.add_child(numbers)
+    h.press_motion(numbers)
+    label(h, body, "全屏显示", Rect2(48, 404, 400, 42), 25, INK, true)
+    var mode := PaperToggle.new()
+    mode.name = "FullscreenMode"
+    mode.position = Vector2(552, 398)
+    mode.size = Vector2(168, 50)
+    mode.button_pressed = h.fullscreen_enabled
+    mode.text = "全屏" if h.fullscreen_enabled else "窗口"
+    mode.add_theme_font_size_override("font_size",21)
+    mode.add_theme_stylebox_override("normal",action_style(IVORY,Color(INK,0.6)))
+    mode.add_theme_stylebox_override("pressed",action_style(RED,IVORY))
+    mode.toggled.connect(func(value: bool):
+        if h.ui_busy():
+            mode.set_pressed_no_signal(h.fullscreen_enabled)
+            return
+        h.fullscreen_enabled = value
+        mode.text = "全屏" if value else "窗口"
+        h.play_ui("button_press")
+        h.display_mode_changed.emit(value))
+    body.add_child(mode)
+    h.press_motion(mode)
+    line(body,Vector2(48,456),674,Color(INK,0.35))
+    label(h, body, "自动存档", Rect2(48, 466, 400, 42), 25, INK, true)
     var toggle := PaperToggle.new()
     toggle.name = "Autosave"
     toggle.text = "开启" if h.autosave_enabled else "关闭"
-    toggle.position = Vector2(552, 348)
+    toggle.position = Vector2(552, 460)
     toggle.size = Vector2(168, 50)
     toggle.button_pressed = h.autosave_enabled
     toggle.add_theme_font_size_override("font_size",21)
@@ -340,16 +388,16 @@ static func settings(h, in_run: bool) -> void:
     body.add_child(toggle)
     h.autosave_toggle = toggle
     h.press_motion(toggle)
-    label(h,body,"结算、购买与返回首页时自动保存",Rect2(48,400,674,26),17,Color("#5c625e"))
-    label(h,body,"手动保存",Rect2(48,436,280,40),25,INK,true)
-    var manual: Button = button(h,body,"SaveNow","保存当前进度 [F5]",Rect2(400,430,320,52),func():h.save_requested.emit(),false,20)
+    label(h,body,"结算、购买与返回首页时自动保存",Rect2(48,514,674,24),17,Color("#5c625e"))
+    label(h,body,"手动保存",Rect2(48,544,280,40),25,INK,true)
+    var manual: Button = button(h,body,"SaveNow","保存当前进度 [F5]",Rect2(400,538,320,52),func():h.save_requested.emit(),false,20)
     manual.disabled = not in_run
-    label(h,body,"按 F5 保存当前旅程" if in_run else "进入游戏后可手动保存",Rect2(48,488,674,26),17,Color("#5c625e"))
-    line(body,Vector2(48,526),674,Color(INK,0.35))
-    h.save_note_label = label(h,body,h.save_note,Rect2(48,540,674,52),16,Color("#586e55"))
+    label(h,body,"按 F5 保存当前旅程" if in_run else "进入游戏后可手动保存",Rect2(48,594,674,24),17,Color("#5c625e"))
+    line(body,Vector2(48,624),674,Color(INK,0.35))
+    h.save_note_label = label(h,body,h.save_note,Rect2(48,634,674,44),16,Color("#586e55"))
     h.save_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    label(h,body,"Esc 关闭",Rect2(48,626,220,32),18)
-    button(h,body,"Back","完成",Rect2(540,615,180,56),func():h.close_front_modal(),true,25)
+    label(h,body,"Esc 关闭",Rect2(48,688,220,32),18)
+    button(h,body,"Back","完成",Rect2(540,680,180,54),func():h.close_front_modal(),true,25)
 
 static func continued(h) -> void:
     var sheet = modal(h, Rect2(230, 91, 820, 618))
@@ -418,6 +466,18 @@ static func help_page(h, page: String, in_run: bool) -> void:
     button(h, body, "HelpGameplay", "玩法", Rect2(40, 520, 116, 43), func(): h.show_help("gameplay", in_run), false, 18)
     button(h, body, "HelpKeys", "按键操作", Rect2(172, 520, 154, 43), func(): h.show_help("keys", in_run), false, 18)
     button(h, body, "Stats", "角色属性 [B]", Rect2(342, 520, 186, 43), func(): h.stats_requested.emit(), false, 18)
-    button(h, body, "TrialBasic", "基础试用" + (" [F2]" if h.debug_cheats else ""), Rect2(40, 581, 222, 44), func(): h.trial_requested.emit(), false, 18)
-    button(h, body, "TrialNew", "新武器试用" + (" [F3]" if h.debug_cheats else ""), Rect2(280, 581, 244, 44), func(): h.new_trial_requested.emit(), false, 18)
+    button(h, body, "TrialBasic", "基础试用" + (" [F2]" if h.debug_cheats else ""), Rect2(40, 581, 222, 44), func(): h.request_help_trial("base"), false, 18)
+    button(h, body, "TrialNew", "新武器试用" + (" [F3]" if h.debug_cheats else ""), Rect2(280, 581, 244, 44), func(): h.request_help_trial("new"), false, 18)
     button(h, body, "Back", "返回 [Esc]", Rect2(720, 570, 224, 54), func(): h.close_front_modal(), true, 22)
+
+static func help_trial_confirm(h, kind: String, in_run: bool) -> void:
+    var sheet = modal(h, Rect2(230, 140, 820, 520))
+    var body: Control = sheet.content
+    var title: String = "开始新武器试用" if kind == "new" else "开始基础试用"
+    label(h, body, title, Rect2(48, 28, 700, 60), 36, INK, true)
+    line(body, Vector2(48, 104), 724, RED)
+    var detail: String = "试用只用于体验武器和成长，不会覆盖正式存档。\n确认后进入试用关卡；取消则返回说明页。"
+    var body_copy: Label = label(h, body, detail, Rect2(48, 130, 724, 160), 22)
+    body_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    button(h, body, "HelpTrialCancel", "取消", Rect2(48, 380, 220, 54), func(): h.cancel_help_trial(), false, 22)
+    button(h, body, "HelpTrialConfirm", "开始试用", Rect2(430, 376, 342, 58), func(): h.confirm_help_trial(), true, 24)
