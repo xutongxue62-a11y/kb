@@ -213,17 +213,31 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
             action_text="%s · %d 金币" % [verb,int(offer.price)]
         text(h,item,action_text,Rect2(12,204,324,28),18,Color("#983f2b"),true)
         text(h,item,action_hint,Rect2(12,234,324,22),14,Color("#59462f"))
-    var footer:=HBoxContainer.new()
-    footer.add_theme_constant_override("separation",14)
+    var footer:=Control.new()
+    footer.custom_minimum_size=Vector2(0,46)
     column.add_child(footer)
-    KeyBindings.attach_to_button(h.action(footer,"SaveNow","保存",func():h.save_requested.emit()), "save")
+    var center_box:=CenterContainer.new()
+    center_box.set_anchors_preset(Control.PRESET_FULL_RECT)
+    footer.add_child(center_box)
+    var next_btn: Button=h.action(center_box,"NextRound","下一关",func():h.next_round_requested.emit(),Color("#b4583e"))
+    next_btn.size_flags_horizontal=Control.SIZE_SHRINK_CENTER
+    KeyBindings.attach_to_button(next_btn, "confirm")
+    var side:=HBoxContainer.new()
+    side.add_theme_constant_override("separation",14)
+    side.set_anchors_preset(Control.PRESET_FULL_RECT)
+    side.mouse_filter=Control.MOUSE_FILTER_IGNORE
+    footer.add_child(side)
+    var save_btn: Button=h.action(side,"SaveNow","保存",func():h.save_requested.emit())
+    save_btn.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+    KeyBindings.attach_to_button(save_btn, "save")
     if reroll_cost >= 0:
-        var reroll: Button=h.action(footer,"RerollShop","刷新货物 · %d 金币" % reroll_cost,func():h.reroll_requested.emit())
+        var reroll: Button=h.action(side,"RerollShop","刷新货物 · %d 金币" % reroll_cost,func():h.reroll_requested.emit())
+        reroll.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
         if coins < reroll_cost:
             reroll.disabled=true
             reroll.modulate=Color(1,1,1,0.65)
-    h.action(footer,"Home","返回首页",func():h.home_requested.emit())
-    KeyBindings.attach_to_button(h.action(footer,"NextRound","准备好了 · 下一关",func():h.next_round_requested.emit(),Color("#b4583e")), "confirm")
+    var home_btn: Button=h.action(side,"Home","返回首页",func():h.home_requested.emit())
+    home_btn.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
     h.open_parchment(column,animate)
     if highlight>=0 and highlight<grid.get_child_count() and h.can_animate(): h.play_ui("choice_confirm")
 
@@ -274,7 +288,7 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
         slot.name="ReplaceSlot%d" % i
         slot.set_meta("ink_layout","side_icon")
         slot.pressed.connect(func():
-            if not h.ui_busy(): h.replace_requested.emit(key))
+            if not h.ui_busy(): h.choose_replace_slot(key))
         text(h,slot,"%d · %s" % [i+1,data.name],Rect2(12,7,324,31),23,Color("#263546"),true)
         text(h,slot,Growth.weapon_level_text(owned),Rect2(12,40,324,28),21,Color("#75442c"),true)
         text(h,slot,Details.attack_type(key),Rect2(12,70,324,25),18,Color("#704127"),true)
@@ -291,3 +305,49 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
     cancel.add_theme_font_size_override("font_size",21)
     KeyBindings.attach_to_button(cancel, "cancel")
     h.open_parchment(column,true)
+
+
+static func replace_confirm(h,pending: Dictionary,outgoing: Dictionary,stage: int=1) -> void:
+    var column: VBoxContainer=h.parchment_column(650,160)
+    column.get_meta("scroll_frame").opening_mode="fold"
+    column.add_theme_constant_override("separation",10)
+    var from_shop: bool=str(pending.get("source",""))=="shop"
+    var heading: Label=h.make_display("确认出售并更换",30)
+    heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(heading)
+    var new_id: String=str(pending.get("id",""))
+    var new_level: int=clampi(int(pending.get("level",1)),1,Growth.MAX_WEAPON_LEVEL)
+    var old_id: String=str(outgoing.get("id",""))
+    var old_level: int=clampi(int(outgoing.get("level",1)),1,Growth.MAX_WEAPON_LEVEL)
+    _replace_confirm_row(h,column,"将获得",new_id,new_level,Color("#3f6b35"))
+    _replace_confirm_row(h,column,"换下",old_id,old_level,Color("#983f2b"))
+    var refund: int=Economy.sell_price(old_id,stage,old_level)
+    var fact: String
+    if from_shop and pending.has("price"):
+        fact="支付 %d 金币 · 出售 +%d 金币" % [int(pending.get("price",0)),refund]
+    else:
+        fact="出售 +%d 金币" % refund
+    var fact_label: Label=h.make_label(fact,18,Color("#59462f"))
+    fact_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(fact_label)
+    KeyBindings.attach_to_button(h.action(column,"ConfirmReplace","确定出售并更换",func():
+        if not h.ui_busy(): h.confirm_replace_choice(),Color("#b4583e")), "confirm")
+    KeyBindings.attach_to_button(h.action(column,"CancelReplaceConfirm","取消",func():
+        if not h.ui_busy(): h.cancel_replace_confirm()), "cancel")
+    h.open_parchment(column,true)
+
+
+static func _replace_confirm_row(h,column: VBoxContainer,tag: String,weapon_id: String,level: int,tag_color: Color) -> void:
+    if not Catalog.WEAPONS.has(weapon_id):
+        return
+    var data: Dictionary=Catalog.WEAPONS[weapon_id]
+    var row:=Control.new()
+    row.custom_minimum_size=Vector2(560,120)
+    column.add_child(row)
+    text(h,row,tag,Rect2(0,2,76,28),19,tag_color,true)
+    art(h,row,weapon_id,Rect2(2,32,56,50),level)
+    text(h,row,"%s · %s" % [str(data.name),Growth.weapon_level_text(level)],Rect2(80,2,470,30),21,Color("#263546"),true)
+    text(h,row,Details.attack_type(weapon_id),Rect2(80,32,470,24),16,Color("#704127"),true)
+    text(h,row,Details.stats_line(weapon_id,level),Rect2(80,56,470,24),16,Color("#75442c"),true)
+    var attack: Label=text(h,row,Details.attack(weapon_id,level),Rect2(80,82,470,36),15,Color("#59462f"))
+    attack.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART

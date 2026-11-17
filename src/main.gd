@@ -972,7 +972,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
         request_trial_growth()
         return
     if KeyBindings.matches_code(code, "cancel"):
-        if not replace_pending.is_empty():
+        if hud != null and hud.screen == "replace_confirm" and hud.has_method("cancel_replace_confirm"):
+            hud.cancel_replace_confirm()
+        elif not replace_pending.is_empty():
             cancel_replace()
         elif hud != null and hud.screen == "restart_confirm" and hud.has_method("cancel_restart"):
             hud.cancel_restart()
@@ -988,6 +990,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
                     hud.confirm_cast()
                 "restart_confirm":
                     hud.confirm_restart()
+                "replace_confirm":
+                    hud.confirm_replace_choice()
                 "help_confirm":
                     hud.confirm_help_trial()
                 "pause":
@@ -998,8 +1002,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
     var slot: int = KeyBindings.shop_slot(code)
     if slot >= 0:
         if not replace_pending.is_empty():
-            if slot >= 0 and slot < inventory.size():
-                confirm_replace(str(inventory[slot]["id"]))
+            if slot >= 0 and slot < inventory.size() and hud != null and hud.screen == "replace":
+                hud.choose_replace_slot(str(inventory[slot]["id"]))
         elif hud != null and hud.screen == "shop":
             if hud.shop_index_available(slot):
                 hud.request_shop_buy(slot)

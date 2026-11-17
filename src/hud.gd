@@ -77,6 +77,10 @@ var autosave_toggle: CheckButton
 var battle_nodes: Array = []
 var menu_hides_hud: bool = true
 var choice_ids: Array = []
+var replace_pending_view: Dictionary = {}
+var replace_inventory_view: Array = []
+var replace_stage_view: int = 1
+var replace_chosen: String = ""
 var ink: Color = Color("#17253a")
 var cream: Color = Color("#f4ead6")
 var stamp: Color = Color("#c0453a")
@@ -947,6 +951,16 @@ func _fit_parchment(column: VBoxContainer) -> void:
     if max_top >= 8.0:
         frame.position.y = minf(frame.position.y, max_top)
 
+func _center_parchment_vertical(column: VBoxContainer) -> void:
+    if column == null or not is_instance_valid(column) or not column.has_meta("scroll_frame"):
+        return
+    var frame = column.get_meta("scroll_frame")
+    if frame == null or not is_instance_valid(frame):
+        return
+    var max_top: float = 800.0 - 12.0 - frame.size.y
+    if max_top >= 8.0:
+        frame.position.y = clampf((800.0 - frame.size.y) * 0.5, 8.0, max_top)
+
 func action(parent: Node, key: String, text: String, callback: Callable, color: Color = cream) -> Button:
     var button: Button = make_button(text, color)
     button.name = key
@@ -1120,6 +1134,8 @@ func show_menu(kind: String, kills: int, sfx: String = "ui_open", summary: Dicti
     save_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     column.add_child(save_note_label)
     open_parchment(column, true)
+    if kind in ["lose", "win"]:
+        call_deferred("_center_parchment_vertical", column)
 
 func show_choices(ids: Array, inventory: Array, levels: Dictionary = {}, reason: String = "xp", stage: int = 1, offer_levels: Dictionary = {}) -> void:
     reset_overlay()
@@ -1136,6 +1152,10 @@ func show_choices(ids: Array, inventory: Array, levels: Dictionary = {}, reason:
     OfferUI.growth(self,ids,inventory,levels,reason,offer_levels,stage)
 
 func show_replace(pending: Dictionary, inventory: Array, stage: int = 1) -> void:
+    replace_pending_view = pending.duplicate(true)
+    replace_inventory_view = inventory.duplicate(true)
+    replace_stage_view = stage
+    replace_chosen = ""
     reset_overlay()
     set_battle_visible(false)
     present_backdrop("none")
@@ -1143,6 +1163,32 @@ func show_replace(pending: Dictionary, inventory: Array, stage: int = 1) -> void
     screen = "replace"
     choice_ids.clear()
     OfferUI.replace(self, pending, inventory, stage)
+
+func _replace_outgoing(key: String) -> Dictionary:
+    for item in replace_inventory_view:
+        if str(item.get("id", "")) == key:
+            return item
+    return {"id": key, "level": 1}
+
+func choose_replace_slot(key: String) -> void:
+    if screen != "replace" or replace_pending_view.is_empty():
+        return
+    replace_chosen = key
+    reset_overlay()
+    set_battle_visible(false)
+    present_backdrop("none")
+    dim_overlay(false,true)
+    screen = "replace_confirm"
+    OfferUI.replace_confirm(self, replace_pending_view, _replace_outgoing(key), replace_stage_view)
+
+func confirm_replace_choice() -> void:
+    if screen == "replace_confirm" and not replace_chosen.is_empty():
+        replace_requested.emit(replace_chosen)
+
+func cancel_replace_confirm() -> void:
+    if screen != "replace_confirm":
+        return
+    show_replace(replace_pending_view, replace_inventory_view, replace_stage_view)
 
 func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = {}) -> void:
     reset_overlay()
