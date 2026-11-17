@@ -19,4 +19,6 @@ static func detail(key: String) -> String:
     var parts: PackedStringArray=plain(key).split("\n")
     return parts[1] if parts.size()>1 else "每次选择增加一层强化。"
 static func limit(key: String) -> String:
-    return "最多 %d 层" % int(Growth.BUFFS[key].max_level)
+    # Layers no longer have a cap (batch 3); the draw weight keeps falling
+    # as the stack grows, so deep stacks stay rare on their own.
+    return "可无限叠加 · 层数越高越少见"

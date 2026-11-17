@@ -25,6 +25,7 @@ signal stats_requested
 signal growth_requested
 signal new_trial_requested
 signal buy_requested(index: int)
+signal reroll_requested
 signal replace_requested(remove_id: String)
 signal replace_cancelled
 signal next_round_requested
@@ -1127,7 +1128,7 @@ func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = 
         entry.custom_minimum_size = Vector2(484, 64)
         entry.add_theme_stylebox_override("panel", style(Color("#dce6cc") if level > 0 else Color("#eee4cb")))
         grid.add_child(entry)
-        var label: Label = make_label(("已选  " if level > 0 else "可成长  ") + data["name"] + "  Lv.%d/%d\n" % [level, data["max_level"]] + data["description"].split("\n")[0], 16, ink if level > 0 else Color("#8b806b"))
+        var label: Label = make_label(("已选  " if level > 0 else "可成长  ") + data["name"] + "  Lv.%d\n" % [level] + data["description"].split("\n")[0], 16, ink if level > 0 else Color("#8b806b"))
         entry.add_child(label)
     var legend: Label = make_label("B 查看属性 · F5 保存    品红尖刺是敌方攻击    绿石给经验，金币用于营地购买", 16, Color("#78674d"))
     legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1262,13 +1263,13 @@ func show_settings(in_run: bool) -> void:
     FrontUI.settings(self, in_run)
     play_ui("ui_open")
 
-func show_shop(stock: Array, coins: int, finished_wave: int, inventory: Array, levels: Dictionary, hp: float, max_hp: float, animate: bool = true, highlight: int = -1) -> void:
+func show_shop(stock: Array, coins: int, finished_wave: int, inventory: Array, levels: Dictionary, hp: float, max_hp: float, animate: bool = true, highlight: int = -1, reroll_cost: int = -1) -> void:
     reset_overlay()
     set_battle_visible(false)
     present_backdrop("none")
     dim_overlay(false,true)
     screen = "shop"
-    OfferUI.shop(self,stock,coins,finished_wave,inventory,levels,hp,max_hp,animate,highlight)
+    OfferUI.shop(self,stock,coins,finished_wave,inventory,levels,hp,max_hp,animate,highlight,reroll_cost)
 
 
 func stage_panel(parent: Node) -> void:
@@ -1692,7 +1693,7 @@ func set_hurt_flash(amount: float) -> void:
     if hurt_flash_layer.has_method("queue_redraw"):
         hurt_flash_layer.queue_redraw()
 
-func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: float, links: Array) -> void:
+func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: float, links: Array, link_hint: String = "") -> void:
     map_label.text = map_name + " · 向四周自由探索"
     dodge_label.text = "就绪" if dodge_cooldown <= 0 else "%.1fs" % dodge_cooldown
     dodge_bar.value = 1 - clampf(dodge_cooldown / maxf(0.01,dodge_total),0,1)
@@ -1700,7 +1701,9 @@ func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: f
         combo_button.text = ("联动可用" if links.size() > 1 else "等待配方") + " [Q]"
     if links.size() <= 1:
         combo_button.tooltip_text = "获得火药筒 + 法杖可选符火；火药筒 + 木棒/石斧/骨刃可选锁链。按 Q 切换，保留改造代价。"
-        combo_label.text = "联动配方：火药筒 + 法杖 / 近战武器；获得后按 Q 切换"
+        # When the player already holds one half of a recipe, main passes a
+        # hint naming the missing piece instead of the generic recipe list.
+        combo_label.text = link_hint if link_hint != "" else "联动配方：火药筒 + 法杖 / 近战武器；获得后按 Q 切换"
 
 func close_scroll_then(callback: Callable) -> void:
     if scroll_closing: return

@@ -1,5 +1,7 @@
 extends RefCounted
 const Evolution=preload("res://src/weapon_evolution.gd")
+const Catalog=preload("res://src/catalog.gd")
+const Growth=preload("res://src/growth.gd")
 # Describes the implemented attack mechanisms, without inventing an elemental-resistance system.
 const COPY={
     "club":["近战 · 钝击伤害","环绕身体击打近处敌人，\n命中时造成较强击退。"],
@@ -18,6 +20,24 @@ const COPY={
     "crystal":["布置 · 碎晶伤害","布下晶簇，敌人靠近触发，\n向四周发射可命中的碎晶。"]
 }
 static func attack_type(key: String) -> String: return str(COPY[key][0]) if COPY.has(key) else ""
+# The weapon's own numbers at the level on the card, computed with the same
+# formulas combat uses: damage grows +35% of base per level; the interval
+# divisor differs per weapon family (basic 0.12, expanded 0.08, armory none).
+# Buff multipliers are not included — this is the figure cards are compared by.
+static func stats_line(key: String, level: int) -> String:
+    if not Catalog.WEAPONS.has(key): return ""
+    var data: Dictionary = Catalog.WEAPONS[key]
+    var lvl: int = clampi(level, 1, Growth.MAX_WEAPON_LEVEL)
+    var damage: float = float(data["damage"]) * (1.0 + float(lvl - 1) * 0.35)
+    var divisor: float = 1.0
+    if Catalog.EXPANDED_IDS.has(key):
+        divisor = 1.0 + float(lvl - 1) * 0.08
+    elif not Catalog.NEW_IDS.has(key):
+        divisor = 1.0 + float(lvl - 1) * 0.12
+    var interval: float = float(data["cooldown"]) / divisor
+    if key == "staff":
+        return "每弹伤害 %.1f · %d 弹 · 间隔 %.2f 秒" % [damage, Evolution.shot_count(key, lvl), interval]
+    return "伤害 %.1f · 间隔 %.2f 秒" % [damage, interval]
 static func attack(key: String,level: int) -> String:
     if key=="spear" and level>=3: return "朝目标扇面刺出骨矛，\n贯穿扇面内的沿途敌人。"
     if key=="totem" and level>=5: return "四跃连锁并向旁侧分叉，\n每次跳跃伤害逐步递减。"

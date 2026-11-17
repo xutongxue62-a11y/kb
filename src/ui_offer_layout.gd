@@ -74,7 +74,7 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         item.pressed.connect(func(): h._choose(key))
         var level: int = Growth.item_level(key,inventory,levels)
         var weapon: bool=Catalog.WEAPONS.has(key)
-        var shown: int = clampi(int(offer_levels.get(key, 1)),1,5) if level==0 and weapon else level+1
+        var shown: int = clampi(int(offer_levels.get(key, 1)),1,Growth.MAX_WEAPON_LEVEL) if level==0 and weapon else level+1
         var title: Label=text(h,item,"%d · %s" % [i+1,data.name],Rect2(12,10,276,36),24 if compact else 27)
         if h.display_font!=null: title.add_theme_font_override("font",h.display_font)
         var top_level: String=("Lv.%d → Lv.%d" % [level,shown] if level>0 else Growth.weapon_level_text(shown)) if weapon else "层数 %d → %d" % [level,shown]
@@ -96,13 +96,18 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         var body: String = BuffDetails.detail(key) if not weapon else data.description
         if weapon:
             body = Details.attack(key,shown)
-        var desc_rect: Rect2=(Rect2(90,99,198,62) if compact else Rect2(19,187,262,51)) if weapon else (Rect2(90,99,198,66) if compact else Rect2(19,190,262,62))
+        var desc_rect: Rect2=(Rect2(90,99,198,62) if compact else Rect2(19,184,262,48)) if weapon else (Rect2(90,99,198,66) if compact else Rect2(19,190,262,62))
         var desc: Label = text(h,item,body,desc_rect,16 if compact else 18)
         desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         if compact: desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         if weapon:
-            var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(14,166,272,41) if compact else Rect2(15,245,270,47),14 if compact else 16,Color("#69533b"))
-            abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            if compact:
+                var abilities: Label=text(h,item,Details.stats_line(key,shown)+"\n"+Details.abilities(key,shown,level),Rect2(14,162,272,50),13,Color("#69533b"))
+                abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            else:
+                text(h,item,Details.stats_line(key,shown),Rect2(15,233,270,24),16,Color("#75442c"),true)
+                var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(15,258,270,40),15,Color("#69533b"))
+                abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         else:
             text(h,item,BuffDetails.limit(key),Rect2(14,176,272,28) if compact else Rect2(14,249,272,29),18,Color("#704127"),true)
         var refund: int=Economy.reward_sell_price(key,stage,shown)
@@ -116,7 +121,7 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         cell.add_child(sell)
     h.open_parchment(column,true)
 
-static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: Dictionary,hp: float,max_hp: float,animate: bool,highlight: int) -> void:
+static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: Dictionary,hp: float,max_hp: float,animate: bool,highlight: int,reroll_cost: int = -1) -> void:
     var column: VBoxContainer=h.parchment_column(1172,8)
     column.add_theme_constant_override("separation",7)
     var heading: Label=h.make_display("营地 · 第 %d 关结束" % stage,29)
@@ -148,7 +153,7 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         var new_weapon: bool=weapon and offer.has("level")
         var owned: int=Growth.item_level(key,inventory,levels)
         if sold and not new_weapon: owned=maxi(0,owned-1)
-        var shown: int=clampi(int(offer.get("level",1)),1,5) if new_weapon else (mini(5,owned+1) if weapon else owned+1)
+        var shown: int=clampi(int(offer.get("level",1)),1,Growth.MAX_WEAPON_LEVEL) if new_weapon else (mini(Growth.MAX_WEAPON_LEVEL,owned+1) if weapon else owned+1)
         var replace_offer: bool=new_weapon and inventory.size()>=6 and not sold
         text(h,item,data.name,Rect2(12,7,324,34),24,Color("#263546"),true)
         var top: String=(Growth.weapon_level_text(shown) if new_weapon or owned==0 else "Lv.%d → %d" % [owned,shown]) if weapon else ("层数 %d → %d" % [owned,shown] if buff else "恢复生命")
@@ -157,8 +162,10 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         text(h,item,effect,Rect2(12,74,324,27),19,Color("#704127"),true)
         art(h,item,key,Rect2(14,106,72,66),maxi(1,shown))
         var body: String=Details.attack(key,shown) if weapon else (BuffDetails.detail(key) if buff else data.description)
-        var desc: Label=text(h,item,body,Rect2(96,106,238,72),17)
+        var desc: Label=text(h,item,body,Rect2(96,100,238,52) if weapon else Rect2(96,106,238,72),17)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        if weapon:
+            text(h,item,Details.stats_line(key,shown),Rect2(96,156,238,22),16,Color("#75442c"),true)
         if weapon:
             var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(14,181,320,43),16,Color("#59462f"))
             ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -199,6 +206,11 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
     footer.add_theme_constant_override("separation",14)
     column.add_child(footer)
     h.action(footer,"SaveNow","保存 [F5]",func():h.save_requested.emit())
+    if reroll_cost >= 0:
+        var reroll: Button=h.action(footer,"RerollShop","刷新货物 · %d 金币" % reroll_cost,func():h.reroll_requested.emit())
+        if coins < reroll_cost:
+            reroll.disabled=true
+            reroll.modulate=Color(1,1,1,0.65)
     h.action(footer,"Home","返回首页",func():h.home_requested.emit())
     h.action(footer,"NextRound","准备好了 · 下一关",func():h.next_round_requested.emit(),Color("#b4583e"))
     h.open_parchment(column,animate)
@@ -213,7 +225,7 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
     heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
     var new_id: String=str(pending.get("id",""))
-    var offered: int=clampi(int(pending.get("level",1)),1,5)
+    var offered: int=clampi(int(pending.get("level",1)),1,Growth.MAX_WEAPON_LEVEL)
     var incoming_name: String=str(Catalog.WEAPONS[new_id].name) if Catalog.WEAPONS.has(new_id) else new_id
     var incoming:=Control.new()
     incoming.custom_minimum_size=Vector2(1080,120)

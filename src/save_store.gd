@@ -102,7 +102,7 @@ func _validate_run(state: Variant) -> String:
             return "存档武器格式无效"
         if typeof(item["id"]) != TYPE_STRING or not WEAPON_IDS.has(item["id"]) or seen.has(item["id"]):
             return "存档含未知或重复武器"
-        if not _integer_in_range(item["level"], 1, 5):
+        if not _integer_in_range(item["level"], 1, Growth.MAX_WEAPON_LEVEL):
             return "存档武器等级无效"
         seen[item["id"]] = true
     var levels: Variant = state["buff_levels"]
@@ -132,7 +132,7 @@ func _validate_optional_run_fields(state: Dictionary) -> String:
     for key in ["shop_open", "boss_round", "boss_defeated", "collapsed", "prefer_elite","wave_closing","boss_pending"]:
         if state.has(key) and typeof(state[key]) != TYPE_BOOL:
             return "存档开关格式无效：" + key
-    if state.has("enemy_adaptation") and not _number_in_range(state["enemy_adaptation"], 1.0, 1.65):
+    if state.has("enemy_adaptation") and not _number_in_range(state["enemy_adaptation"], 1.0, 1.75):
         return "存档敌人强化倍率无效"
     if state.has("xp_needed") and not _integer_in_range(state["xp_needed"], 1, MAX_SAFE_INTEGER):
         return "存档升级所需经验无效"
@@ -183,7 +183,7 @@ func _validate_stock(stock: Variant) -> String:
             return "存档商品价格或售罄标记无效"
         if offer.has("probability") and not _number_in_range(offer["probability"], 0.0, 1.0):
             return "存档商品首抽率无效"
-        if offer.has("level") and not _integer_in_range(offer["level"], 1, 5):
+        if offer.has("level") and not _integer_in_range(offer["level"], 1, Growth.MAX_WEAPON_LEVEL):
             return "存档商品等级无效"
     return ""
 

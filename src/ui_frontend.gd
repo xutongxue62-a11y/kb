@@ -411,9 +411,9 @@ static func help_page(h, page: String, in_run: bool) -> void:
     var body: Control = sheet.content
     label(h, body, "按键操作" if page == "keys" else "玩法说明", Rect2(40, 20, 800, 65), 40, INK, true)
     line(body, Vector2(40, 100), 904, RED)
-    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n成长时三选一；武器、Buff 和支援各有用途。\n最多携带 6 把武器，伙伴不占武器槽。\n\n留意攻击预警，在恐龙的包围中寻找空间。"
+    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n联动：集齐配对武器后按 Q 切换，屏幕下方会提示还差哪件。\n熔岩地面会持续烫伤，站在里面会不断掉血。\n营地商店可以花金币刷新货物，等级越高价格越贵。"
     if page == "keys":
-        text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒\n← / → 翻页预览角色，点击画像确认选择\nEnter 确认出发 · Esc 返回 / 暂停\nB 角色属性 · F5 手动保存\n空格 展开 / 收束 · Q 两两联动 · E 精英优先\n1 / 2 / 3 选择成长"
+        text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒\n← / → 翻页预览角色，点击画像确认选择\nEnter 确认出发 · Esc 返回 / 暂停\nB 角色属性 · F5 手动保存\n空格 散射 / 集火切换 · Q 两两联动 · E 切换瞄准目标\n1 / 2 / 3 选择成长"
     label(h, body, text, Rect2(44, 125, 894, 372), 22)
     button(h, body, "HelpGameplay", "玩法", Rect2(40, 520, 116, 43), func(): h.show_help("gameplay", in_run), false, 18)
     button(h, body, "HelpKeys", "按键操作", Rect2(172, 520, 154, 43), func(): h.show_help("keys", in_run), false, 18)

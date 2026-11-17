@@ -1,5 +1,6 @@
 extends RefCounted
 const Catalog = preload("res://src/catalog.gd")
+const Growth = preload("res://src/growth.gd")
 const MAX_WEAPONS: int = 6
 
 static func equip(inventory: Array, weapon_id: String) -> Dictionary:
@@ -7,7 +8,7 @@ static func equip(inventory: Array, weapon_id: String) -> Dictionary:
         return {"accepted": false, "reason": "unknown"}
     for entry in inventory:
         if entry["id"] == weapon_id:
-            if entry["level"] >= 5:
+            if entry["level"] >= Growth.MAX_WEAPON_LEVEL:
                 return {"accepted": false, "reason": "max_level"}
             entry["level"] += 1
             return {"accepted": true, "upgraded": true}

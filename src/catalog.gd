@@ -54,10 +54,13 @@ const CHARACTERS = {
         "weapon_label": "弹弓",
         "confirm_button": "StartSling",
         "skills": [
-            {"id": "auto_attack", "name": "自动攻击", "description": "携带的武器会自行寻找目标。"},
-            {"id": "camp_craft", "name": "营地整备", "description": "每波结束后，可在营地商店补给与换装。"}
+            {"id": "quick_learner", "name": "学得快", "description": "经验 +25%，升级更快，成长来得更勤。"},
+            {"id": "scavenger", "name": "拾荒手", "description": "拾取范围 +40，掉落更容易收齐。"}
         ],
-        "modifiers": {}
+        "modifiers": {
+            "xp_multiplier": 1.25,
+            "pickup_radius": 40.0
+        }
     },
     "chief": {
         "id": "chief",
@@ -129,6 +132,8 @@ static func apply_character_modifiers(stats: Dictionary, character_id: String) -
     stats["reduction"] = float(stats.get("reduction", 0.0)) + float(mods.get("reduction", 0.0))
     stats["max_hp"] = float(stats.get("max_hp", 8.0)) + float(mods.get("max_hp", 0.0))
     stats["pierce"] = int(stats.get("pierce", 0)) + int(mods.get("pierce", 0))
+    stats["xp_multiplier"] = float(stats.get("xp_multiplier", 1.0)) * float(mods.get("xp_multiplier", 1.0))
+    stats["pickup_radius"] = float(stats.get("pickup_radius", 100.0)) + float(mods.get("pickup_radius", 0.0))
     stats["close_damage_bonus"] = float(mods.get("close_damage_bonus", 0.0))
     stats["close_damage_range"] = float(mods.get("close_damage_range", 140.0))
     return stats

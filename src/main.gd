@@ -73,6 +73,7 @@ var boss_defeated: bool = false
 var boss_pending: bool = false
 var shop_open: bool = false
 var shop_stock: Array = []
+var shop_rerolls: int = 0
 var wave_closing: bool = false
 var wave_buffer: float = 0.0
 var departure_left: float = 0.0
@@ -212,6 +213,7 @@ func _ready() -> void:
     hud.stats_requested.connect(toggle_stats)
     hud.growth_requested.connect(request_trial_growth)
     hud.buy_requested.connect(buy_shop_item)
+    hud.reroll_requested.connect(reroll_shop)
     hud.replace_requested.connect(confirm_replace)
     hud.replace_cancelled.connect(cancel_replace)
     hud.next_round_requested.connect(leave_shop)
@@ -456,7 +458,12 @@ func save_game(finished: bool = false) -> bool:
         refresh_save_status("试用/演示不会覆盖正常存档" if trial_mode or demo else "当前没有可保存的战斗")
         return false
     var result: Dictionary = save_store.write_run(SessionState.capture(self, finished))
-    refresh_save_status("已保存 · 第%d关 · %d金币" % [wave,coins] if result.get("ok",false) else "保存失败：" + str(result.get("error","未知错误")))
+    var note: String = "保存失败：" + str(result.get("error", "未知错误"))
+    if result.get("ok", false):
+        # A finished run is sealed, not continuable; saying 已保存 here made
+        # players think they could pick the run back up from the death screen.
+        note = "本局已结束 · 战绩已记录" if finished else "已保存 · 第%d关 · %d金币" % [wave, coins]
+    refresh_save_status(note)
     return result.get("ok",false)
 
 func auto_save() -> void:
@@ -587,7 +594,7 @@ func grant_weapon(key: String, level: int = 1) -> bool:
     if not result.get("upgraded", false):
         for item in inventory:
             if item["id"] == key:
-                item["level"] = clampi(level, 1, 5)
+                item["level"] = clampi(level, 1, Growth.MAX_WEAPON_LEVEL)
                 break
     bind_weapon_view(key)
     rebuild_groups()
@@ -838,7 +845,7 @@ func sell_reward(key: String) -> bool:
     var owned: int = Growth.item_level(key, inventory, buff_levels)
     var offered: int=owned+1
     if Catalog.WEAPONS.has(key):
-        offered=mini(5,owned+1) if owned>0 else clampi(int(upgrade_offer_levels.get(key,1)),1,5)
+        offered=mini(Growth.MAX_WEAPON_LEVEL,owned+1) if owned>0 else clampi(int(upgrade_offer_levels.get(key,1)),1,Growth.MAX_WEAPON_LEVEL)
     elif owned>=int(Growth.BUFFS[key].max_level): return false
     # Convert only this offered reward. Equipped weapons and other candidates are untouched.
     coins += Economy.reward_sell_price(key, wave, offered)
@@ -867,7 +874,7 @@ func update_hud() -> void:
             boss = enemy
             break
     hud.update_round(wave,wave_elapsed,boss_round,coins,boss.get("hp",0.0),boss.get("max_hp",0.0))
-    hud.update_world_status(WorldMap.BIOMES[WorldMap.biome_for_wave(wave)],dodge_cooldown,DODGE_COOLDOWN,available_links)
+    hud.update_world_status(WorldMap.BIOMES[WorldMap.biome_for_wave(wave)],dodge_cooldown,DODGE_COOLDOWN,available_links,link_hint_text())
     if combo_message_time > 0.0:
         hud.notice_label.text = combo_message
 
@@ -1055,8 +1062,10 @@ func simulate(delta: float, movement: Vector2) -> void:
         _simulating = false
         return
     spawn_clock -= delta
-    if spawn_clock <= 0.0 and enemies.size() < 42:
-        spawn_clock = 4.5 if boss_round else maxf(0.40, 0.62 - (wave - 1) * 0.10)
+    var alive_cap: int = 42 + clampi((wave - 5) * 2, 0, 42)
+    if spawn_clock <= 0.0 and enemies.size() < alive_cap:
+        var spawn_interval: float = 0.62 - (wave - 1) * 0.10 if wave <= 3 else maxf(0.26, 0.42 - (wave - 3) * 0.008)
+        spawn_clock = maxf(3.0, 4.5 - float(maxi(0, wave / 5 - 1)) * 0.3) if boss_round else spawn_interval
         if boss_pending:
             spawn_enemy("boss",offscreen_point(1)+Vector2(48,0),false,"enter")
             var boss: Dictionary=enemies.back()
@@ -1064,6 +1073,11 @@ func simulate(delta: float, movement: Vector2) -> void:
             var capped_hp: float = Progression.cap_boss_hp(formula_hp, Progression.estimate_power(inventory,buff_levels,active_link))
             boss.hp=capped_hp
             boss.max_hp=capped_hp
+            # Later bosses are the same species but visibly bigger specimens:
+            # tier 2 (wave 10) +16% size, tier 3 (wave 15) +32%, and so on.
+            var boss_tier: int = maxi(1, wave / 5)
+            if boss_tier > 1 and boss.get("view") != null:
+                boss["view"].scale = Vector2.ONE * (1.0 + 0.16 * float(boss_tier - 1))
             boss.timer=1.6
             boss_pending=false
             if audio != null:
@@ -1270,6 +1284,7 @@ func open_round_shop() -> void:
     if world_camera != null:
         world_camera.offset = Vector2.ZERO
     shop_open = true
+    shop_rerolls = 0
     shop_stock = Economy.stock(inventory,buff_levels,wave,rng)
     audio.set_paused(true)
     show_current_shop()
@@ -1277,7 +1292,43 @@ func open_round_shop() -> void:
     auto_save()
 
 func show_current_shop(animate: bool = true, highlight: int = -1) -> void:
-    hud.show_shop(shop_stock,coins,wave,inventory,buff_levels,player_hp,stats["max_hp"],animate,highlight)
+    hud.show_shop(shop_stock,coins,wave,inventory,buff_levels,player_hp,stats["max_hp"],animate,highlight,Economy.reroll_price(wave,shop_rerolls))
+
+func reroll_shop() -> void:
+    if not shop_open:
+        return
+    var cost: int = Economy.reroll_price(wave, shop_rerolls)
+    if coins < cost:
+        return
+    coins -= cost
+    shop_rerolls += 1
+    shop_stock = Economy.stock(inventory,buff_levels,wave,rng)
+    show_current_shop(false)
+    update_hud()
+    auto_save()
+
+# When no link is available yet but the player already holds one half of a
+# recipe, name the missing half — the generic recipe list left players
+# guessing which piece they were waiting for.
+func link_hint_text() -> String:
+    if available_links.size() > 1:
+        return ""
+    for link_id in Catalog.LINK_ORDER:
+        if link_id == "none":
+            continue
+        var weapons: Array = Catalog.LINKS[link_id]["weapons"]
+        if weapons.size() != 2:
+            continue
+        # weapon_level() defaults to 1 for unowned weapons, so ownership is
+        # checked against the inventory itself.
+        var first_owned: bool = Growth.item_level(str(weapons[0]), inventory, {}) > 0
+        var second_owned: bool = Growth.item_level(str(weapons[1]), inventory, {}) > 0
+        if first_owned == second_owned:
+            continue
+        var held: String = str(weapons[0]) if first_owned else str(weapons[1])
+        var missing: String = str(weapons[1]) if first_owned else str(weapons[0])
+        return "联动将成：已有%s，还差%s → %s（集齐后按 Q 切换）" % [Catalog.WEAPONS[held]["name"], Catalog.WEAPONS[missing]["name"], Catalog.LINKS[link_id]["name"]]
+    return ""
 
 func buy_shop_item(index: int) -> bool:
     if not shop_open or index < 0 or index >= shop_stock.size():
@@ -1603,10 +1654,10 @@ func update_enemies(delta: float) -> void:
                 var impact: Vector2 = enemy["slam_at"]
                 effects.burst(impact,Color("#d95770"),110.0,"blast")
                 if player_position.distance_to(impact) <= 110.0 + 19.0:
-                    hurt_player((player_position-impact).normalized(),enemy["damage"])
+                    hurt_player((player_position-impact).normalized(),enemy["damage"],true)
                 for index in range(8):
                     var shot_direction: Vector2 = Vector2.from_angle(index * TAU / 8.0 + elapsed * 0.2)
-                    projectiles.append({"position":enemy["position"] + shot_direction * 60, "velocity":shot_direction*175, "damage":enemy["damage"]*0.55, "kind":"hostile", "life":3.0, "radius":6.5, "weapon_id":"", "from_combo":false})
+                    projectiles.append({"position":enemy["position"] + shot_direction * 60, "velocity":shot_direction*175, "damage":enemy["damage"]*0.55, "kind":"hostile", "life":3.0, "radius":6.5, "weapon_id":"", "from_combo":false, "boss":true})
                 enemy["state"] = "recover"
                 enemy["timer"] = 0.9
         elif enemy["kind"] in ["charger","boss"]:
@@ -1669,7 +1720,7 @@ func update_enemies(delta: float) -> void:
         enemy["view"].health_fraction = enemy["hp"] / enemy["max_hp"]
         enemy["view"].animate(velocity, delta, behavior.get("pose",enemy["state"]))
         if enemy["position"].distance_to(player_position) < enemy["radius"] + 18.0:
-            hurt_player((player_position - enemy["position"]).normalized(), enemy["damage"])
+            hurt_player((player_position - enemy["position"]).normalized(), enemy["damage"], enemy["kind"] == "boss")
             if not running:
                 break
 
@@ -1864,7 +1915,7 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
                     effects.rune_ignition(mounts.get("staff", player_position + Rules.ranged_mount("staff")), point + direction * 19.0)
                     audio.play("magic", -2.0)
         var penalty: float = active_link["cooldown_multiplier"] if key == "powder" and active_link["weapons"].has("powder") else 1.0
-        runtime["cooldown"] = data["cooldown"] * penalty / (1.0 + (item["level"] - 1) * 0.08)
+        runtime["cooldown"] = data["cooldown"] * penalty / (1.0 + (item["level"] - 1) * 0.12)
         runtime["recoil"] = 0.12
         hero.recoil(direction)
     refresh_weapon_draw_order()
@@ -2037,7 +2088,7 @@ func update_projectiles(delta: float) -> void:
         var consumed: bool = false
         if projectile["kind"] == "hostile":
             if Geometry2D.get_closest_point_to_segment(player_position, previous, projectile["position"]).distance_to(player_position) < projectile["radius"] + 19.0:
-                hurt_player(projectile["velocity"].normalized(), projectile["damage"])
+                hurt_player(projectile["velocity"].normalized(), projectile["damage"], bool(projectile.get("boss", false)))
                 consumed = true
         else:
             for enemy in targets:
@@ -2249,7 +2300,7 @@ func update_terrain_damage(delta: float, player_exposure: float = -1.0) -> void:
         if amount > 0.0:
             hurt_enemy(enemy,amount,"terrain_lava",false,Vector2.ZERO)
 
-func hurt_player(direction: Vector2, damage: float = 1.0) -> void:
+func hurt_player(direction: Vector2, damage: float = 1.0, from_boss: bool = false) -> void:
     if not running or invulnerable > 0.0 or demo or animation_demo:
         return
     if rng.randf() < stats["dodge"]:
@@ -2257,6 +2308,8 @@ func hurt_player(direction: Vector2, damage: float = 1.0) -> void:
         effects.floating_text(player_position, "闪避", Color("#9ce7f0"), 22)
         return
     var amount: float = damage * (1.0 - stats["reduction"])
+    if from_boss:
+        amount = minf(amount, Progression.BOSS_HIT_CAP_RATIO * float(stats["max_hp"]))
     player_hp = maxf(0.0, player_hp - amount)
     invulnerable = 0.7
     hero.hurt()

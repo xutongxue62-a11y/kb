@@ -56,7 +56,7 @@ static func apply(world: Node, state: Dictionary) -> bool:
     world.map_view.restore_terrain(state.get("terrain_state",{}))
     world.wave_elapsed = maxf(0.0,float(state.get("wave_elapsed",0.0)))
     world.elapsed = maxf(0.0,float(state.get("elapsed",0.0)))
-    world.enemy_adaptation = clampf(float(state.get("enemy_adaptation",1.0)),1.0,1.65)
+    world.enemy_adaptation = clampf(float(state.get("enemy_adaptation",1.0)),1.0,1.75)
     world.set_start_weapon(str(state.get("starting_weapon","sling")))
     world.character_id = Catalog.resolve_character_id(str(state.get("character_id","")), world.starting_weapon)
     if world.hero != null and world.hero.has_method("set_character"):
@@ -65,7 +65,7 @@ static func apply(world: Node, state: Dictionary) -> bool:
         var key: String = str(item.get("id",""))
         if not Catalog.WEAPONS.has(key):
             return false
-        for index in range(clampi(int(item.get("level",1)),1,5)):
+        for index in range(clampi(int(item.get("level",1)),1,Growth.MAX_WEAPON_LEVEL)):
             world.grant_weapon(key)
     world.buff_levels.clear()
     for key in state.get("buff_levels",{}):
@@ -122,7 +122,7 @@ static func apply(world: Node, state: Dictionary) -> bool:
     for offer in state.get("shop_stock",[]):
         var restored_offer := {"id":str(offer.get("id","")),"price":int(offer.get("price",0)),"sold":bool(offer.get("sold",false))}
         if offer.has("probability"): restored_offer["probability"] = float(offer["probability"])
-        if offer.has("level"): restored_offer["level"] = clampi(int(offer["level"]), 1, 5)
+        if offer.has("level"): restored_offer["level"] = clampi(int(offer["level"]), 1, Growth.MAX_WEAPON_LEVEL)
         world.shop_stock.append(restored_offer)
     world.rng.state = str(state.get("rng_state",world.rng.state)).to_int()
     world.invulnerable = 1.0
