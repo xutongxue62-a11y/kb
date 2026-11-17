@@ -108,7 +108,7 @@ func _test_polish_numbers() -> void:
     expect(is_equal_approx(Progression.adapt_ceiling(5), 1.0 + 0.75 * 4.0 / 28.0) and Progression.adapt_ceiling(5) < 1.2, "adaptation still rises at stage 5 but no longer hits the cap")
     expect(is_equal_approx(Progression.adapt_ceiling(29), Progression.ADAPT_CAP), "the 1.75 adaptation cap is reached around stage 29")
     expect(Progression.adaptation(5, 1000.0, 1.0) <= Progression.adapt_ceiling(5), "strong builds cannot exceed the stage-scaled adaptation ceiling")
-    expect(is_equal_approx(Progression.cap_boss_hp(100.0, 10.0), 240.0) and is_equal_approx(Progression.cap_boss_hp(100.0, 2.0), 100.0), "dynamic boss HP is capped at 2.4x the fixed formula and never below it")
+    expect(is_equal_approx(Progression.cap_boss_hp(100.0, 10.0), 320.0) and is_equal_approx(Progression.cap_boss_hp(100.0, 2.0), 100.0), "dynamic boss HP is capped at 3.2x the fixed formula and never below it")
     expect(int(Growth.BUFFS["power"]["max_level"]) == 999 and int(Growth.BUFFS["haste"]["max_level"]) == 999, "蛮力 and 迅捷 play caps are uncapped in normal play")
     expect(int(Growth.BUFFS["crit_chance"]["max_level"]) == 999 and int(Growth.BUFFS["crit_power"]["max_level"]) == 999, "猎手直觉 and 致命一击 play caps are uncapped in normal play")
     expect(int(Growth.BUFFS["power"]["save_max_level"]) == 999 and int(Growth.BUFFS["crit_chance"]["save_max_level"]) == 999, "save validation accepts the current uncapped buff stacks")

@@ -964,11 +964,31 @@ func _unhandled_key_input(event: InputEvent) -> void:
             toggle_stats()
         KEY_G:
             request_trial_growth()
+        KEY_ENTER, KEY_KP_ENTER:
+            # Confirm with the keyboard: Enter accepts the open dialog, or
+            # triggers the screen's primary action (resume / next round).
+            if hud != null:
+                match hud.screen:
+                    "choice_confirm":
+                        hud.confirm_choice_take()
+                    "shop_confirm":
+                        hud.confirm_shop_buy()
+                    "restart_confirm":
+                        hud.confirm_restart()
+                    "help_confirm":
+                        hud.confirm_help_trial()
+                    "pause":
+                        toggle_pause()
+                    "shop":
+                        hud.next_round_requested.emit()
         KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6:
             var slot: int = int(event.physical_keycode) - int(KEY_1)
             if not replace_pending.is_empty():
                 if slot >= 0 and slot < inventory.size():
                     confirm_replace(str(inventory[slot]["id"]))
+            elif hud != null and hud.screen == "shop":
+                if hud.shop_index_available(slot):
+                    hud.request_shop_buy(slot)
             elif slot < hud.choice_ids.size():
                 hud.choose_index(slot)
 
@@ -1126,7 +1146,7 @@ func simulate(delta: float, movement: Vector2) -> void:
     var alive_cap: int = 42 + clampi((wave - 5) * 2, 0, 42) + clampi((wave - 26) * 3, 0, 42)
     if spawn_clock <= 0.0 and enemies.size() < alive_cap:
         var spawn_interval: float = 0.62 - (wave - 1) * 0.10 if wave <= 3 else maxf(0.18, 0.42 - (wave - 3) * 0.008)
-        spawn_clock = maxf(2.2, 4.5 - float(maxi(0, wave / 5 - 1)) * 0.35) if boss_round else spawn_interval
+        spawn_clock = maxf(1.5, 3.4 - float(maxi(0, wave / 5 - 1)) * 0.28) if boss_round else spawn_interval
         if boss_pending:
             spawn_enemy("boss",offscreen_point(1)+Vector2(48,0),false,"enter")
             var boss: Dictionary=enemies.back()

@@ -50,7 +50,7 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
     var shortcut: String="1–6" if compact else "1 / 2 / 3"
-    var hint: Label = h.make_label("选择 1 份 · 点击纸卡领取 / %s · 或出售该份奖励，保留现有装备" % shortcut,16,Color("#65704f"))
+    var hint: Label = h.make_label("选择 1 份 · 数字键 %s 或点击选择 · 回车确认 · 也可出售该份奖励，保留现有装备" % shortcut,16,Color("#65704f"))
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(hint)
     var grid := GridContainer.new()
@@ -65,7 +65,7 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         var cell:=VBoxContainer.new()
         cell.add_theme_constant_override("separation",7)
         grid.add_child(cell)
-        var item: Button = card(h,cell,key,Vector2(300,250 if compact else 344))
+        var item: Button = card(h,cell,key,Vector2(300,250 if compact else 362))
         item.name = "GrowthOffer%d" % i
         item.set_meta("ink_reward",true)
         # Reward cards share neutral paper; identity comes from the original icon and text.
@@ -92,24 +92,26 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
             status = "新武器 · 装入空槽"
         else:
             status = "直接叠加 · 不占武器槽" if level>0 else "新获得 · 不占武器槽"
-        text(h,item,status,Rect2(12,214 if compact else 303,276,28),16 if compact else 18,Color("#923f29") if replace_offer else Color("#3e5439"),true)
+        text(h,item,status,Rect2(12,214 if compact else 322,276,28),16 if compact else 18,Color("#923f29") if replace_offer else Color("#3e5439"),true)
         var body: String = BuffDetails.detail(key) if not weapon else data.description
         if weapon:
             body = Details.attack(key,shown)
-        var desc_rect: Rect2=(Rect2(90,99,198,62) if compact else Rect2(19,184,262,48)) if weapon else (Rect2(90,99,198,66) if compact else Rect2(19,190,262,62))
+        var desc_rect: Rect2=(Rect2(90,99,198,62) if compact else Rect2(19,190,262,50)) if weapon else (Rect2(90,99,198,66) if compact else Rect2(19,196,262,62))
         var desc: Label = text(h,item,body,desc_rect,16 if compact else 18)
         desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        if compact: desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+        desc.add_theme_constant_override("line_spacing",3)
         if weapon:
             if compact:
                 var abilities: Label=text(h,item,Details.stats_line(key,shown)+"\n"+Details.abilities(key,shown,level),Rect2(14,162,272,50),13,Color("#69533b"))
                 abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                abilities.add_theme_constant_override("line_spacing",3)
             else:
-                text(h,item,Details.stats_line(key,shown),Rect2(15,233,270,24),16,Color("#75442c"),true)
-                var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(15,258,270,40),15,Color("#69533b"))
+                text(h,item,Details.stats_line(key,shown),Rect2(15,246,270,24),16,Color("#75442c"),true)
+                var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(15,274,270,42),15,Color("#69533b"))
                 abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+                abilities.add_theme_constant_override("line_spacing",3)
         else:
-            text(h,item,BuffDetails.limit(key),Rect2(14,176,272,28) if compact else Rect2(14,249,272,29),18,Color("#704127"),true)
+            text(h,item,BuffDetails.limit(key),Rect2(14,176,272,28) if compact else Rect2(14,264,272,29),18,Color("#704127"),true)
         var refund: int=Economy.reward_sell_price(key,stage,shown)
         var sell: Button=h.make_button("出售此奖励 +%d 金币" % refund,Color("#edca82"))
         sell.name="GrowthRewardSell%d" % i
@@ -127,7 +129,7 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
     var heading: Label=h.make_display("营地 · 第 %d 关结束" % stage,29)
     heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
-    var wallet: Label=h.make_display("金币 %d · 生命 %.1f / %.0f · 选择补给，购买后准备下一关" % [coins,hp,max_hp],19,Color("#704127"))
+    var wallet: Label=h.make_display("金币 %d · 生命 %.1f / %.0f · 数字键 1–6 选择 · 回车确认" % [coins,hp,max_hp],19,Color("#704127"))
     wallet.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(wallet)
     var grid:=GridContainer.new()
@@ -158,7 +160,7 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         var kind_label: String="武器" if weapon else ("属性" if buff else "补给")
         var kind_tag: Label=text(h,item,kind_label,Rect2(12,6,70,22),14,Color("#983f2b"),true)
         kind_tag.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-        var title: String="%s（%s）" % [str(data.name), kind_label]
+        var title: String="%d · %s（%s）" % [i+1,str(data.name), kind_label]
         text(h,item,title,Rect2(86,4,250,26),20,Color("#263546"),true)
         var top: String=(Growth.weapon_level_text(shown) if new_weapon or owned==0 else "Lv.%d → %d" % [owned,shown]) if weapon else ("层数 %d → %d" % [owned,shown] if buff else "恢复生命")
         text(h,item,top,Rect2(12,32,324,24),18,Color("#75442c"),true)
@@ -168,12 +170,14 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         var body: String=Details.attack(key,shown) if weapon else (BuffDetails.detail(key) if buff else data.description)
         var desc: Label=text(h,item,body,Rect2(88,80,246,46) if weapon else Rect2(51,80,246,58),15)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-        desc.vertical_alignment=VERTICAL_ALIGNMENT_TOP
+        desc.add_theme_constant_override("line_spacing",4)
+        desc.vertical_alignment=VERTICAL_ALIGNMENT_TOP if weapon else VERTICAL_ALIGNMENT_CENTER
         if weapon:
-            text(h,item,Details.stats_line(key,shown),Rect2(88,126,246,20),14,Color("#75442c"),true)
+            text(h,item,Details.stats_line(key,shown),Rect2(88,128,246,20),14,Color("#75442c"),true)
         if weapon:
-            var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(14,148,320,36),14,Color("#59462f"))
+            var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(14,154,320,40),14,Color("#59462f"))
             ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            ability.add_theme_constant_override("line_spacing",3)
             ability.vertical_alignment=VERTICAL_ALIGNMENT_TOP
         elif buff:
             text(h,item,BuffDetails.limit(key),Rect2(14,150,320,24),16,Color("#704127"),true)
@@ -528,9 +532,9 @@ static func centered_confirm(h, config: Dictionary) -> void:
     var footer := HBoxContainer.new()
     footer.add_theme_constant_override("separation", 12)
     column.add_child(footer)
-    var cancel: Button = h.action(footer, "ShopBuyCancel", "取消", config.get("on_cancel") as Callable)
+    var cancel: Button = h.action(footer, "ShopBuyCancel", "取消 [Esc]", config.get("on_cancel") as Callable)
     _slim_confirm_button(cancel, 150)
-    var confirm: Button = h.action(footer, "ShopBuyConfirm", str(config.get("confirm", "确定")), config.get("on_confirm") as Callable)
+    var confirm: Button = h.action(footer, "ShopBuyConfirm", str(config.get("confirm", "确定")) + " [回车]", config.get("on_confirm") as Callable)
     _slim_confirm_button(confirm, 210)
     _place_confirm_sheet(sheet, sheet_w, sheet_h)
 

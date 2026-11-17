@@ -36,8 +36,8 @@ static func estimate_power(inventory: Array, levels: Dictionary, link: Dictionar
 
 const ADAPT_CAP: float = 1.75
 const ADAPT_FULL_WAVE: int = 28
-const BOSS_DYNAMIC_MULT: float = 34.0
-const BOSS_DYNAMIC_CAP: float = 2.4
+const BOSS_DYNAMIC_MULT: float = 46.0
+const BOSS_DYNAMIC_CAP: float = 3.2
 # A single combat hit may never remove more than this share of the player's
 # max HP (applied after armor reduction, at the hurt_player funnel).
 # Lava and other terrain DoT ticks do not pass through this cap.

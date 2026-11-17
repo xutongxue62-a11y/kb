@@ -1373,13 +1373,35 @@ func show_restart_confirm() -> void:
     body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     body.custom_minimum_size = Vector2(560, 72)
     column.add_child(body)
-    action(column, "RestartConfirm", "确定重新开始", func(): restart_requested.emit())
-    action(column, "RestartCancel", "取消", func(): cancel_restart())
+    action(column, "RestartConfirm", "确定重新开始 [回车]", func(): restart_requested.emit())
+    action(column, "RestartCancel", "取消 [Esc]", func(): cancel_restart())
     open_parchment(column, true)
 
 func cancel_restart() -> void:
     show_menu("pause", menu_kills, "ui_back")
     play_ui("ui_open")
+
+func confirm_restart() -> void:
+    # Keyboard counterpart of the RestartConfirm button (Enter).
+    if screen == "restart_confirm":
+        restart_requested.emit()
+
+func shop_index_available(index: int) -> bool:
+    # Mirrors the shop card's mouse disabled state (ui_offer_layout.shop):
+    # sold out, unaffordable, or a heal at full HP cannot be picked.
+    if shop_state.is_empty():
+        return false
+    var stock: Array = shop_state.get("stock", [])
+    if index < 0 or index >= stock.size():
+        return false
+    var offer: Dictionary = stock[index]
+    if bool(offer.get("sold", false)):
+        return false
+    if int(shop_state.get("coins", 0)) < int(offer.get("price", 0)):
+        return false
+    if str(offer.get("id", "")) == "heal" and float(shop_state.get("hp", 0.0)) >= float(shop_state.get("max_hp", 0.0)):
+        return false
+    return true
 
 func show_settings(in_run: bool) -> void:
     remember_modal_origin()
