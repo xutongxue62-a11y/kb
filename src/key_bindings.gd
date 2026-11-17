@@ -215,10 +215,12 @@ static func settings_order() -> Array:
 
 
 static func hint_font_size(button: BaseButton) -> int:
+    # Juniper 指示（2026-11-17）：按键提示字太小看不清，统一用与按钮正文同等
+    # 的清晰字号，不再缩小一号。全游戏只有这一套按键提示样式。
     var base: int = button.get_theme_font_size("font_size")
     if base <= 0:
         base = 18
-    return clampi(base - 2, 14, 18)
+    return clampi(base, 16, 20)
 
 
 static func measure_hint(button: BaseButton, text: String) -> Vector2:
