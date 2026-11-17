@@ -1998,11 +1998,17 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
             var flight_time: float = muzzle.distance_to(aim_point) / maxf(1.0, data["speed"] * stats["bullet_speed"])
             aim_point += target.get("velocity", Vector2.ZERO) * minf(0.35, flight_time * 0.65)
             direction = (aim_point - muzzle).normalized() if aim_point.distance_to(muzzle) > 0.001 else visual_aim
-            visual_aim = Rules.parked_aim_direction(point, player_position, direction, aim_limit)
+            # Juniper (2026-11-17): with the idle cone clamp the cannon's barrel
+            # stayed up to ~160 degrees away from its target, so shells visibly
+            # left through the back of the barrel. While a target is tracked,
+            # pose the weapon along the mount-to-target line (no cone clamp),
+            # so the barrel, the muzzle and the shell all sit on one line;
+            # the tight torso-safe cone only governs the idle pose.
+            visual_aim = (aim_point - point).normalized() if aim_point.distance_to(point) > 0.001 else direction
             runtime["aim"] = visual_aim
             view.position = point - visual_aim * runtime["recoil"] * 20.0
             view.rotation = visual_aim.angle() + (0.0 if key == "powder" else PI / 2.0)
-            Rules.apply_parked_hold(view, key, player_position, visual_aim)
+            Rules.apply_parked_hold(view, key, player_position, visual_aim, true, PI)
             muzzle = weapon_muzzle_point(key, visual_aim)
             if aim_point.distance_to(muzzle) > 0.001:
                 direction = (aim_point - muzzle).normalized()
@@ -2018,9 +2024,9 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
             launch_chain(linked, target["position"])
         else:
             var damage: float = data["damage"] * (1.0 + (item["level"] - 1) * 0.35)
-            # Shells always leave the visual muzzle. Their heading aims at the
-            # chosen target so the shot origin stays on the barrel even when
-            # the parked art can only turn inside a tight torso-safe cone.
+            # Shells always leave the visual muzzle, and while a target is
+            # tracked the barrel is posed along the shot (see above), so the
+            # shell's origin and heading both sit on the barrel line.
             if key == "staff":
                 var count: int=Evolution.shot_count(key,item.level)
                 for index in range(count):

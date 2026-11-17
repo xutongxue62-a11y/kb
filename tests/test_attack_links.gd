@@ -118,9 +118,16 @@ func scene_checks() -> void:
     world.weapon_runtime["axe"]["chain_state"] = "rest"
     world.weapon_runtime["powder"]["cooldown"] = 0.0
     var extended: bool = false
+    var peak_reach: float = 0.0
     for index in range(35):
         world.simulate(1.0 / 60.0, Vector2.ZERO)
-        if world.weapon_runtime["axe"].get("chain_state", "rest") == "out" and world.weapon_views["axe"].position.distance_to(world.player_position) > 95.0:
+        # The chain launches from the tracked barrel muzzle (Juniper,
+        # 2026-11-17), so it can pass 95 px on the very step it reaches its
+        # target and turns back; judge the launch by the flight's peak reach
+        # instead of one same-step snapshot.
+        if world.weapon_runtime["axe"].get("chain_state", "rest") != "rest":
+            peak_reach = maxf(peak_reach, world.weapon_views["axe"].position.distance_to(world.player_position))
+        if peak_reach > 95.0:
             extended = true
             break
     expect(extended, "chain weapon really extends out")

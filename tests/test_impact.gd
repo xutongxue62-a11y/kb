@@ -43,14 +43,28 @@ func check_close_ranged_targets(world: Node) -> void:
             world.weapon_runtime[key]["cooldown"] = 0.0
             world.update_weapons(0.0)
             var view: Sprite2D = world.weapon_views[key]
-            var aim: Vector2 = (enemy["position"] - view.position).normalized()
             var view_direction: Vector2 = Vector2.from_angle(view.rotation - (0.0 if key == "powder" else PI / 2.0))
-            var visual_aim: Vector2 = Rules.parked_aim_direction(view.position, world.player_position, aim, Rules.parked_aim_limit(key))
-            # Every shell leaves the displayed barrel muzzle, even when its heading turns toward a close target.
-            var muzzle: Vector2 = world.weapon_muzzle_point(key, visual_aim)
-            var aligned: bool = world.projectiles.size() == (3 if key == "staff" else 1) and view_direction.dot(visual_aim) > 0.9999
-            for projectile in world.projectiles:
-                aligned = aligned and projectile["position"].distance_to(muzzle) <= 1.5
+            # Juniper (2026-11-17): the barrel itself must turn to the monster.
+            # A shell that leaves toward the target while the barrel points
+            # elsewhere reads as firing out of the weapon's back, so while a
+            # target is tracked the displayed barrel follows the shot — and
+            # the shell still leaves the displayed muzzle.
+            var muzzle: Vector2 = world.weapon_muzzle_point(key, view_direction)
+            var aligned: bool = world.projectiles.size() == (3 if key == "staff" else 1)
+            if aligned:
+                var center_shot: Dictionary = world.projectiles[world.projectiles.size() / 2]
+                var heading: Vector2 = Vector2(center_shot["velocity"]).normalized()
+                aligned = heading.dot((enemy["position"] - muzzle).normalized()) > 0.99
+                # At point-blank on the weapon's own side the muzzle reach can
+                # pass the target: the shell then hops back from the muzzle
+                # into the target while the barrel points at it from its base.
+                var overshot: bool = muzzle.distance_to(view.position) > enemy["position"].distance_to(view.position)
+                if overshot:
+                    aligned = aligned and view_direction.dot((enemy["position"] - view.position).normalized()) > 0.99
+                else:
+                    aligned = aligned and view_direction.dot(heading) > 0.999
+                for projectile in world.projectiles:
+                    aligned = aligned and projectile["position"].distance_to(muzzle) <= 1.5
             expect(aligned, "actual ranged muzzle and aim follow the displayed barrel for a close target: " + key + " " + str(target_offset))
             for index in range(60):
                 world.update_projectiles(1.0 / 60.0)

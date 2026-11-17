@@ -906,12 +906,14 @@ func _column_body_height(column: VBoxContainer) -> float:
 func open_parchment(column: VBoxContainer, animate: bool) -> void:
     if column == null or not column.has_meta("scroll_frame"):
         return
+    _fit_parchment(column)
+    # Children measured in the same tick they were created report inflated
+    # minimum sizes (their font metrics have not settled yet), which made
+    # panels open far taller than their content — the pause menu gained a
+    # long blank tail that spilled over the battle HUD. Re-measure on the
+    # next frame, once layout has settled, so the sheet hugs its content.
+    call_deferred("_fit_parchment", column)
     var frame = column.get_meta("scroll_frame")
-    var full_w: float = frame.get_meta("full_width", frame.size.x)
-    column.position = Vector2(46, 28)
-    column.custom_minimum_size.x = full_w - 92
-    column.size = Vector2(full_w - 92, maxf(_column_body_height(column), 80))
-    frame.size = Vector2(full_w, column.size.y + 56)
     if animate and can_animate():
         var span: float = 0.62 if frame.opening_mode == "scroll" else 0.34
         frame.reveal = 0.02
@@ -921,6 +923,23 @@ func open_parchment(column: VBoxContainer, animate: bool) -> void:
         tw.tween_property(frame, "reveal", 1.0, span).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     else:
         frame.reveal = 1.0
+
+func _fit_parchment(column: VBoxContainer) -> void:
+    if column == null or not is_instance_valid(column) or not column.has_meta("scroll_frame"):
+        return
+    var frame = column.get_meta("scroll_frame")
+    if frame == null or not is_instance_valid(frame):
+        return
+    var full_w: float = frame.get_meta("full_width", frame.size.x)
+    column.position = Vector2(46, 28)
+    column.custom_minimum_size.x = full_w - 92
+    column.size = Vector2(full_w - 92, maxf(_column_body_height(column), 80))
+    frame.size = Vector2(full_w, column.size.y + 56)
+    # Never let the sheet run past the bottom of the 1280x800 canvas:
+    # shift it up when it fits whole, so a menu cannot spill over the HUD.
+    var max_top: float = 800.0 - 12.0 - frame.size.y
+    if max_top >= 8.0:
+        frame.position.y = minf(frame.position.y, max_top)
 
 func action(parent: Node, key: String, text: String, callback: Callable, color: Color = cream) -> Button:
     var button: Button = make_button(text, color)

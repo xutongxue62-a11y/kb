@@ -269,13 +269,14 @@ static func parked_aim_direction(mount: Vector2, origin: Vector2, desired: Vecto
         return outward.rotated(signf(ang) * limit)
     return aim
 
-static func apply_parked_hold(view: Sprite2D, weapon_id: String, origin: Vector2, aim: Vector2, idle: bool = true) -> void:
+static func apply_parked_hold(view: Sprite2D, weapon_id: String, origin: Vector2, aim: Vector2, idle: bool = true, aim_limit: float = -1.0) -> void:
     if view == null or not is_instance_valid(view):
         return
     if orbits_with_formation(weapon_id):
         view.offset = Vector2.ZERO
         return
-    var visual_aim: Vector2 = parked_aim_direction(view.position, origin, aim, parked_aim_limit(weapon_id))
+    var limit: float = parked_aim_limit(weapon_id) if aim_limit < 0.0 else aim_limit
+    var visual_aim: Vector2 = parked_aim_direction(view.position, origin, aim, limit)
     if idle and weapon_id in ["sling","staff","bonebow","spear"]:
         view.rotation = visual_aim.angle() + PI / 2.0
     elif idle and weapon_id == "powder":
