@@ -647,6 +647,7 @@ func rebuild_groups() -> void:
     active_link = Rules.link_profile(active_link.get("id", "none"), ids)
     groups = [] if active_link["id"] == "none" else [active_link]
     combo_mode = active_link["id"]
+    announce_link_ready()
 
 func select_link(link_id: String) -> void:
     var ids: Array = []
@@ -684,6 +685,29 @@ func switch_formation() -> void:
         return
     collapsed = not collapsed
     update_hud()
+
+func announce_link_ready() -> void:
+    if available_links.size() <= 1 or bool(settings.get("seen_link_guide", false)):
+        return
+    var names: PackedStringArray = PackedStringArray()
+    for recipe in available_links:
+        if str(recipe.get("id", "none")) != "none":
+            names.append(str(recipe.get("name", "")))
+    if names.is_empty():
+        return
+    combo_message = "已集齐联动（%s）。按 Q 切换；锁链从火药筒炮口弹出。暂停菜单的「帮助」里有完整说明。" % " / ".join(names)
+    combo_message_time = 6.5
+    settings["seen_link_guide"] = true
+    var result: Dictionary = save_store.write_settings(settings)
+    if not result.get("ok", false):
+        settings["seen_link_guide"] = false
+
+func toggle_hud_hidden() -> void:
+    if hud == null or not running or shop_open or upgrade_pending or not hud.has_method("toggle_hud_hidden"):
+        return
+    if paused or stats_open:
+        return
+    hud.toggle_hud_hidden()
 
 func switch_combo_mode() -> void:
     if not running or upgrade_pending or wave_closing or shop_open or player_frozen or available_links.size() <= 1:
@@ -918,6 +942,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
             switch_combo_mode()
         KEY_E:
             switch_elite()
+        KEY_V:
+            toggle_hud_hidden()
         KEY_R:
             if _cheats_allowed() or trial_mode:
                 start_run(trial_mode,trial_preset)
@@ -1341,7 +1367,12 @@ func reroll_shop() -> void:
 # guessing which piece they were waiting for.
 func link_hint_text() -> String:
     if available_links.size() > 1:
-        return ""
+        var names: PackedStringArray = PackedStringArray()
+        for recipe in available_links:
+            if str(recipe.get("id", "none")) != "none":
+                names.append(str(recipe.get("name", "")))
+        var current: String = str(active_link.get("name", "不联动"))
+        return "已可联动：按 Q 切换（当前：%s）。锁链从火药筒炮口弹出。帮助里有完整配方。" % current
     for link_id in Catalog.LINK_ORDER:
         if link_id == "none":
             continue
@@ -1906,19 +1937,35 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
             attack_range = (365.0 if collapsed else 265.0) * float(stats.get("range_multiplier", 1.0))
         if key == "powder" and active_link["weapons"].has("powder"):
             attack_range = float(active_link["range"]) * float(stats.get("range_multiplier", 1.0))
-        var target_origin: Vector2 = player_position if key == "powder" and str(active_link.get("kind", "none")) == "chain" else point
-        var target: Dictionary = Rules.choose_target(target_origin, attack_range, targets, prefer_elite)
-        var aim_point: Vector2 = target["position"] if not target.is_empty() else point
-        if not target.is_empty():
-            var flight_time: float = point.distance_to(aim_point) / (data["speed"] * stats["bullet_speed"])
-            aim_point += target.get("velocity", Vector2.ZERO) * minf(0.35, flight_time * 0.65)
-        var direction: Vector2 = (aim_point - point).normalized() if not target.is_empty() else runtime.get("aim", (point - player_position).normalized())
-        runtime["aim"] = direction
+        var aim_limit: float = Rules.parked_aim_limit(key)
+        var preview_aim: Vector2 = runtime.get("aim", (point - player_position).normalized())
+        if preview_aim.length() < 0.001:
+            preview_aim = Vector2.RIGHT
+        var visual_aim: Vector2 = Rules.parked_aim_direction(point, player_position, preview_aim, aim_limit)
         var view: Sprite2D = weapon_views[key]
-        var visual_aim: Vector2 = Rules.parked_aim_direction(point, player_position, direction)
         view.position = point - visual_aim * runtime["recoil"] * 20.0
         view.rotation = visual_aim.angle() + (0.0 if key == "powder" else PI / 2.0)
         Rules.apply_parked_hold(view, key, player_position, visual_aim)
+        # Pose first so the first shot of a new weapon already uses a real muzzle,
+        # then retarget from that muzzle and snap the barrel again.
+        var muzzle: Vector2 = weapon_muzzle_point(key, visual_aim)
+        var target: Dictionary = Rules.choose_target(muzzle, attack_range, targets, prefer_elite)
+        var direction: Vector2 = visual_aim
+        if not target.is_empty():
+            var aim_point: Vector2 = target["position"]
+            var flight_time: float = muzzle.distance_to(aim_point) / maxf(1.0, data["speed"] * stats["bullet_speed"])
+            aim_point += target.get("velocity", Vector2.ZERO) * minf(0.35, flight_time * 0.65)
+            direction = (aim_point - muzzle).normalized() if aim_point.distance_to(muzzle) > 0.001 else visual_aim
+            visual_aim = Rules.parked_aim_direction(point, player_position, direction, aim_limit)
+            runtime["aim"] = visual_aim
+            view.position = point - visual_aim * runtime["recoil"] * 20.0
+            view.rotation = visual_aim.angle() + (0.0 if key == "powder" else PI / 2.0)
+            Rules.apply_parked_hold(view, key, player_position, visual_aim)
+            muzzle = weapon_muzzle_point(key, visual_aim)
+            if aim_point.distance_to(muzzle) > 0.001:
+                direction = (aim_point - muzzle).normalized()
+        else:
+            runtime["aim"] = visual_aim
         view.modulate = Color(0.86, 0.98, 0.86) if active_link["suppressed"].has(key) else Color.WHITE
         if active_link["suppressed"].has(key) or target.is_empty() or runtime["cooldown"] > 0.0:
             continue
@@ -1929,27 +1976,34 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
             launch_chain(linked, target["position"])
         else:
             var damage: float = data["damage"] * (1.0 + (item["level"] - 1) * 0.35)
+            # Shells always leave the visual muzzle. Their heading aims at the
+            # chosen target so the shot origin stays on the barrel even when
+            # the parked art can only turn inside a tight torso-safe cone.
             if key == "staff":
                 var count: int=Evolution.shot_count(key,item.level)
                 for index in range(count):
                     var offset: float=index-(count-1)*0.5
-                    fire_projectile(point, direction.rotated(offset * (0.055 if collapsed else 0.24)), key, damage*(1.0 if count==3 else 0.85), attack_range)
+                    var shot_aim: Vector2 = direction.rotated(offset * (0.055 if collapsed else 0.24))
+                    fire_projectile(muzzle, shot_aim, key, damage*(1.0 if count==3 else 0.85), attack_range)
                 audio.play("magic", -2.0, 1.0)
                 flash_weapon(key)
             else:
                 var count: int=Evolution.shot_count(key,item.level) if key=="sling" else 1
                 for index in range(count):
                     var offset: float=(index-(count-1)*0.5)*0.13
-                    fire_projectile(point, direction.rotated(offset), key, damage*(1.0 if count==1 else (0.70 if count==2 else 0.61)), attack_range, false, key == "powder" and active_link["kind"] == "rune")
+                    var shot_aim: Vector2 = direction.rotated(offset)
+                    fire_projectile(muzzle, shot_aim, key, damage*(1.0 if count==1 else (0.70 if count==2 else 0.61)), attack_range, false, key == "powder" and active_link["kind"] == "rune")
                 audio.play("powder" if key == "powder" else "sling", 0.0 if key == "powder" else -2.0, 0.86 if key == "powder" else 1.0)
                 flash_weapon(key)
                 if key == "powder" and active_link["kind"] == "rune":
-                    effects.rune_ignition(mounts.get("staff", player_position + Rules.ranged_mount("staff")), point + direction * 19.0)
+                    effects.rune_ignition(mounts.get("staff", player_position + Rules.ranged_mount("staff")), muzzle)
                     audio.play("magic", -2.0)
         var penalty: float = active_link["cooldown_multiplier"] if key == "powder" and active_link["weapons"].has("powder") else 1.0
         runtime["cooldown"] = data["cooldown"] * penalty / (1.0 + (item["level"] - 1) * 0.12)
         runtime["recoil"] = 0.12
         hero.recoil(direction)
+    if chain_key != "" and weapon_runtime.has(chain_key) and str(weapon_runtime[chain_key].get("chain_state", "rest")) == "rest":
+        attach_chain_weapon(chain_key)
     refresh_weapon_draw_order()
 
 
@@ -2015,19 +2069,60 @@ func weapon_level(key: String) -> int:
             return item["level"]
     return 1
 
+func weapon_muzzle_point(key: String, aim: Vector2 = Vector2.ZERO) -> Vector2:
+    var direction: Vector2 = aim
+    var view: Sprite2D = weapon_views.get(key) as Sprite2D
+    if direction.length() < 0.001 and weapon_runtime.has(key):
+        direction = Vector2(weapon_runtime[key].get("aim", Vector2.ZERO))
+    if direction.length() < 0.001 and view != null and is_instance_valid(view):
+        direction = Vector2.from_angle(view.rotation if key == "powder" else view.rotation - PI / 2.0)
+    if direction.length() < 0.001:
+        direction = Vector2.RIGHT
+    else:
+        direction = direction.normalized()
+    var mount: Vector2 = current_weapon_mounts().get(key, player_position + Rules.ranged_mount(key))
+    if view == null or not is_instance_valid(view):
+        var fallback: float = Rules.parked_hold_length(key) * 2.0 if Rules.is_parked_weapon(key) else 17.0
+        return mount + direction * fallback
+    var axis: float = absf(view.scale.x)
+    var center: Vector2 = view.position + view.offset.rotated(view.rotation) * axis
+    if Rules.is_parked_weapon(key):
+        return center + direction * Rules.parked_hold_length(key)
+    return center
+
 func chain_anchor() -> Vector2:
-    return player_position + Vector2(38, 36)
+    var aim: Vector2 = Vector2.ZERO
+    if weapon_runtime.has("powder"):
+        aim = Vector2(weapon_runtime["powder"].get("aim", Vector2.ZERO))
+    return weapon_muzzle_point("powder", aim)
+
+func attach_chain_weapon(key: String) -> void:
+    if not weapon_views.has(key) or not is_instance_valid(weapon_views[key]):
+        return
+    var muzzle: Vector2 = chain_anchor()
+    var aim: Vector2 = Vector2.RIGHT
+    if weapon_runtime.has("powder") and Vector2(weapon_runtime["powder"].get("aim", Vector2.ZERO)).length() > 0.001:
+        aim = Vector2(weapon_runtime["powder"]["aim"]).normalized()
+    var view: Sprite2D = weapon_views[key]
+    view.position = muzzle
+    view.rotation = aim.angle() + (PI / 2.0 if key == "axe" else PI / 4.0)
+    weapon_runtime[key]["position"] = muzzle
+    weapon_runtime[key]["chain_position"] = muzzle
 
 func launch_chain(key: String, target: Vector2) -> void:
     var runtime: Dictionary = weapon_runtime[key]
+    var muzzle: Vector2 = chain_anchor()
     runtime["chain_state"] = "out"
-    runtime["chain_position"] = chain_anchor()
-    runtime["chain_direction"] = (target - chain_anchor()).normalized()
+    runtime["chain_position"] = muzzle
+    var shot: Vector2 = target - muzzle
+    runtime["chain_direction"] = shot.normalized() if shot.length() > 0.001 else Vector2(weapon_runtime.get("powder", {}).get("aim", Vector2.RIGHT))
+    if runtime["chain_direction"].length() < 0.001:
+        runtime["chain_direction"] = Vector2.RIGHT
     runtime["chain_distance"] = 0.0
     runtime["chain_hit_ids"] = []
     runtime["chain_damage"] = Catalog.WEAPONS[key]["damage"] * (1.0 + (weapon_level(key) - 1) * 0.35) + 1.6 * (1.0 + (weapon_level("powder") - 1) * 0.25)
     weapon_views[key].position = runtime["chain_position"]
-    effects.burst(current_weapon_mounts().get("powder", player_position + Rules.ranged_mount("powder")), Color("#d5b47c"), 12)
+    effects.burst(muzzle, Color("#d5b47c"), 12)
     audio.play("chain_out", -1.0)
     flash_weapon(key)
     flash_weapon("powder")
@@ -2037,9 +2132,7 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
     var runtime: Dictionary = weapon_runtime[key]
     var view: Sprite2D = weapon_views[key]
     if runtime["chain_state"] == "rest":
-        view.position = chain_anchor()
-        view.rotation = 0.35
-        runtime["position"] = view.position
+        attach_chain_weapon(key)
         runtime["initialized"] = false
         return
     var previous: Vector2 = runtime["chain_position"]
@@ -2086,11 +2179,12 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
 
 func fire_projectile(point: Vector2, direction: Vector2, key: String, damage: float, attack_range: float, from_combo: bool = false, enchanted: bool = false) -> void:
     var speed: float = Catalog.WEAPONS[key]["speed"] * stats["bullet_speed"]
-    projectiles.append({"position": point + direction * 17.0, "velocity": direction * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"]})
+    var aim: Vector2 = direction.normalized() if direction.length() > 0.001 else Vector2.RIGHT
+    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"]})
     if not from_combo and weapon_level(key)>=5:
         if key=="sling": projectiles.back().bounces_left+=1
         if key=="staff": projectiles.back().pierce_left+=1
-    effects.muzzle(point+direction*17.0,direction,key,enchanted)
+    effects.muzzle(point,aim,key,enchanted)
 
 func update_projectiles(delta: float) -> void:
     var remaining: Array = []
@@ -2474,7 +2568,7 @@ func draw_link_shapes() -> void:
     if active_link.get("kind", "none") != "chain":
         return
     var key: String = active_link["weapons"][1]
-    var start: Vector2 = current_weapon_mounts().get("powder", player_position + Rules.ranged_mount("powder"))
+    var start: Vector2 = chain_anchor()
     var end: Vector2 = weapon_views[key].position
     var direction: Vector2 = end - start
     var length: float = direction.length()
@@ -2528,6 +2622,15 @@ func apply_display_mode(fullscreen: bool) -> void:
     else:
         DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
         _fit_playable_window()
+    _apply_content_scale()
+
+func _apply_content_scale() -> void:
+    if DisplayServer.get_name() == "headless" or not is_inside_tree():
+        return
+    var win := get_tree().root
+    win.content_scale_size = Vector2i(1280, 800)
+    win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+    win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 
 func set_fullscreen(enabled: bool) -> void:
     var previous: bool = bool(settings.get("fullscreen", false))

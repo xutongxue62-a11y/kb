@@ -250,7 +250,11 @@ static func parked_hold_length(weapon_id: String) -> float:
     # belongs here; adding almost a full weapon length made the art float away.
     return size * scale * float(GRIP_FRACTIONS.get(weapon_id,0.24))
 
-static func parked_aim_direction(mount: Vector2, origin: Vector2, desired: Vector2) -> Vector2:
+static func parked_aim_limit(_weapon_id: String) -> float:
+    # Keep the long padded sprite in a tight outward cone so it cannot sweep through the torso.
+    return PI * 0.12
+
+static func parked_aim_direction(mount: Vector2, origin: Vector2, desired: Vector2, max_angle: float = -1.0) -> Vector2:
     var outward: Vector2 = mount - origin
     if outward.length() < 0.001:
         outward = Vector2.RIGHT
@@ -260,8 +264,7 @@ static func parked_aim_direction(mount: Vector2, origin: Vector2, desired: Vecto
         return outward
     var aim: Vector2 = desired.normalized()
     var ang: float = outward.angle_to(aim)
-    # Keep the long padded sprite in the outward cone so it cannot sweep through the torso.
-    var limit: float = PI * 0.12
+    var limit: float = PI * 0.12 if max_angle < 0.0 else max_angle
     if absf(ang) > limit:
         return outward.rotated(signf(ang) * limit)
     return aim
@@ -272,7 +275,7 @@ static func apply_parked_hold(view: Sprite2D, weapon_id: String, origin: Vector2
     if orbits_with_formation(weapon_id):
         view.offset = Vector2.ZERO
         return
-    var visual_aim: Vector2 = parked_aim_direction(view.position, origin, aim)
+    var visual_aim: Vector2 = parked_aim_direction(view.position, origin, aim, parked_aim_limit(weapon_id))
     if idle and weapon_id in ["sling","staff","bonebow","spear"]:
         view.rotation = visual_aim.angle() + PI / 2.0
     elif idle and weapon_id == "powder":

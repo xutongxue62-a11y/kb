@@ -457,15 +457,20 @@ static func continued(h) -> void:
 static func help_page(h, page: String, in_run: bool) -> void:
     var sheet = modal(h, Rect2(146, 72, 988, 656))
     var body: Control = sheet.content
-    label(h, body, "按键操作" if page == "keys" else "玩法说明", Rect2(40, 20, 800, 65), 40, INK, true)
+    var heading: String = "按键操作" if page == "keys" else ("武器联动" if page == "links" else "玩法说明")
+    label(h, body, heading, Rect2(40, 20, 800, 65), 40, INK, true)
     line(body, Vector2(40, 100), 904, RED)
-    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n联动：集齐配对武器后按 Q 切换，屏幕下方会提示还差哪件。\n熔岩地面会持续烫伤，站在里面会不断掉血。\n营地商店可以花金币刷新货物，等级越高价格越贵。"
+    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后按 Q 切换联动。屏幕下方会提示还差哪一件。\n锁链类联动会从火药筒炮口弹出。详情见「武器联动」。\n按 V 可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。"
     if page == "keys":
-        text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒\n← / → 翻页预览角色，点击画像确认选择\nEnter 确认出发 · Esc 返回 / 暂停\nB 角色属性 · F5 手动保存\n空格 散射 / 集火切换 · Q 两两联动 · E 切换瞄准目标\n1 / 2 / 3 选择成长"
-    label(h, body, text, Rect2(44, 125, 894, 372), 22)
-    button(h, body, "HelpGameplay", "玩法", Rect2(40, 520, 116, 43), func(): h.show_help("gameplay", in_run), false, 18)
-    button(h, body, "HelpKeys", "按键操作", Rect2(172, 520, 154, 43), func(): h.show_help("keys", in_run), false, 18)
-    button(h, body, "Stats", "角色属性 [B]", Rect2(342, 520, 186, 43), func(): h.stats_requested.emit(), false, 18)
+        text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒\n← / → 翻页预览角色，点击画像确认选择\nEnter 确认出发 · Esc 返回 / 暂停\nB 角色属性 · F5 手动保存 · V 隐藏或显示界面\n空格 散射 / 集火切换 · Q 切换武器联动 · E 切换瞄准目标\n1 / 2 / 3 选择成长"
+    elif page == "links":
+        text = "集齐配对武器后，按 Q 在「不联动」和联动之间切换。下方提示会写还差哪一件。\n\n火药筒 + 木棒 / 石斧 / 骨刃 → 锁链武器。\n锁链从火药筒炮口弹出并弹射往返；木棒不再环绕，火药筒不再发普通炮弹。\n火药筒 + 法杖 → 符火炮弹。火种壶 + 雷鸣图腾等也有各自配方。\n\n每一种联动都有代价，切换前请看说明。战斗界面不再长期放置联动按钮，请用 Q 切换。"
+    var copy: Label = label(h, body, text, Rect2(44, 118, 894, 378), 20)
+    copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    button(h, body, "HelpGameplay", "玩法", Rect2(40, 508, 110, 43), func(): h.show_help("gameplay", in_run), false, 18)
+    button(h, body, "HelpKeys", "按键操作", Rect2(160, 508, 150, 43), func(): h.show_help("keys", in_run), false, 18)
+    button(h, body, "HelpLinks", "武器联动", Rect2(320, 508, 150, 43), func(): h.show_help("links", in_run), false, 18)
+    button(h, body, "Stats", "角色属性 [B]", Rect2(480, 508, 186, 43), func(): h.stats_requested.emit(), false, 18)
     button(h, body, "TrialBasic", "基础试用" + (" [F2]" if h.debug_cheats else ""), Rect2(40, 581, 222, 44), func(): h.request_help_trial("base"), false, 18)
     button(h, body, "TrialNew", "新武器试用" + (" [F3]" if h.debug_cheats else ""), Rect2(280, 581, 244, 44), func(): h.request_help_trial("new"), false, 18)
     button(h, body, "Back", "返回 [Esc]", Rect2(720, 570, 224, 54), func(): h.close_front_modal(), true, 22)

@@ -45,14 +45,13 @@ func check_close_ranged_targets(world: Node) -> void:
             var view: Sprite2D = world.weapon_views[key]
             var aim: Vector2 = (enemy["position"] - view.position).normalized()
             var view_direction: Vector2 = Vector2.from_angle(view.rotation - (0.0 if key == "powder" else PI / 2.0))
-            var visual_aim: Vector2 = Rules.parked_aim_direction(view.position, world.player_position, aim)
-            # Shots still leave the displayed mount toward the target; the sprite stays in the
-            # outward handheld cone so a long staff cannot sweep through the torso.
+            var visual_aim: Vector2 = Rules.parked_aim_direction(view.position, world.player_position, aim, Rules.parked_aim_limit(key))
+            # Every shell leaves the displayed barrel muzzle, even when its heading turns toward a close target.
+            var muzzle: Vector2 = world.weapon_muzzle_point(key, visual_aim)
             var aligned: bool = world.projectiles.size() == (3 if key == "staff" else 1) and view_direction.dot(visual_aim) > 0.9999
             for projectile in world.projectiles:
-                var muzzle_offset: Vector2 = projectile["position"] - view.position
-                aligned = aligned and is_equal_approx(muzzle_offset.length(), 17.0) and muzzle_offset.normalized().dot(projectile["velocity"].normalized()) > 0.9999
-            expect(aligned, "actual ranged muzzle and aim follow the displayed mount for a close target: " + key + " " + str(target_offset))
+                aligned = aligned and projectile["position"].distance_to(muzzle) <= 1.5
+            expect(aligned, "actual ranged muzzle and aim follow the displayed barrel for a close target: " + key + " " + str(target_offset))
             for index in range(60):
                 world.update_projectiles(1.0 / 60.0)
             expect(enemy["hp"] < 1000.0, "actual ranged shot hits a hunter just outside body contact on every side: " + key + " " + str(target_offset))

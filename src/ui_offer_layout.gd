@@ -141,7 +141,7 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         var weapon: bool=Catalog.WEAPONS.has(key)
         var buff: bool=Growth.BUFFS.has(key)
         var data: Dictionary=Catalog.WEAPONS[key] if weapon else (Growth.BUFFS[key] if buff else {"name":"篝火治疗","description":"恢复 3 点生命\n不超过生命上限"})
-        var item: Button=card(h,grid,key,Vector2(348,292))
+        var item: Button=card(h,grid,key,Vector2(348,268))
         item.name="ShopOffer%d" % i
         item.set_meta("ink_layout","side_icon")
         var full: bool=key=="heal" and hp>=max_hp
@@ -155,22 +155,28 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         if sold and not new_weapon: owned=maxi(0,owned-1)
         var shown: int=clampi(int(offer.get("level",1)),1,Growth.MAX_WEAPON_LEVEL) if new_weapon else (mini(Growth.MAX_WEAPON_LEVEL,owned+1) if weapon else owned+1)
         var replace_offer: bool=new_weapon and inventory.size()>=6 and not sold
-        text(h,item,data.name,Rect2(12,7,324,34),24,Color("#263546"),true)
+        var kind_label: String="武器" if weapon else ("属性" if buff else "补给")
+        var kind_tag: Label=text(h,item,kind_label,Rect2(12,6,70,22),14,Color("#983f2b"),true)
+        kind_tag.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+        var title: String="%s（%s）" % [str(data.name), kind_label]
+        text(h,item,title,Rect2(86,4,250,26),20,Color("#263546"),true)
         var top: String=(Growth.weapon_level_text(shown) if new_weapon or owned==0 else "Lv.%d → %d" % [owned,shown]) if weapon else ("层数 %d → %d" % [owned,shown] if buff else "恢复生命")
-        text(h,item,top,Rect2(12,42,324,30),21,Color("#75442c"),true)
+        text(h,item,top,Rect2(12,32,324,24),18,Color("#75442c"),true)
         var effect: String=Details.attack_type(key) if weapon else (BuffDetails.headline(key) if buff else "生命 +3")
-        text(h,item,effect,Rect2(12,74,324,27),19,Color("#704127"),true)
-        art(h,item,key,Rect2(14,106,72,66),maxi(1,shown))
+        text(h,item,effect,Rect2(12,56,324,22),16,Color("#704127"),true)
+        art(h,item,key,Rect2(16,82,64,56),maxi(1,shown))
         var body: String=Details.attack(key,shown) if weapon else (BuffDetails.detail(key) if buff else data.description)
-        var desc: Label=text(h,item,body,Rect2(96,100,238,52) if weapon else Rect2(96,106,238,72),17)
+        var desc: Label=text(h,item,body,Rect2(88,80,246,46) if weapon else Rect2(88,80,246,58),15)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+        desc.vertical_alignment=VERTICAL_ALIGNMENT_TOP
         if weapon:
-            text(h,item,Details.stats_line(key,shown),Rect2(96,156,238,22),16,Color("#75442c"),true)
+            text(h,item,Details.stats_line(key,shown),Rect2(88,126,246,20),14,Color("#75442c"),true)
         if weapon:
-            var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(14,181,320,43),16,Color("#59462f"))
+            var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(14,148,320,36),14,Color("#59462f"))
             ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+            ability.vertical_alignment=VERTICAL_ALIGNMENT_TOP
         elif buff:
-            text(h,item,BuffDetails.limit(key),Rect2(14,186,320,29),19,Color("#704127"),true)
+            text(h,item,BuffDetails.limit(key),Rect2(14,150,320,24),16,Color("#704127"),true)
         var action_text: String
         var action_hint: String
         if sold:
@@ -200,8 +206,8 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
                 verb="购买治疗"
                 action_hint="立即恢复 3 点生命"
             action_text="%s · %d 金币" % [verb,int(offer.price)]
-        text(h,item,action_text,Rect2(12,230,324,30),20,Color("#983f2b"),true)
-        text(h,item,action_hint,Rect2(12,262,324,24),16,Color("#59462f"))
+        text(h,item,action_text,Rect2(12,204,324,28),18,Color("#983f2b"),true)
+        text(h,item,action_hint,Rect2(12,234,324,22),14,Color("#59462f"))
     var footer:=HBoxContainer.new()
     footer.add_theme_constant_override("separation",14)
     column.add_child(footer)
@@ -227,6 +233,7 @@ static func shop_confirm(h, state: Dictionary, index: int) -> void:
     var max_hp: float = float(state.get("max_hp", 8.0))
     var inventory: Array = state.get("inventory", [])
     var levels: Dictionary = state.get("levels", {})
+    var stage: int = int(state.get("wave", 1))
     var weapon: bool = Catalog.WEAPONS.has(key)
     var buff: bool = Growth.BUFFS.has(key)
     var data: Dictionary = Catalog.WEAPONS[key] if weapon else (Growth.BUFFS[key] if buff else {"name": "篝火治疗"})
@@ -241,21 +248,70 @@ static func shop_confirm(h, state: Dictionary, index: int) -> void:
         verb = "购买新武器"
     elif buff:
         verb = "购买并强化"
-    var column: VBoxContainer = h.parchment_column(760, 140)
-    column.get_meta("scroll_frame").opening_mode = "fold"
-    column.add_theme_constant_override("separation", 12)
-    var heading: Label = h.make_display("确认" + verb, 30)
+    var dim := ColorRect.new()
+    dim.name = "ShopConfirmDim"
+    dim.position = Vector2.ZERO
+    dim.size = Vector2(1280, 800)
+    dim.color = Color(0.06, 0.04, 0.03, 0.46)
+    dim.mouse_filter = Control.MOUSE_FILTER_STOP
+    h.overlay.add_child(dim)
+    var sheet_h: float = 430.0 if replace_offer else 280.0
+    var sheet := PanelContainer.new()
+    sheet.name = "ShopConfirmSheet"
+    sheet.position = Vector2(150, 800.0 - sheet_h - 16.0)
+    sheet.size = Vector2(980, sheet_h)
+    var panel: StyleBoxFlat = h.style(Color("#f3e6cc"), Color("#8e714a"))
+    panel.set_corner_radius_all(10)
+    panel.content_margin_left = 22
+    panel.content_margin_right = 22
+    panel.content_margin_top = 16
+    panel.content_margin_bottom = 16
+    sheet.add_theme_stylebox_override("panel", panel)
+    h.overlay.add_child(sheet)
+    var column := VBoxContainer.new()
+    column.add_theme_constant_override("separation", 8)
+    sheet.add_child(column)
+    var heading: Label = h.make_display("确认" + verb, 28)
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
-    var detail: String = "确定花费 %d 金币%s「%s」吗？\n取消将返回商店，不会扣费。" % [int(offer.get("price", 0)), "购买并更换" if replace_offer else "购买", str(data.get("name", key))]
-    if replace_offer:
-        detail += "\n换下的武器按原价 50% 折价售回。"
-    var body: Label = h.make_label(detail, 18, Color("#66705e"))
+    var kind_label: String = "武器" if weapon else ("属性" if buff else "补给")
+    var shown: int = clampi(int(offer.get("level", 1)), 1, Growth.MAX_WEAPON_LEVEL) if weapon and offer.has("level") else (mini(Growth.MAX_WEAPON_LEVEL, owned + 1) if weapon else owned + 1)
+    var detail: String = "确定花费 %d 金币%s「%s（%s）」吗？取消将返回商店，不会扣费。" % [int(offer.get("price", 0)), "购买并更换" if replace_offer else "购买", str(data.get("name", key)), kind_label]
+    if weapon:
+        detail += "\n新装备：%s · %s" % [Growth.weapon_level_text(shown), Details.stats_line(key, shown)]
+    elif buff:
+        detail += "\n层数 %d → %d" % [owned, shown]
+    var body: Label = h.make_label(detail, 16, Color("#66705e"))
     body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    body.custom_minimum_size = Vector2(640, 90)
+    body.custom_minimum_size = Vector2(900, 64 if replace_offer else 72)
     column.add_child(body)
-    var wallet: Label = h.make_label("当前金币 %d · 生命 %.1f / %.0f" % [coins, hp, max_hp], 17, Color("#704127"))
+    if replace_offer:
+        var compare: Label = h.make_label("将与现有武器对比后更换；换下的武器按原价 50% 折价售回。", 15, Color("#704127"))
+        compare.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        column.add_child(compare)
+        var grid := GridContainer.new()
+        grid.columns = 2
+        grid.add_theme_constant_override("h_separation", 10)
+        grid.add_theme_constant_override("v_separation", 6)
+        column.add_child(grid)
+        var incoming: Label = h.make_label("获得  %s  ·  %s  ·  %s  ·  花费 %d 金币" % [str(data.get("name", key)), Growth.weapon_level_text(shown), Details.stats_line(key, shown), int(offer.get("price", 0))], 14, Color("#3e5439"))
+        incoming.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        incoming.custom_minimum_size = Vector2(900, 22)
+        incoming.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        incoming.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        column.add_child(incoming)
+        for held in inventory:
+            var hid: String = str(held.get("id", ""))
+            if not Catalog.WEAPONS.has(hid):
+                continue
+            var lv: int = int(held.get("level", 1))
+            var refund: int = Economy.sell_price(hid, stage, lv)
+            var row: Label = h.make_label("%s  ·  %s  ·  %s  ·  售回 %d 金币" % [Catalog.WEAPONS[hid]["name"], Growth.weapon_level_text(lv), Details.stats_line(hid, lv), refund], 14, Color("#59462f"))
+            row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+            row.custom_minimum_size = Vector2(430, 22)
+            grid.add_child(row)
+    var wallet: Label = h.make_label("当前金币 %d · 生命 %.1f / %.0f" % [coins, hp, max_hp], 16, Color("#704127"))
     wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(wallet)
     var footer := HBoxContainer.new()
@@ -266,7 +322,6 @@ static func shop_confirm(h, state: Dictionary, index: int) -> void:
     h.action(footer, "ShopBuyConfirm", "确定" + verb, func():
         if not h.ui_busy():
             h.confirm_shop_buy())
-    h.open_parchment(column, true)
 
 static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void:
     var column: VBoxContainer=h.parchment_column(1172,16)

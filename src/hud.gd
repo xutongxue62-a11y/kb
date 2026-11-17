@@ -51,6 +51,8 @@ var notice_label: Label
 var formation_button: Button
 var combo_button: Button
 var elite_button: Button
+var hide_ui_button: Button
+var hud_hidden: bool = false
 var xp_bar: ProgressBar
 var hp_bar: ProgressBar
 var xp_label: Label
@@ -788,12 +790,15 @@ func update_state(hp: float, elapsed: float, kills: int, xp: float, xp_needed: i
     last_kills = kills
     var seconds: int = maxi(0, ceili(30.0 - fmod(elapsed, 30.0)))
     timer_label.text = "第 %d 关  %02d:%02d" % [floori(elapsed / 30.0) + 1, seconds / 60, seconds % 60]
-    formation_button.text = ("收束集火" if collapsed else "展开扫荡") + " [空格]"
-    combo_button.text = link["name"] + " [Q]"
-    combo_button.tooltip_text = link["cost"]
-    elite_button.text = ("射程内精英优先" if prefer_elite else "最近目标") + " [E]"
+    if formation_button != null:
+        formation_button.text = ("收束集火" if collapsed else "展开扫荡") + " [空格]"
+    if combo_button != null:
+        combo_button.text = link["name"] + " [Q]"
+        combo_button.tooltip_text = link["cost"]
+    if elite_button != null:
+        elite_button.text = ("射程内精英优先" if prefer_elite else "最近目标") + " [E]"
     notice_label.text = "试用：按 G 自选成长" if trial else "绿石经验 · 金币用于营地"
-    growth_button.visible = trial and screen == "combat"
+    growth_button.visible = trial and screen == "combat" and not hud_hidden and not menu_hides_hud
     combo_label.text = str(link["summary"]).replace("\n", " · ")
     xp_bar.max_value = maxf(1.0, float(xp_needed))
     xp_bar.value = xp
@@ -1186,12 +1191,36 @@ func hide_menu() -> void:
 
 func set_battle_visible(value: bool) -> void:
     menu_hides_hud = not value
-    for node in battle_nodes:
-        if node != boss_bar and node != boss_label:
-            node.visible = value
     if not value:
-        boss_bar.visible = false
-        boss_label.visible = false
+        hud_hidden = false
+    apply_battle_visibility()
+
+func toggle_hud_hidden() -> void:
+    if menu_hides_hud or ui_busy() or screen not in ["combat", ""]:
+        return
+    hud_hidden = not hud_hidden
+    apply_battle_visibility()
+
+func apply_battle_visibility() -> void:
+    for node in battle_nodes:
+        if node == null or not is_instance_valid(node):
+            continue
+        var vital: bool = bool(node.get_meta("vital_hud", false))
+        var toggle: bool = bool(node.get_meta("hud_toggle", false)) or node == hide_ui_button
+        if node == boss_bar or node == boss_label:
+            if menu_hides_hud:
+                node.visible = false
+            continue
+        if menu_hides_hud:
+            node.visible = false
+            continue
+        if vital or toggle:
+            node.visible = true
+        else:
+            node.visible = not hud_hidden
+    if hide_ui_button != null and is_instance_valid(hide_ui_button):
+        hide_ui_button.visible = not menu_hides_hud
+        hide_ui_button.text = ("显示界面 [V]" if hud_hidden and not menu_hides_hud else "隐藏界面 [V]")
     refresh_debug_controls()
 
 func configure_save(available: bool, autosave: bool, note: String = "", summary: Dictionary = {}) -> void:
@@ -1345,16 +1374,12 @@ func show_shop(stock: Array, coins: int, finished_wave: int, inventory: Array, l
     OfferUI.shop(self,stock,coins,finished_wave,inventory,levels,hp,max_hp,animate,highlight,reroll_cost)
 
 func request_shop_buy(index: int) -> void:
-    if ui_busy() or shop_state.is_empty():
+    if ui_busy() or shop_state.is_empty() or screen == "shop_confirm":
         return
     var stock: Array = shop_state.get("stock", [])
     if index < 0 or index >= stock.size():
         return
     shop_confirm_index = index
-    reset_overlay()
-    set_battle_visible(false)
-    present_backdrop("none")
-    dim_overlay(false, true)
     screen = "shop_confirm"
     OfferUI.shop_confirm(self, shop_state, index)
 
@@ -1362,18 +1387,37 @@ func confirm_shop_buy() -> void:
     if ui_busy():
         return
     var index: int = shop_confirm_index
+    close_shop_confirm_layer()
     shop_confirm_index = -1
+    screen = "shop"
     if index < 0:
-        cancel_shop_buy()
         return
-    cancel_shop_buy()
     buy_requested.emit(index)
 
 func cancel_shop_buy() -> void:
+    close_shop_confirm_layer()
     shop_confirm_index = -1
     if shop_state.is_empty():
         return
-    show_shop(shop_state.get("stock", []), int(shop_state.get("coins", 0)), int(shop_state.get("wave", 1)), shop_state.get("inventory", []), shop_state.get("levels", {}), float(shop_state.get("hp", 0.0)), float(shop_state.get("max_hp", 8.0)), false, -1, int(shop_state.get("reroll_cost", -1)))
+    screen = "shop"
+
+func close_shop_confirm_layer() -> void:
+    # Rename and detach immediately so the shop underneath is current even
+    # before queue_free flushes, and so a cancel never frees the sheet while
+    # its own button callback is still running.
+    for node_name in ["ShopConfirmSheet", "ShopConfirmDim"]:
+        var node: Node = overlay.find_child(node_name, true, false)
+        while node != null:
+            node.name = str(node_name) + "Closed"
+            if node is CanvasItem:
+                (node as CanvasItem).visible = false
+            if node is Control:
+                (node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+            var parent: Node = node.get_parent()
+            if parent != null:
+                parent.remove_child(node)
+            node.queue_free()
+            node = overlay.find_child(node_name, true, false)
 
 
 func stage_panel(parent: Node) -> void:
@@ -1834,13 +1878,16 @@ func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: f
     map_label.text = map_name + " · 向四周自由探索"
     dodge_label.text = "就绪" if dodge_cooldown <= 0 else "%.1fs" % dodge_cooldown
     dodge_bar.value = 1 - clampf(dodge_cooldown / maxf(0.01,dodge_total),0,1)
-    if combo_button.text.begins_with("不联动"):
+    if combo_button != null and combo_button.text.begins_with("不联动"):
         combo_button.text = ("联动可用" if links.size() > 1 else "等待配方") + " [Q]"
     if links.size() <= 1:
-        combo_button.tooltip_text = "获得火药筒 + 法杖可选符火；火药筒 + 木棒/石斧/骨刃可选锁链。按 Q 切换，保留改造代价。"
+        if combo_button != null:
+            combo_button.tooltip_text = "获得火药筒 + 法杖可选符火；火药筒 + 木棒/石斧/骨刃可选锁链。按 Q 切换，保留改造代价。"
         # When the player already holds one half of a recipe, main passes a
         # hint naming the missing piece instead of the generic recipe list.
-        combo_label.text = link_hint if link_hint != "" else "联动配方：火药筒 + 法杖 / 近战武器；获得后按 Q 切换"
+        combo_label.text = link_hint if link_hint != "" else "联动配方：火药筒 + 法杖 / 近战武器；集齐后按 Q 切换。帮助里有炮口与配方说明。"
+    elif link_hint != "":
+        combo_label.text = link_hint
 
 func close_scroll_then(callback: Callable) -> void:
     if scroll_closing: return

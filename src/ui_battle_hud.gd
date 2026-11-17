@@ -57,6 +57,7 @@ static func meter(h, parent: Node, rect: Rect2, color: Color) -> ProgressBar:
 static func build(h) -> void:
     var status: Array = paper(h, Rect2(18, 16, 306, 118))
     h.status_strip = status[0]
+    status[0].set_meta("vital_hud", true)
     label(h,status[1],"生命",Rect2(18,8,58,26),17,Color("#a74235"))
     h.health_label = label(h,status[1],"8 / 8",Rect2(186,8,100,26),18)
     h.health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -75,9 +76,8 @@ static func build(h) -> void:
     h.coin_label = label(h,wallet[1],"金币 0",Rect2(15,7,126,46),17,Color("#956c2f"))
     h.score_label = label(h,wallet[1],"击败 0",Rect2(145,7,124,46),17)
     action(h,"BattlePause","暂停 / 设置 [Esc]",Rect2(1050,21,208,48),func():h.pause_requested.emit())
-    h.formation_button = action(h,"Formation","展开扫荡 [空格]",Rect2(350,94,170,36),func():h.formation_requested.emit())
-    h.combo_button = action(h,"LinkMode","联动 [Q]",Rect2(536,91,240,42),func():h.combo_requested.emit(),true)
-    h.elite_button = action(h,"TargetMode","最近目标 [E]",Rect2(791,94,184,36),func():h.elite_requested.emit())
+    h.hide_ui_button = action(h,"HideUI","隐藏界面 [V]",Rect2(350,94,170,42),func():h.toggle_hud_hidden())
+    h.hide_ui_button.set_meta("hud_toggle", true)
     action(h,"BattleStats","属性 [B]",Rect2(991,94,126,36),func():h.stats_requested.emit())
     h.growth_button = action(h,"TrialGrowth","成长 [G]",Rect2(1133,94,124,36),func():h.growth_requested.emit())
     h.growth_button.visible = false

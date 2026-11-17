@@ -106,6 +106,16 @@ func scene_checks() -> void:
     world.spawn_enemy("tank", world.player_position + Vector2(150, 0))
     world.enemies[0]["hp"] = 1000.0
     world.enemies[0]["max_hp"] = 1000.0
+    world.update_weapons(0.0, false)
+    var muzzle: Vector2 = world.chain_anchor()
+    expect(muzzle.distance_to(world.weapon_muzzle_point("powder")) <= 1.5, "chain anchor uses the powder cannon muzzle")
+    expect(world.weapon_views["axe"].position.distance_to(muzzle) <= 3.0, "the linked weapon rests on the cannon muzzle")
+    var launch_target: Vector2 = world.enemies[0]["position"]
+    world.launch_chain("axe", launch_target)
+    expect(world.weapon_runtime["axe"]["chain_position"].distance_to(muzzle) <= 1.5, "the chain launches from the cannon muzzle")
+    var launch_dir: Vector2 = world.weapon_runtime["axe"]["chain_direction"]
+    expect(launch_dir.dot((launch_target - muzzle).normalized()) > 0.999, "the chain aims from the muzzle to the target")
+    world.weapon_runtime["axe"]["chain_state"] = "rest"
     world.weapon_runtime["powder"]["cooldown"] = 0.0
     var extended: bool = false
     for index in range(35):
