@@ -76,8 +76,16 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         var level: int = Growth.item_level(key,inventory,levels)
         var weapon: bool=Catalog.WEAPONS.has(key)
         var shown: int = clampi(int(offer_levels.get(key, 1)),1,Growth.MAX_WEAPON_LEVEL) if level==0 and weapon else level+1
-        var title: Label=text(h,item,"%d · %s" % [i+1,data.name],Rect2(12,10,276,36),24 if compact else 27)
-        if h.display_font!=null: title.add_theme_font_override("font",h.display_font)
+        var title_size: int=20 if compact else 23
+        var g_title_main: String="%d · %s" % [i+1,data.name]
+        var g_title_kind: String="（%s）" % ("武器" if weapon else "属性")
+        var g_main_w: float=h.text_width(g_title_main,title_size,true)
+        var g_kind_w: float=h.text_width(g_title_kind,title_size,true)
+        var g_title_x: float=150.0-(g_main_w+g_kind_w)*0.5
+        var g_title_main_label: Label=text(h,item,g_title_main,Rect2(g_title_x,10,g_main_w,36),title_size,Color("#263546"),true)
+        g_title_main_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+        var g_title_kind_label: Label=text(h,item,g_title_kind,Rect2(g_title_x+g_main_w,10,g_kind_w,36),title_size,Color("#983f2b"),true)
+        g_title_kind_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         var top_level: String=("Lv.%d → Lv.%d" % [level,shown] if level>0 else Growth.weapon_level_text(shown)) if weapon else "层数 %d → %d" % [level,shown]
         text(h,item,top_level,Rect2(12,47,276,27),21,Color("#7d432c"),true)
         art(h,item,key,Rect2(16,73,64,58) if compact else Rect2(106,79,88,72),maxi(1,shown))
@@ -102,8 +110,8 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         var growth_block_x: float=19.0
         if weapon and not compact:
             growth_block_x=maxf(19.0,150.0-h.text_width(attack_type,19,true)*0.5)
-        var desc_rect: Rect2=(Rect2(90,99,198,62) if compact else Rect2(growth_block_x,190,281.0-growth_block_x,50)) if weapon else (Rect2(90,99,198,66) if compact else Rect2(19,196,262,62))
-        var desc: Label = text(h,item,body,desc_rect,16 if compact else 18)
+        var desc_rect: Rect2=(Rect2(90,99,198,62) if compact else Rect2(19,190,262,50)) if weapon else (Rect2(90,99,198,66) if compact else Rect2(19,196,262,62))
+        var desc: Label = text(h,item,body,desc_rect,15 if compact else 18)
         desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         desc.add_theme_constant_override("line_spacing",3)
         if weapon or compact:
