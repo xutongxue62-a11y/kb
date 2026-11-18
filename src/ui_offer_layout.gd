@@ -115,8 +115,13 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
                 abilities.add_theme_constant_override("line_spacing",3)
                 abilities.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
             else:
-                var growth_stats: Label=text(h,item,Details.stats_line(key,shown),Rect2(growth_block_x,246,281.0-growth_block_x,24),16,Color("#75442c"),true)
-                growth_stats.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+                var gstats_text: String=Details.stats_line(key,shown)
+                var growth_stats: Label
+                if growth_block_x+h.text_width(gstats_text,16,true)>274.0:
+                    growth_stats=text(h,item,gstats_text,Rect2(15,246,270,24),16,Color("#75442c"),true)
+                else:
+                    growth_stats=text(h,item,gstats_text,Rect2(growth_block_x,246,281.0-growth_block_x,24),16,Color("#75442c"),true)
+                    growth_stats.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
                 var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(growth_block_x,274,281.0-growth_block_x,42),15,Color("#69533b"))
                 abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
                 abilities.add_theme_constant_override("line_spacing",3)
@@ -187,8 +192,13 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
             desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         desc.vertical_alignment=VERTICAL_ALIGNMENT_TOP if weapon else VERTICAL_ALIGNMENT_CENTER
         if weapon:
-            var stats_label: Label=text(h,item,Details.stats_line(key,shown),Rect2(block_x,128,334.0-block_x,20),14,Color("#75442c"),true)
-            stats_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+            var stats_text: String=Details.stats_line(key,shown)
+            var stats_label: Label
+            if block_x+h.text_width(stats_text,14,true)>322.0:
+                stats_label=text(h,item,stats_text,Rect2(12,128,324,20),14,Color("#75442c"),true)
+            else:
+                stats_label=text(h,item,stats_text,Rect2(block_x,128,334.0-block_x,20),14,Color("#75442c"),true)
+                stats_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         if weapon:
             var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(block_x,154,334.0-block_x,40),14,Color("#59462f"))
             ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
