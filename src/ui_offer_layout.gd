@@ -107,14 +107,11 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         var body: String = BuffDetails.detail(key) if not weapon else data.description
         if weapon:
             body = Details.attack(key,shown)
-        var growth_block_x: float=19.0
-        if weapon and not compact:
-            growth_block_x=maxf(19.0,150.0-h.text_width(attack_type,19,true)*0.5)
         var desc_rect: Rect2=(Rect2(90,99,198,62) if compact else Rect2(19,190,262,50)) if weapon else (Rect2(90,99,198,66) if compact else Rect2(19,196,262,62))
-        var desc: Label = text(h,item,body,desc_rect,15 if compact else 18)
+        var desc: Label = text(h,item,body,desc_rect,15 if compact else 16)
         desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         desc.add_theme_constant_override("line_spacing",3)
-        if weapon or compact:
+        if compact:
             desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         if weapon:
             if compact:
@@ -124,16 +121,10 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
                 abilities.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
             else:
                 var gstats_text: String=Details.stats_line(key,shown)
-                var growth_stats: Label
-                if growth_block_x+h.text_width(gstats_text,16,true)>274.0:
-                    growth_stats=text(h,item,gstats_text,Rect2(15,246,270,24),16,Color("#75442c"),true)
-                else:
-                    growth_stats=text(h,item,gstats_text,Rect2(growth_block_x,246,281.0-growth_block_x,24),16,Color("#75442c"),true)
-                    growth_stats.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
-                var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(growth_block_x,274,281.0-growth_block_x,42),15,Color("#69533b"))
+                text(h,item,gstats_text,Rect2(15,246,270,24),16,Color("#75442c"),true)
+                var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(19,274,262,42),15,Color("#69533b"))
                 abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
                 abilities.add_theme_constant_override("line_spacing",3)
-                abilities.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         else:
             text(h,item,BuffDetails.limit(key),Rect2(14,176,272,28) if compact else Rect2(14,264,272,29),18,Color("#704127"),true)
         var refund: int=Economy.reward_sell_price(key,stage,shown)
