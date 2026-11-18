@@ -182,7 +182,7 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         text(h,item,top,Rect2(12,32,324,24),18,Color("#75442c"),true)
         var effect: String=Details.attack_type(key) if weapon else (BuffDetails.headline(key) if buff else "生命 +3")
         text(h,item,effect,Rect2(12,56,324,22),16,Color("#704127"),true)
-        art(h,item,key,Rect2(16,82,64,56),maxi(1,shown))
+        art(h,item,key,Rect2(16,74,64,56),maxi(1,shown))
         var body: String=Details.attack(key,shown) if weapon else (BuffDetails.detail(key) if buff else data.description)
         var block_x: float=maxf(88.0,174.0-h.text_width(effect,16,true)*0.5) if weapon else 51.0
         var desc: Label=text(h,item,body,Rect2(block_x,80,334.0-block_x,46) if weapon else Rect2(51,80,246,58),15)
@@ -315,7 +315,7 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
         var type_text: String=Details.attack_type(key)
         text(h,slot,type_text,Rect2(12,70,324,25),18,Color("#704127"),true)
         var slot_block_x: float=maxf(96.0,174.0-h.text_width(type_text,18,true)*0.5)
-        art(h,slot,key,Rect2(14,99,72,62),owned)
+        art(h,slot,key,Rect2(14,91,72,62),owned)
         var desc: Label=text(h,slot,Details.attack(key,owned),Rect2(slot_block_x,99,334.0-slot_block_x,57),17)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
