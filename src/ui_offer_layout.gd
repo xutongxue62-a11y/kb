@@ -80,7 +80,7 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         if h.display_font!=null: title.add_theme_font_override("font",h.display_font)
         var top_level: String=("Lv.%d → Lv.%d" % [level,shown] if level>0 else Growth.weapon_level_text(shown)) if weapon else "层数 %d → %d" % [level,shown]
         text(h,item,top_level,Rect2(12,47,276,27),21,Color("#7d432c"),true)
-        art(h,item,key,Rect2(16,79,64,58) if compact else Rect2(106,79,88,72),maxi(1,shown))
+        art(h,item,key,Rect2(16,73,64,58) if compact else Rect2(106,79,88,72),maxi(1,shown))
         var attack_type: String=Details.attack_type(key) if weapon else BuffDetails.headline(key)
         var attack_type_label: Label=text(h,item,attack_type,Rect2(90,73,198,23) if compact else Rect2(12,158,276,27),15 if compact else 19,Color("#704127"),true)
         if compact:
@@ -174,15 +174,20 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         var shown: int=clampi(int(offer.get("level",1)),1,Growth.MAX_WEAPON_LEVEL) if new_weapon else (mini(Growth.MAX_WEAPON_LEVEL,owned+1) if weapon else owned+1)
         var replace_offer: bool=new_weapon and inventory.size()>=6 and not sold
         var kind_label: String="武器" if weapon else ("属性" if buff else "补给")
-        var kind_tag: Label=text(h,item,kind_label,Rect2(12,5,70,26),17,Color("#983f2b"),true)
-        kind_tag.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-        var title: String="%d· %s（%s）" % [i+1,str(data.name), kind_label]
-        text(h,item,title,Rect2(36,4,300,26),20,Color("#263546"),true)
+        var title_main: String="%d· %s" % [i+1,str(data.name)]
+        var title_kind: String="（%s）" % kind_label
+        var title_main_w: float=h.text_width(title_main,20,true)
+        var title_kind_w: float=h.text_width(title_kind,20,true)
+        var title_x: float=174.0-(title_main_w+title_kind_w)*0.5
+        var title_main_label: Label=text(h,item,title_main,Rect2(title_x,4,title_main_w,26),20,Color("#263546"),true)
+        title_main_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+        var title_kind_label: Label=text(h,item,title_kind,Rect2(title_x+title_main_w,4,title_kind_w,26),20,Color("#983f2b"),true)
+        title_kind_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         var top: String=(Growth.weapon_level_text(shown) if new_weapon or owned==0 else "Lv.%d → %d" % [owned,shown]) if weapon else ("层数 %d → %d" % [owned,shown] if buff else "恢复生命")
         text(h,item,top,Rect2(12,32,324,24),18,Color("#75442c"),true)
         var effect: String=Details.attack_type(key) if weapon else (BuffDetails.headline(key) if buff else "生命 +3")
         text(h,item,effect,Rect2(12,56,324,22),16,Color("#704127"),true)
-        art(h,item,key,Rect2(16,74,64,56),maxi(1,shown))
+        art(h,item,key,Rect2(16,56,64,56),maxi(1,shown))
         var body: String=Details.attack(key,shown) if weapon else (BuffDetails.detail(key) if buff else data.description)
         var block_x: float=maxf(88.0,174.0-h.text_width(effect,16,true)*0.5) if weapon else 51.0
         var desc: Label=text(h,item,body,Rect2(block_x,80,334.0-block_x,46) if weapon else Rect2(51,80,246,58),15)
@@ -315,7 +320,7 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
         var type_text: String=Details.attack_type(key)
         text(h,slot,type_text,Rect2(12,70,324,25),18,Color("#704127"),true)
         var slot_block_x: float=maxf(96.0,174.0-h.text_width(type_text,18,true)*0.5)
-        art(h,slot,key,Rect2(14,91,72,62),owned)
+        art(h,slot,key,Rect2(14,73,72,62),owned)
         var desc: Label=text(h,slot,Details.attack(key,owned),Rect2(slot_block_x,99,334.0-slot_block_x,57),17)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
