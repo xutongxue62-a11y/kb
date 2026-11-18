@@ -77,15 +77,15 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         var weapon: bool=Catalog.WEAPONS.has(key)
         var shown: int = clampi(int(offer_levels.get(key, 1)),1,Growth.MAX_WEAPON_LEVEL) if level==0 and weapon else level+1
         var title_size: int=20 if compact else 23
-        var g_title_main: String="%d · %s" % [i+1,data.name]
-        var g_title_kind: String="（%s）" % ("武器" if weapon else "属性")
-        var g_main_w: float=h.text_width(g_title_main,title_size,true)
-        var g_kind_w: float=h.text_width(g_title_kind,title_size,true)
-        var g_title_x: float=150.0-(g_main_w+g_kind_w)*0.5
-        var g_title_main_label: Label=text(h,item,g_title_main,Rect2(g_title_x,10,g_main_w,36),title_size,Color("#263546"),true)
-        g_title_main_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
-        var g_title_kind_label: Label=text(h,item,g_title_kind,Rect2(g_title_x+g_main_w,10,g_kind_w,36),title_size,Color("#983f2b"),true)
-        g_title_kind_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+        var g_title_box: HBoxContainer=HBoxContainer.new()
+        g_title_box.position=Vector2(0,10)
+        g_title_box.size=Vector2(300,36)
+        g_title_box.alignment=BoxContainer.ALIGNMENT_CENTER
+        g_title_box.mouse_filter=Control.MOUSE_FILTER_IGNORE
+        g_title_box.add_theme_constant_override("separation",0)
+        item.add_child(g_title_box)
+        text(h,g_title_box,"%d · %s" % [i+1,data.name],Rect2(0,0,0,36),title_size,Color("#263546"),true)
+        text(h,g_title_box,"（%s）" % ("武器" if weapon else "属性"),Rect2(0,0,0,36),title_size,Color("#983f2b"),true)
         var top_level: String=("Lv.%d → Lv.%d" % [level,shown] if level>0 else Growth.weapon_level_text(shown)) if weapon else "层数 %d → %d" % [level,shown]
         text(h,item,top_level,Rect2(12,47,276,27),21,Color("#7d432c"),true)
         art(h,item,key,Rect2(16,73,64,58) if compact else Rect2(106,79,88,72),maxi(1,shown))
@@ -173,15 +173,15 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         var shown: int=clampi(int(offer.get("level",1)),1,Growth.MAX_WEAPON_LEVEL) if new_weapon else (mini(Growth.MAX_WEAPON_LEVEL,owned+1) if weapon else owned+1)
         var replace_offer: bool=new_weapon and inventory.size()>=6 and not sold
         var kind_label: String="武器" if weapon else ("属性" if buff else "补给")
-        var title_main: String="%d· %s" % [i+1,str(data.name)]
-        var title_kind: String="（%s）" % kind_label
-        var title_main_w: float=h.text_width(title_main,20,true)
-        var title_kind_w: float=h.text_width(title_kind,20,true)
-        var title_x: float=174.0-(title_main_w+title_kind_w)*0.5
-        var title_main_label: Label=text(h,item,title_main,Rect2(title_x,4,title_main_w,26),20,Color("#263546"),true)
-        title_main_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
-        var title_kind_label: Label=text(h,item,title_kind,Rect2(title_x+title_main_w,4,title_kind_w,26),20,Color("#983f2b"),true)
-        title_kind_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+        var title_box: HBoxContainer=HBoxContainer.new()
+        title_box.position=Vector2(0,4)
+        title_box.size=Vector2(348,26)
+        title_box.alignment=BoxContainer.ALIGNMENT_CENTER
+        title_box.mouse_filter=Control.MOUSE_FILTER_IGNORE
+        title_box.add_theme_constant_override("separation",0)
+        item.add_child(title_box)
+        text(h,title_box,"%d· %s" % [i+1,str(data.name)],Rect2(0,0,0,26),20,Color("#263546"),true)
+        text(h,title_box,"（%s）" % kind_label,Rect2(0,0,0,26),20,Color("#983f2b"),true)
         var top: String=(Growth.weapon_level_text(shown) if new_weapon or owned==0 else "Lv.%d → %d" % [owned,shown]) if weapon else ("层数 %d → %d" % [owned,shown] if buff else "恢复生命")
         text(h,item,top,Rect2(12,32,324,24),18,Color("#75442c"),true)
         var effect: String=Details.attack_type(key) if weapon else (BuffDetails.headline(key) if buff else "生命 +3")
