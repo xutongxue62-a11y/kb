@@ -112,7 +112,7 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
                 abilities.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
             else:
                 text(h,item,Details.stats_line(key,shown),Rect2(15,246,270,24),16,Color("#75442c"),true)
-                var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(15,274,270,42),15,Color("#69533b"))
+                var abilities: Label=text(h,item,Details.abilities(key,shown,level),Rect2(19,274,262,42),15,Color("#69533b"))
                 abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
                 abilities.add_theme_constant_override("line_spacing",3)
                 abilities.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
@@ -166,24 +166,29 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         var kind_label: String="武器" if weapon else ("属性" if buff else "补给")
         var kind_tag: Label=text(h,item,kind_label,Rect2(12,5,70,26),17,Color("#983f2b"),true)
         kind_tag.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-        var title: String="%d · %s（%s）" % [i+1,str(data.name), kind_label]
-        text(h,item,title,Rect2(12,4,324,26),20,Color("#263546"),true)
+        var title: String="%d· %s（%s）" % [i+1,str(data.name), kind_label]
+        text(h,item,title,Rect2(36,4,300,26),20,Color("#263546"),true)
         var top: String=(Growth.weapon_level_text(shown) if new_weapon or owned==0 else "Lv.%d → %d" % [owned,shown]) if weapon else ("层数 %d → %d" % [owned,shown] if buff else "恢复生命")
         text(h,item,top,Rect2(12,32,324,24),18,Color("#75442c"),true)
         var effect: String=Details.attack_type(key) if weapon else (BuffDetails.headline(key) if buff else "生命 +3")
-        text(h,item,effect,Rect2(12,56,324,22),16,Color("#704127"),true)
+        if weapon:
+            var effect_label: Label=text(h,item,effect,Rect2(88,56,246,22),16,Color("#704127"),true)
+            effect_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+        else:
+            text(h,item,effect,Rect2(12,56,324,22),16,Color("#704127"),true)
         art(h,item,key,Rect2(16,82,64,56),maxi(1,shown))
         var body: String=Details.attack(key,shown) if weapon else (BuffDetails.detail(key) if buff else data.description)
         var desc: Label=text(h,item,body,Rect2(88,80,246,46) if weapon else Rect2(88,80,246,58),15)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         desc.add_theme_constant_override("line_spacing",4)
-        desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+        if weapon:
+            desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         desc.vertical_alignment=VERTICAL_ALIGNMENT_TOP if weapon else VERTICAL_ALIGNMENT_CENTER
         if weapon:
             var stats_label: Label=text(h,item,Details.stats_line(key,shown),Rect2(88,128,246,20),14,Color("#75442c"),true)
             stats_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         if weapon:
-            var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(14,154,320,40),14,Color("#59462f"))
+            var ability: Label=text(h,item,Details.abilities(key,shown,owned),Rect2(88,154,246,40),14,Color("#59462f"))
             ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
             ability.add_theme_constant_override("line_spacing",3)
             ability.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
@@ -263,10 +268,16 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
     var attack_type: Label=text(h,incoming,Details.attack_type(new_id),Rect2(pair_left+90,35,title_width,26),18,Color("#704127"),true)
     attack_type.name="IncomingWeaponType"
     attack_type.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
-    var attack: Label=text(h,incoming,Details.attack(new_id,offered),Rect2(82,68,528,50),17)
+    var desc_left: float=pair_left+90
+    var desc_width: float=maxf(120.0,630.0-desc_left)
+    var attack_text: String=Details.attack(new_id,offered)
+    var desc_lines: int=maxi(1,int(ceil(h.text_width(attack_text,17,false)/desc_width)))
+    var attack: Label=text(h,incoming,attack_text,Rect2(desc_left,68,desc_width,desc_lines*24+4),17)
     attack.name="IncomingWeaponAttack"
     attack.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     attack.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
+    attack.vertical_alignment=VERTICAL_ALIGNMENT_TOP
+    incoming.custom_minimum_size=Vector2(1080,maxf(120.0,68.0+desc_lines*24+8.0))
     var abilities: Label=text(h,incoming,Details.abilities(new_id,offered,0),Rect2(646,68,352,50),17,Color("#59462f"))
     abilities.name="IncomingWeaponAbilities"
     abilities.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -289,12 +300,13 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
             if not h.ui_busy(): h.choose_replace_slot(key))
         text(h,slot,"%d · %s" % [i+1,data.name],Rect2(12,7,324,31),23,Color("#263546"),true)
         text(h,slot,Growth.weapon_level_text(owned),Rect2(12,40,324,28),21,Color("#75442c"),true)
-        text(h,slot,Details.attack_type(key),Rect2(12,70,324,25),18,Color("#704127"),true)
+        var slot_type: Label=text(h,slot,Details.attack_type(key),Rect2(96,70,238,25),18,Color("#704127"),true)
+        slot_type.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         art(h,slot,key,Rect2(14,99,72,62),owned)
         var desc: Label=text(h,slot,Details.attack(key,owned),Rect2(96,99,238,57),17)
         desc.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
-        var ability: Label=text(h,slot,Details.abilities(key,owned,owned),Rect2(14,158,320,40),15,Color("#59462f"))
+        var ability: Label=text(h,slot,Details.abilities(key,owned,owned),Rect2(96,158,238,40),15,Color("#59462f"))
         ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
         ability.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
         text(h,slot,"换下并出售 · +%d 金币" % refund,Rect2(12,203,324,29),19,Color("#983f2b"),true)
