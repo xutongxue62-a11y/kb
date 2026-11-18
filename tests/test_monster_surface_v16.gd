@@ -21,7 +21,9 @@ func _initialize() -> void:
             expect(view.base_scale==scale_before,kind+" surface does not change combat/body scale")
         view.free()
     check_boss_spines(library)
+    check_later_bosses_have_no_procedural_crests()
     print("MONSTER SURFACE V16 RESULT: %d checks, %d failures" % [checks,failures])
+    quit(1 if failures else 0)
 
 func is_cream(c: Color) -> bool:
     return c.a > 0.6 and c.r > 0.78 and c.g > 0.68 and c.b > 0.52 and c.b < 0.85 and c.r > c.b + 0.08
@@ -87,4 +89,9 @@ func check_boss_spines(library) -> void:
         expect(tip_gold >= 20, horn["name"] + " horn tip is painted")
         expect(base_gold >= 20, horn["name"] + " horn root sits on the back plate")
     view.free()
-    quit(1 if failures else 0)
+
+func check_later_bosses_have_no_procedural_crests() -> void:
+    var source := FileAccess.get_file_as_string("res://src/dino_view.gd")
+    expect(source.find("draw_colored_polygon(crest") == -1, "later bosses must not get a second pass of triangular crests in DinoView._draw")
+    expect(source.find("Color(\"#7f4850\")") == -1, "procedural crest ink is gone")
+    expect(source.find("Color(\"#c4a477\")") == -1, "procedural crest fill is gone")

@@ -163,13 +163,9 @@ func _draw() -> void:
             draw_line(Vector2(-bar_width / 2, height), Vector2(bar_width / 2, height), Color("#4c2937"), 5.5, true)
             draw_line(Vector2(-bar_width / 2, height), Vector2(-bar_width / 2 + bar_width * maxf(0.0, health_fraction), height), Color("#f1798c"), 3.5, true)
         return
-    if kind == "boss":
-        for index in range(5):
-            var x: float=(-0.24+index*0.12)*display_width
-            var base_y: float=sprite.position.y-display_width*(0.14+0.08*(1.0-absf(index-2)/2.0))
-            var crest:=PackedVector2Array([Vector2(x-display_width*0.065,base_y+3),Vector2(x-display_width*0.018,base_y-display_width*0.14),Vector2(x+display_width*0.06,base_y+4)])
-            draw_colored_polygon(crest,Color("#7f4850"))
-            draw_colored_polygon(PackedVector2Array([crest[0]+Vector2(3,0),crest[1]+Vector2(0,5),crest[2]-Vector2(3,0)]),Color("#c4a477"))
+    # Back plates and horns already come from the body sprite and surface layer.
+    # A second pass of triangular crests used to be drawn here; later-tier bosses
+    # scale this node up, so those leftover spikes became obvious.
     if elite:
         var face: float = -1.0 if sprite.flip_h else 1.0
         var mid: Vector2 = Vector2(face * display_width * 0.13, sprite.position.y - display_width * 0.15)
