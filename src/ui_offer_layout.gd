@@ -186,7 +186,7 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         text(h,item,top,Rect2(12,32,324,24),18,Color("#75442c"),true)
         var effect: String=Details.attack_type(key) if weapon else (BuffDetails.headline(key) if buff else "生命 +3")
         text(h,item,effect,Rect2(12,56,324,22),16,Color("#704127"),true)
-        art(h,item,key,Rect2(16,56,64,56),maxi(1,shown))
+        art(h,item,key,Rect2(30,56,64,56),maxi(1,shown))
         var body: String=Details.attack(key,shown) if weapon else (BuffDetails.detail(key) if buff else data.description)
         var block_x: float=maxf(88.0,174.0-h.text_width(effect,16,true)*0.5) if weapon else 51.0
         var desc: Label=text(h,item,body,Rect2(block_x,80,334.0-block_x,46) if weapon else Rect2(51,80,246,58),15)
@@ -374,14 +374,14 @@ static func _replace_confirm_row(h,column: VBoxContainer,tag: String,weapon_id: 
     var row:=Control.new()
     row.custom_minimum_size=Vector2(560,120)
     column.add_child(row)
-    text(h,row,tag,Rect2(0,2,76,28),19,tag_color,true)
-    art(h,row,weapon_id,Rect2(2,32,56,50),level)
-    var name_label: Label=text(h,row,"%s · %s" % [str(data.name),Growth.weapon_level_text(level)],Rect2(80,2,470,30),21,Color("#263546"),true)
+    text(h,row,tag,Rect2(56,2,76,28),19,tag_color,true)
+    art(h,row,weapon_id,Rect2(58,32,56,50),level)
+    var name_label: Label=text(h,row,"%s · %s" % [str(data.name),Growth.weapon_level_text(level)],Rect2(136,2,414,30),21,Color("#263546"),true)
     name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
-    var type_label: Label=text(h,row,Details.attack_type(weapon_id),Rect2(80,32,470,24),16,Color("#704127"),true)
+    var type_label: Label=text(h,row,Details.attack_type(weapon_id),Rect2(136,32,414,24),16,Color("#704127"),true)
     type_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
-    var stats_label: Label=text(h,row,Details.stats_line(weapon_id,level),Rect2(80,56,470,24),16,Color("#75442c"),true)
+    var stats_label: Label=text(h,row,Details.stats_line(weapon_id,level),Rect2(136,56,414,24),16,Color("#75442c"),true)
     stats_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
-    var attack: Label=text(h,row,Details.attack(weapon_id,level),Rect2(80,82,470,36),15,Color("#59462f"))
+    var attack: Label=text(h,row,Details.attack(weapon_id,level),Rect2(136,82,414,36),15,Color("#59462f"))
     attack.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     attack.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
