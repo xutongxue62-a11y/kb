@@ -1240,7 +1240,10 @@ func simulate(delta: float, movement: Vector2) -> void:
     # a 0.18 s floor by wave 33, so deep waves feel denser than wave 29 instead
     # of freezing at the wave-26 density.
     var alive_cap: int = enemy_limit()
-    if spawn_clock <= 0.0 and enemies.size() < alive_cap and not boss_defeated:
+    # Boss down starts the 30 s cleanup window, but minions keep trickling in
+    # during it (Juniper, 2026-11-19): the window is extra fighting/looting
+    # time before settlement, not a spawn freeze.
+    if spawn_clock <= 0.0 and enemies.size() < alive_cap:
         var spawn_interval: float = 0.62 - (wave - 1) * 0.10 if wave <= 3 else maxf(0.18, 0.42 - (wave - 3) * 0.008)
         spawn_clock = maxf(1.5, 3.4 - float(maxi(0, wave / 5 - 1)) * 0.28) if boss_round else spawn_interval
         if boss_pending:
