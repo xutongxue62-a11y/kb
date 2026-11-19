@@ -26,6 +26,14 @@ func copy(node: Node) -> String:
         value += copy(child)
     return value
 
+func visible_copy(node: Node) -> String:
+    if node is CanvasItem and not (node as CanvasItem).visible:
+        return ""
+    var value: String = node.text + "\n" if node is Label else ""
+    for child in node.get_children():
+        value += visible_copy(child)
+    return value
+
 func press(node: Node, key: String) -> void:
     var button = find(node, key)
     expect(button is BaseButton, "visible UI exposes " + key)
@@ -153,6 +161,60 @@ func run_checks() -> void:
     expect(purchases == [0], "shop purchase applies immediately after its roll, with no confirm step")
 
     world.queue_free()
+    await process_frame
+
+    var home = load("res://src/main.gd").new()
+    home.save_store = load("res://src/save_store.gd").new("res://runtime/tests/frontend_home_" + str(Time.get_ticks_usec()))
+    root.add_child(home)
+    home.set_physics_process(false)
+    var home_hud = home.hud
+    home.start_run(false)
+    home.spawn_enemy("hunter", home.player_position + Vector2(120, 40))
+    home.pickups.append({"kind": "coin", "position": home.player_position + Vector2(40, 40), "value": 1})
+    home.chest_marks.append({"position": home.player_position + Vector2(-80, 30), "age": 0.5})
+    home.hud.show_shop([{"id":"sling","price":1,"sold":false}], 10, 1, home.inventory, {}, home.player_hp, home.stats["max_hp"], false)
+    home.shop_open = true
+    expect(home.running and home.hero.visible and home.enemies.size() > 0, "a shop-return fixture starts with a live hunter and leftovers")
+    expect(home_hud.screen == "shop", "the fixture is on the shop screen")
+    var saved_settings: Dictionary = home.settings.duplicate(true)
+    home.go_home()
+    await process_frame
+    expect(not home.running and not home.shop_open, "returning home leaves the run")
+    expect(home_hud.screen in ["title", "start"], "returning home opens the title")
+    expect(home_hud.overlay.find_child("HomeStage", true, false) != null, "the title decorative stage is kept")
+    expect(find(home_hud.overlay, "EnterCamp") != null, "title actions are present after returning home")
+    expect(find(home_hud.overlay, "ShopOffer0") == null, "the shop scroll is not left on the title")
+    expect(home.enemies.is_empty() and home.pickups.is_empty() and home.chest_marks.is_empty(), "wave leftovers are cleared before the title")
+    expect(home.hero != null and not home.hero.is_visible_in_tree(), "the live hunter is hidden on the title")
+    expect(home.actors == null or not home.actors.visible, "combat actors are hidden on the title")
+    expect(home.weapons_layer == null or not home.weapons_layer.visible, "equipped weapons are hidden on the title")
+    expect(home.map_view == null or not home.map_view.visible, "the combat map is hidden under the title")
+    var marker: Node = home.hero.get_node_or_null("PlayerMarker") if home.hero != null else null
+    expect(marker == null or not (marker as CanvasItem).is_visible_in_tree(), "the live player marker is not visible on the title")
+    expect(home.settings.get("autosave", true) == saved_settings.get("autosave", true), "going home does not wipe settings")
+
+    home_hud.show_cast()
+    await process_frame
+    expect(copy(home_hud.overlay).contains("选择角色"), "character select still has its title chrome before the snapshot")
+    expect(find(home_hud.overlay, "Back") != null and find(home_hud.overlay, "Back").visible, "the back button is visible before the departure snapshot")
+    expect(find(home_hud.overlay, "Settings") != null and find(home_hud.overlay, "Settings").visible, "settings stays visible before the departure snapshot")
+    var paper_sheet: Node = find(home_hud.overlay, "HanddrawnPaper")
+    expect(home_hud.has_method("snapshot_departure_previous"), "departure snapshots go through a chrome-hiding helper")
+    var previous: Texture2D = home_hud.snapshot_departure_previous()
+    var shown: String = visible_copy(home_hud.overlay)
+    var back: Node = find(home_hud.overlay, "Back")
+    var settings: Node = find(home_hud.overlay, "Settings")
+    var cast_title: Node = find(home_hud.overlay, "CastTitle")
+    expect(not shown.contains("选择角色"), "torn-paper snapshot hides the character-select title")
+    expect(back != null and not back.visible, "the back button is hidden for the departure snapshot")
+    expect(settings != null and not settings.visible, "settings is hidden for the departure snapshot")
+    expect(cast_title == null or not (cast_title as CanvasItem).visible, "the cast title label is hidden for the departure snapshot")
+    expect(paper_sheet != null and paper_sheet is CanvasItem and (paper_sheet as CanvasItem).visible, "the parchment itself stays in the departure snapshot")
+    expect(copy(home_hud.overlay).contains("原始人"), "character details remain in the overlay tree after hiding chrome")
+    if home_hud.has_method("restore_front_chrome"):
+        home_hud.restore_front_chrome()
+        expect(find(home_hud.overlay, "Back").visible and find(home_hud.overlay, "Settings").visible, "chrome can be restored if a start does not begin")
+    home.queue_free()
     await process_frame
     var paper = load("res://src/ui_paper.gd").new()
     paper.size = Vector2(772, 620)

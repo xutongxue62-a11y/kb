@@ -1540,6 +1540,26 @@ func stage_panel(parent: Node) -> void:
         tween.tween_property(child, "modulate:a", 1.0, 0.18)
         order += 1
 
+func conceal_front_chrome() -> void:
+    if overlay == null:
+        return
+    for child in overlay.get_children():
+        if str(child.name) == "HanddrawnPaper":
+            continue
+        if child is CanvasItem:
+            child.visible = false
+
+func restore_front_chrome() -> void:
+    if overlay == null:
+        return
+    for child in overlay.get_children():
+        if child is CanvasItem:
+            child.visible = true
+
+func snapshot_departure_previous() -> Texture2D:
+    conceal_front_chrome()
+    return snapshot_ui()
+
 func snapshot_ui() -> Texture2D:
     if not can_animate() or not is_inside_tree():
         return null

@@ -187,7 +187,8 @@ static func character_cutout(h, parent: Node, rect: Rect2, path: String) -> Cont
 
 static func cast(h) -> void:
     flat_background(h)
-    label(h, h.overlay, "选择角色", Rect2(48, 24, 600, 78), 52, IVORY, true)
+    var cast_title: Label = label(h, h.overlay, "选择角色", Rect2(48, 24, 600, 78), 52, IVORY, true)
+    cast_title.name = "CastTitle"
     line(h.overlay, Vector2(50, 107), 278, RED)
     button(h, h.overlay, "Settings", "设置", Rect2(1100, 35, 128, 48), func(): h.show_settings(false), false, 19)
     var sheet = paper(h, Rect2(52, 134, 1176, 520), true, "compose")
@@ -229,29 +230,30 @@ static func cast(h) -> void:
     var blurb: String = str(profile.get("weapon_blurb", blurbs.get(starter, "自动瞄准")))
     label(h, body, blurb, Rect2(730, 223, 388, 34), 20)
     line(body, Vector2(620, 281), 486, Color(INK, 0.6))
-    label(h, body, "角色能力 / 技能", Rect2(620, 300, 486, 32), 22, INK, true)
-    var y: float = 344
+    label(h, body, "角色能力 / 技能", Rect2(620, 288, 486, 32), 22, INK, true)
+    var y: float = 318
     for skill in profile.get("skills", []):
-        label(h, body, str(skill.get("name", "")), Rect2(626, y, 470, 32), 22, INK, true)
-        label(h, body, str(skill.get("description", "")), Rect2(626, y + 33, 470, 28), 16, Color("#506071"))
-        y += 76
+        label(h, body, str(skill.get("name", "")), Rect2(626, y, 470, 28), 22, INK, true)
+        label(h, body, str(skill.get("description", "")), Rect2(626, y + 28, 470, 28), 16, Color("#506071"))
+        y += 62
     KeyBindings.attach_to_button(button(h, h.overlay, "Back", "← 返回首页", Rect2(52, 705, 258, 52), func(): h.show_title(), false, 21), "cancel")
     var progress: Dictionary = h.character_best_wave if h.get("character_best_wave") != null else {}
     var unlocked: bool = Catalog.is_character_unlocked(shown, progress)
-    var can_start: bool = Catalog.can_start_character(shown, progress)
     var note: String = ""
     if Catalog.shows_preview_unlock(shown, progress):
         note = "试玩提前解锁"
     elif not unlocked:
         note = Catalog.unlock_requirement_text(shown)
     if not note.is_empty():
-        var note_label: Label = label(h, h.overlay, note, Rect2(848, 652, 380, 36), 22, RED if not can_start else IVORY, true)
-        note_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        note_label.name = "UnlockNote"
+        var note_y: float = minf(y + 10.0, 448.0)
         if Catalog.shows_preview_unlock(shown, progress):
-            var condition: Label = label(h, h.overlay, Catalog.unlock_requirement_text(shown), Rect2(848, 626, 380, 26), 16, Color("#d7c7ad"))
-            condition.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            var condition: Label = label(h, body, Catalog.unlock_requirement_text(shown), Rect2(626, note_y, 470, 24), 16, Color("#506071"))
+            condition.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
             condition.name = "UnlockCondition"
+            note_y += 24
+        var note_label: Label = label(h, body, note, Rect2(626, note_y, 470, 30), 22, RED, true)
+        note_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        note_label.name = "UnlockNote"
     for id in Catalog.CHARACTER_ORDER:
         var entry: Dictionary = Catalog.character(id)
         var key: String = str(entry.get("confirm_button", "StartSling"))

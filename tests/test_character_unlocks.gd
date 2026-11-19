@@ -30,6 +30,22 @@ func copy(node: Node) -> String:
         value += copy(child)
     return value
 
+func under_paper(node: Node) -> bool:
+    var current: Node = node
+    while current != null:
+        if str(current.name) == "HanddrawnPaper":
+            return true
+        current = current.get_parent()
+    return false
+
+func readable_ink(node: Label) -> bool:
+    if node == null:
+        return false
+    var color: Color = node.get_theme_color("font_color")
+    if color.is_equal_approx(Color("#d7c7ad")) or color.is_equal_approx(Color("#f2e8d2")):
+        return false
+    return color.r * 0.3 + color.g * 0.59 + color.b * 0.11 < 0.55
+
 func enemy(id: int, point: Vector2, radius: float = 8.0) -> Dictionary:
     return {"id": id, "position": point, "hp": 1000.0, "radius": radius}
 
@@ -221,6 +237,12 @@ func check_select_and_progress() -> void:
     expect(hud.preview_character == "hunter", "arrows reach the hunter preview")
     var preview_text: String = copy(hud.overlay)
     expect(preview_text.contains("猎手") and preview_text.contains("骨弩") and preview_text.contains("试玩提前解锁"), "preview mode marks a formally locked hunter")
+    var preview_note: Label = find(hud.overlay, "UnlockNote") as Label
+    var preview_condition: Label = find(hud.overlay, "UnlockCondition") as Label
+    expect(preview_note != null and preview_condition != null, "preview mode shows both the preview mark and the official condition")
+    expect(under_paper(preview_note) and under_paper(preview_condition), "preview unlock labels sit inside the parchment, not on the tear")
+    expect(readable_ink(preview_note) and readable_ink(preview_condition), "preview unlock labels use dark ink with contrast on the parchment")
+    expect(preview_text.contains("用原始人到达第 5 关解锁"), "preview mode still shows the official hunter condition")
     var confirm: BaseButton = find(hud.overlay, "StartBonebow")
     expect(confirm != null and confirm.visible and not confirm.disabled, "preview mode still allows confirming a formally locked hunter")
     events.clear()
@@ -241,6 +263,9 @@ func check_select_and_progress() -> void:
     await process_frame
     var locked_text: String = copy(hud.overlay)
     expect(locked_text.contains("用原始人到达第 5 关解锁") and not locked_text.contains("试玩提前解锁"), "official mode shows the hunter unlock condition")
+    var locked_note: Label = find(hud.overlay, "UnlockNote") as Label
+    expect(locked_note != null and under_paper(locked_note) and readable_ink(locked_note), "official unlock condition sits inside the parchment in dark ink")
+    expect(find(hud.overlay, "UnlockCondition") == null, "official mode does not add a separate preview condition label")
     confirm = find(hud.overlay, "StartBonebow")
     expect(confirm != null and confirm.disabled, "official mode disables confirm for a locked hunter")
     events.clear()

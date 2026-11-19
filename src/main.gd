@@ -294,6 +294,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     if trial and running and not trial_mode and not restoring:
         if settings.get("autosave",true) and not demo and not animation_demo and not save_game():
             return
+    set_run_world_visible(true)
     map_view.reset_terrain()
     dodge_left = 0.0
     dodge_cooldown = 0.0
@@ -446,9 +447,11 @@ func begin_departure(trial: bool = false) -> void:
                 hud.clear_launch_commit()
             return
         starting_weapon = str(Catalog.character(character_id).get("starting_weapon", starting_weapon))
-    var previous: Texture2D = hud.snapshot_ui()
+    var previous: Texture2D = hud.snapshot_departure_previous() if hud.has_method("snapshot_departure_previous") else hud.snapshot_ui()
     start_run(trial)
     if not running:
+        if hud.has_method("restore_front_chrome"):
+            hud.restore_front_chrome()
         return
     departure_left = 2.4
     hud.show_departure(departure_left)
@@ -457,8 +460,10 @@ func begin_departure(trial: bool = false) -> void:
 func begin_continue() -> void:
     if departure_left > 0.0:
         return
-    var previous: Texture2D = hud.snapshot_ui()
+    var previous: Texture2D = hud.snapshot_departure_previous() if hud.has_method("snapshot_departure_previous") else hud.snapshot_ui()
     if not continue_game():
+        if hud.has_method("restore_front_chrome"):
+            hud.restore_front_chrome()
         return
     if not shop_open:
         departure_left = 2.4
@@ -531,10 +536,52 @@ func go_home() -> void:
     wave_closing = false
     wave_buffer = 0.0
     player_frozen = false
+    clear_run_for_title()
     audio.stop_all()
     hud.show_menu("start",kills)
     update_hud()
     refresh_save_status()
+
+func set_run_world_visible(value: bool) -> void:
+    if actors != null:
+        actors.visible = value
+    if hero != null:
+        hero.visible = value
+    if map_view != null:
+        map_view.visible = value
+    if pickup_renderer != null:
+        pickup_renderer.visible = value
+    if effects != null:
+        effects.visible = value
+    if weapons_layer != null:
+        weapons_layer.visible = value
+    if armory != null:
+        armory.visible = value
+    if companions != null:
+        companions.visible = value
+    if value:
+        set_loadout_visible(not shop_open)
+    else:
+        set_loadout_visible(false)
+
+func clear_run_for_title() -> void:
+    clear_enemies()
+    pickups.clear()
+    chest_marks.clear()
+    projectiles.clear()
+    burning_fields.clear()
+    expire_combat_fx()
+    if companions != null:
+        companions.reset()
+    if armory != null:
+        armory.reset()
+    if pickup_renderer != null:
+        pickup_renderer.sync([], Rect2(), 0.0)
+    set_run_world_visible(false)
+    position = Vector2.ZERO
+    if world_camera != null:
+        world_camera.offset = Vector2.ZERO
+    queue_redraw()
 
 func _notification(what: int) -> void:
     if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -2627,6 +2674,8 @@ func draw_grass(at: Vector2, size: float) -> void:
     draw_line(at, at + Vector2(size * 0.6, -size * 0.75), color, 4.0, true)
 
 func _draw() -> void:
+    if not running and not animation_demo:
+        return
     if animation_demo:
         draw_string(demo_font, Vector2(64, 67), "原始人 · 动作预览", HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color("#543b2c"))
         draw_string(demo_font, Vector2(360, 185), demo_caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color("#64513a"))
