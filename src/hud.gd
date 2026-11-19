@@ -11,6 +11,7 @@ const UIAudio = preload("res://src/ui_audio.gd")
 const BattleUI = preload("res://src/ui_battle_hud.gd")
 const OfferUI = preload("res://src/ui_offer_layout.gd")
 const KeyBindings = preload("res://src/key_bindings.gd")
+const LinkPackUI = preload("res://src/ui_link_pack.gd")
 
 signal start_requested(trial: bool)
 signal formation_requested
@@ -41,6 +42,7 @@ signal display_mode_changed(fullscreen: bool)
 signal key_bindings_changed
 signal link_discovery_enable(link_id)
 signal link_discovery_closed
+signal link_pack_closed
 
 var library
 var root: Control
@@ -90,6 +92,7 @@ var link_discover_column: VBoxContainer = null
 var link_discover_recipes: Array = []
 var link_discover_complete: Array = []
 var link_discover_over_shop: bool = false
+var link_pack = null
 var ink: Color = Color("#17253a")
 var cream: Color = Color("#f4ead6")
 var stamp: Color = Color("#c0453a")
@@ -879,6 +882,7 @@ func reset_overlay() -> void:
     for child in overlay.get_children():
         overlay.remove_child(child)
         child.queue_free()
+    link_pack = null
     overlay.visible = true
 
 func menu_column(width: float = 480.0, top: float = 220.0) -> VBoxContainer:
@@ -1480,7 +1484,52 @@ func confirm_restart() -> void:
     if screen == "restart_confirm":
         restart_requested.emit()
 
+func show_link_pack(world) -> void:
+    if link_pack != null and is_instance_valid(link_pack):
+        link_pack.host = world
+        link_pack.hud = self
+        if not link_pack.is_inside_tree():
+            overlay.add_child(link_pack)
+        link_pack.refresh()
+        screen = "link_pack"
+        overlay.visible = true
+        overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+        return
+    reset_overlay()
+    set_battle_visible(true)
+    present_backdrop("none")
+    overlay.color = Color(0.04, 0.08, 0.13, 0.64)
+    overlay.visible = true
+    overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+    screen = "link_pack"
+    link_pack = LinkPackUI.new()
+    link_pack.name = "LinkPack"
+    overlay.add_child(link_pack)
+    link_pack.setup(self, world)
+    if not link_pack.closed.is_connected(request_close_link_pack):
+        link_pack.closed.connect(request_close_link_pack)
+    play_ui("paper_popup")
+
+func refresh_link_pack() -> void:
+    if link_pack != null and is_instance_valid(link_pack) and link_pack.has_method("refresh"):
+        link_pack.refresh()
+
+func hide_link_pack() -> void:
+    if link_pack != null and is_instance_valid(link_pack):
+        if link_pack.get_parent() == overlay:
+            overlay.remove_child(link_pack)
+        link_pack.queue_free()
+    link_pack = null
+    if screen == "link_pack":
+        hide_menu()
+
+func request_close_link_pack() -> void:
+    if screen != "link_pack":
+        return
+    link_pack_closed.emit()
+
 func show_link_discovery(recipes: Array, owned: Array) -> void:
+
     link_discover_recipes = []
     link_discover_complete = []
     for recipe in recipes:
@@ -1807,6 +1856,13 @@ func handle_front_key(code: int) -> bool:
         if KeyBindings.matches_code(code, "confirm"):
             confirm_restart()
             return true
+    if screen == "link_pack":
+        if KeyBindings.matches_code(code, "cancel"):
+            request_close_link_pack()
+            return true
+        if KeyBindings.matches_code(code, "link"):
+            return false
+        return true
     if screen == "link_discover":
         if KeyBindings.matches_code(code, "cancel"):
             cancel_link_discovery()
@@ -2230,10 +2286,10 @@ func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: f
         KeyBindings.attach_to_button(combo_button, "link")
     if links.size() <= 1:
         if combo_button != null:
-            combo_button.tooltip_text = "获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 切换，不会自动开启。" % KeyBindings.caption_for("link")
+            combo_button.tooltip_text = "获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包拖拽启用，不会自动开启。" % KeyBindings.caption_for("link")
         # When the player already holds one half of a recipe, main passes a
         # hint naming the missing piece instead of the generic recipe list.
-        combo_label.text = link_hint if link_hint != "" else ("获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 切换。" % KeyBindings.caption_for("link"))
+        combo_label.text = link_hint if link_hint != "" else ("获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包，拖到一起即可联动。" % KeyBindings.caption_for("link"))
     elif link_hint != "":
         combo_label.text = link_hint
 

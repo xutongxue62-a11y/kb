@@ -92,7 +92,7 @@ static func build(h) -> void:
     h.notice_label = label(h,notice[1],"",Rect2(10,3,188,25),13,Color("#5b624d"))
     h.notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
     var link_note: Array = paper(h,Rect2(246,661,698,32))
-    h.combo_label = label(h,link_note[1],"Q 切换可用联动",Rect2(10,3,678,24),14)
+    h.combo_label = label(h,link_note[1],"Q 打开武器背包",Rect2(10,3,678,24),14)
     h.combo_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
     var dodge: Array = paper(h,Rect2(18,704,208,77))
     dodge[0].name = "DodgeStatus"

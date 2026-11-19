@@ -105,9 +105,8 @@ func run_checks() -> void:
     world.simulate(0.01, Vector2.ZERO)
     expect(world.player_position == no_dash_origin, "restart has no latent dash displacement")
     world.start_run(true)
-    key.physical_keycode = KEY_Q
-    world._unhandled_key_input(key)
-    expect(world.active_link["id"] == "rune_shell", "native Q activates earned rune link")
+    world.select_link("rune_shell")
+    expect(world.active_link["id"] == "rune_shell", "selecting the rune recipe activates the earned link")
     world.effects.particles.clear()
     world.effects.rune_ignition(Vector2(20,20),Vector2(80,20))
     expect(world.effects.particles.any(func(p):return p["kind"] == "rune_ignition"), "rune ignition produces dedicated particles")

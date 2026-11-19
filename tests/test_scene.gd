@@ -73,7 +73,7 @@ func run_checks() -> void:
             near = false
     expect(near, "ranged weapons stay near the avatar")
     expect(world.active_link["id"] == "none", "trial starts without forcing a link")
-    world.switch_combo_mode()
+    world.select_link("rune_shell")
     expect(world.active_link["id"] == "rune_shell" and world.inventory.size() == 6, "selecting a pair preserves original weapon slots")
     world.grant_weapon("club")
     expect(world.inventory.size() == 6 and world.inventory[0]["level"] == 2, "full-slot duplicate upgrades in the real scene")

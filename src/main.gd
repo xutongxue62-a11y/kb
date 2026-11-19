@@ -90,6 +90,7 @@ var available_links: Array = []
 var pending_link: String = ""
 var burning_fields: Array = []
 var link_notice_open: bool = false
+var link_pack_open: bool = false
 var pending_link_notice: Array = []
 var _run_bootstrapping: bool = false
 var _link_notice_return: String = ""
@@ -214,7 +215,7 @@ func _ready() -> void:
     hud.setup(library)
     hud.start_requested.connect(begin_departure)
     hud.formation_requested.connect(switch_formation)
-    hud.combo_requested.connect(switch_combo_mode)
+    hud.combo_requested.connect(toggle_link_pack)
     hud.elite_requested.connect(switch_elite)
     hud.trial_requested.connect(func(): start_run(true, "base"))
     hud.new_trial_requested.connect(start_expanded_trial)
@@ -233,6 +234,8 @@ func _ready() -> void:
         hud.link_discovery_enable.connect(_on_link_discovery_enable)
     if hud.has_signal("link_discovery_closed"):
         hud.link_discovery_closed.connect(_on_link_discovery_closed)
+    if hud.has_signal("link_pack_closed"):
+        hud.link_pack_closed.connect(close_link_pack)
     hud.next_round_requested.connect(leave_shop)
     hud.save_requested.connect(save_game)
     hud.continue_requested.connect(begin_continue)
@@ -392,7 +395,9 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     running = true
     player_hp = stats["max_hp"]
     combo_message_time = 0.0
+    close_link_pack()
     link_notice_open = false
+    link_pack_open = false
     pending_link_notice.clear()
     _hinted_complete_links.clear()
     _pending_departure_discovery = false
@@ -556,6 +561,7 @@ func go_home() -> void:
     wave_closing = false
     wave_buffer = 0.0
     player_frozen = false
+    close_link_pack()
     clear_run_for_title()
     audio.stop_all()
     hud.show_menu("start",kills)
@@ -655,7 +661,7 @@ func apply_buff(key: String) -> bool:
     return true
 
 func toggle_stats() -> void:
-    if upgrade_pending or shop_open or animation_demo:
+    if upgrade_pending or shop_open or animation_demo or link_pack_open or link_notice_open:
         return
     if not running:
         stats_open = not stats_open
@@ -695,7 +701,7 @@ func _return_from_home_stats() -> void:
             hud.show_title()
 
 func request_trial_growth() -> void:
-    if trial_mode and running and not paused and not upgrade_pending and not shop_open:
+    if trial_mode and running and not paused and not upgrade_pending and not shop_open and not link_pack_open and not link_notice_open:
         present_upgrade("trial")
 
 func grant_weapon(key: String, level: int = 1) -> bool:
@@ -803,7 +809,7 @@ func announce_link_ready() -> void:
         names.append(str(recipe.get("name", "")))
     if names.is_empty():
         return
-    combo_message = "已可启用「%s」。不会自动开启，按 Q 切换或在说明中选择启用。" % " / ".join(names)
+    combo_message = "已可启用「%s」。不会自动开启，按 %s 打开背包拖拽，或在说明中选择启用。" % [" / ".join(names), KeyBindings.caption_for("link")]
     combo_message_time = 3.2
 
 func _seen_link_ids() -> Array:
@@ -909,14 +915,53 @@ func toggle_hud_hidden() -> void:
     hud.toggle_hud_hidden()
 
 func switch_combo_mode() -> void:
-    if not running or upgrade_pending or wave_closing or shop_open or player_frozen or available_links.size() <= 1:
+    toggle_link_pack()
+
+func _can_open_link_pack() -> bool:
+    if not running or inventory.is_empty() or player_hp <= 0.0:
+        return false
+    if upgrade_pending or wave_closing or shop_open or link_notice_open or departure_left > 0.0 or animation_demo or paused or stats_open:
+        return false
+    if not replace_pending.is_empty():
+        return false
+    if hud == null:
+        return true
+    return hud.screen in ["combat", "link_pack", ""]
+
+func toggle_link_pack() -> void:
+    if link_pack_open:
+        close_link_pack()
         return
-    var current: String = pending_link if not pending_link.is_empty() else active_link["id"]
-    var index: int = 0
-    for i in range(available_links.size()):
-        if available_links[i]["id"] == current:
-            index = i
-    select_link(available_links[(index + 1) % available_links.size()]["id"])
+    open_link_pack()
+
+func open_link_pack() -> bool:
+    if link_pack_open:
+        if hud != null and hud.has_method("refresh_link_pack"):
+            hud.refresh_link_pack()
+        return true
+    if not _can_open_link_pack():
+        return false
+    link_pack_open = true
+    player_frozen = true
+    if audio != null and not paused:
+        audio.set_paused(true)
+    if hud != null and hud.has_method("show_link_pack"):
+        hud.show_link_pack(self)
+    update_hud()
+    return true
+
+func close_link_pack() -> void:
+    if not link_pack_open and (hud == null or hud.link_pack == null):
+        link_pack_open = false
+        return
+    link_pack_open = false
+    if hud != null and hud.has_method("hide_link_pack"):
+        hud.hide_link_pack()
+    if not shop_open and not upgrade_pending and not link_notice_open and not paused and running and player_hp > 0.0 and not wave_closing:
+        player_frozen = false
+        if audio != null:
+            audio.set_paused(false)
+    update_hud()
 
 func switch_elite() -> void:
     prefer_elite = not prefer_elite
@@ -934,7 +979,7 @@ func toggle_pause() -> void:
     if hud.screen in ["help", "settings", "continue"]:
         hud.close_front_modal()
         return
-    if not running or upgrade_pending or shop_open or animation_demo or link_notice_open:
+    if not running or upgrade_pending or shop_open or animation_demo or link_notice_open or link_pack_open:
         return
     paused = not paused
     audio.set_paused(paused)
@@ -953,7 +998,9 @@ func finish_run(won: bool) -> void:
     wave_closing = false
     wave_buffer = 0.0
     player_frozen = false
+    close_link_pack()
     link_notice_open = false
+    link_pack_open = false
     pending_link_notice.clear()
     impact_strength = 0.0
     position = Vector2.ZERO
@@ -982,6 +1029,7 @@ func present_upgrade(reason: String = "xp") -> void:
         player_hp = minf(stats["max_hp"], player_hp + 2.0)
         try_present_chest()
         return
+    close_link_pack()
     upgrade_reason = reason
     upgrade_pending = true
     _fill_offer_levels(upgrade_choices)
@@ -1149,7 +1197,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
         switch_formation()
         return
     if KeyBindings.matches_code(code, "link"):
-        switch_combo_mode()
+        toggle_link_pack()
         return
     if KeyBindings.matches_code(code, "aim"):
         switch_elite()
@@ -1213,7 +1261,7 @@ func read_movement() -> Vector2:
         float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)) - float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))+touch_input
 
 func request_dodge(direction: Vector2 = Vector2.ZERO) -> bool:
-    if not running or player_hp <= 0.0 or paused or shop_open or upgrade_pending or stats_open or player_frozen or link_notice_open or wave_closing or departure_left > 0.0 or animation_demo:
+    if not running or player_hp <= 0.0 or paused or shop_open or upgrade_pending or stats_open or player_frozen or link_notice_open or link_pack_open or wave_closing or departure_left > 0.0 or animation_demo:
         return false
     if dodge_cooldown > 0.000001 or dodge_left > 0.000001:
         return false
@@ -1272,7 +1320,7 @@ func simulate(delta: float, movement: Vector2) -> void:
     if animation_demo:
         animate_showcase(delta)
         return
-    if not running or paused or upgrade_pending or shop_open or link_notice_open:
+    if not running or paused or upgrade_pending or shop_open or link_notice_open or link_pack_open:
         return
     if player_frozen:
         movement = Vector2.ZERO
@@ -1437,7 +1485,9 @@ func begin_round(stage: int) -> void:
     shop_open = false
     if link_notice_open:
         _on_link_discovery_closed()
+    close_link_pack()
     link_notice_open = false
+    link_pack_open = false
     player_frozen = false
     boss_round = wave % 5 == 0
     boss_defeated = false
@@ -1510,6 +1560,7 @@ func is_loadout_visible() -> bool:
 func start_wave_closing() -> void:
     if wave_closing or shop_open or not running:
         return
+    close_link_pack()
     spawn_clock = 9999.0
     expire_combat_fx()
     dismiss_remaining_enemies()
@@ -1566,6 +1617,7 @@ func end_round() -> void:
     continue_round_rewards()
 
 func open_round_shop() -> void:
+    close_link_pack()
     wave_closing = false
     wave_buffer = 0.0
     player_frozen = true
@@ -1612,7 +1664,7 @@ func link_hint_text() -> String:
             if str(recipe.get("id", "none")) != "none":
                 names.append(str(recipe.get("name", "")))
         var current: String = str(active_link.get("name", "不联动"))
-        return "已可联动：按 Q 切换（当前：%s）。锁链从火药筒炮口弹出。" % current
+        return "已可联动：按 %s 打开背包，把武器拖到一起即可启用（当前：%s）。锁链从火药筒炮口弹出。" % [KeyBindings.caption_for("link"), current]
     for link_id in Catalog.LINK_ORDER:
         if link_id == "none":
             continue
@@ -1627,7 +1679,7 @@ func link_hint_text() -> String:
             continue
         var held: String = str(weapons[0]) if first_owned else str(weapons[1])
         var missing: String = str(weapons[1]) if first_owned else str(weapons[0])
-        return "联动将成：已有%s，还差%s → %s（集齐后按 Q 切换）" % [Catalog.WEAPONS[held]["name"], Catalog.WEAPONS[missing]["name"], Catalog.LINKS[link_id]["name"]]
+        return "联动将成：已有%s，还差%s → %s（集齐后按 %s 打开背包拖拽启用）" % [Catalog.WEAPONS[held]["name"], Catalog.WEAPONS[missing]["name"], Catalog.LINKS[link_id]["name"], KeyBindings.caption_for("link")]
     return ""
 
 func buy_shop_item(index: int) -> bool:
@@ -2789,7 +2841,7 @@ func damage_area(point: Vector2, radius: float, damage: float, weapon_id: String
 # Environmental DPS is the same for both teams: no armor, random dodge,
 # weapon bonuses or criticals. Timed hero immunity still protects a short dodge.
 func update_terrain_damage(delta: float, player_exposure: float = -1.0) -> void:
-    if delta <= 0.0 or not running or paused or shop_open or upgrade_pending or stats_open or player_frozen or link_notice_open or wave_closing or departure_left > 0.0 or animation_demo:
+    if delta <= 0.0 or not running or paused or shop_open or upgrade_pending or stats_open or player_frozen or link_notice_open or link_pack_open or wave_closing or departure_left > 0.0 or animation_demo:
         return
     var exposure: float = (delta if invulnerable <= 0.0 else 0.0) if player_exposure < 0.0 else player_exposure
     if exposure > 0.0 and not demo and player_hp > 0.0:

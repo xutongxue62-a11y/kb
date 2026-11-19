@@ -359,7 +359,7 @@ func run_checks() -> void:
     await click(named_button(hud, "HelpKeys"))
     expect(hud.screen == "help" and label_text(hud).contains("F5") and label_text(hud).contains("1 / 2 / 3") and label_text(hud).contains("V") and not label_text(hud).contains("F2") and not label_text(hud).contains("F3"), "keys expose save, HUD-hide and choice shortcuts, not official debug trial keys")
     await click(named_button(hud, "HelpLinks"))
-    expect(hud.screen == "help" and label_text(hud).contains("火药筒") and label_text(hud).contains("炮口") and label_text(hud).contains("按 Q"), "weapon-link help teaches the Q toggle and cannon-muzzle chain")
+    expect(hud.screen == "help" and label_text(hud).contains("火药筒") and label_text(hud).contains("炮口") and label_text(hud).contains("武器背包") and label_text(hud).contains("拖到一起") and not label_text(hud).contains("在「不联动」和联动之间切换"), "weapon-link help teaches the backpack drag and cannon-muzzle chain")
     await click(named_button(hud, "Stats"))
     expect(events == [["stats"]], "attributes preserve the B controller route")
     events.clear()
