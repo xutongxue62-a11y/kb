@@ -36,7 +36,7 @@ static func stats_line(key: String, level: int) -> String:
         divisor = 1.0 + float(lvl - 1) * 0.12
     var interval: float = float(data["cooldown"]) / divisor
     if key == "staff":
-        return "每弹伤害 %.1f · %d 弹 · 间隔 %.2f 秒" % [damage, Evolution.shot_count(key, lvl), interval]
+        return "每弹伤害 %.1f × %d 弹｜间隔 %.2f 秒" % [damage, Evolution.shot_count(key, lvl), interval]
     return "伤害 %.1f · 间隔 %.2f 秒" % [damage, interval]
 static func attack(key: String,level: int) -> String:
     if key=="spear" and level>=3: return "朝目标扇面刺出骨矛，\n贯穿扇面内的沿途敌人。"

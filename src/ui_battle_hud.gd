@@ -125,7 +125,9 @@ static func build(h) -> void:
         trial_button.disabled = not bool(h.debug_cheats)
         if not bool(h.debug_cheats):
             trial_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    h.boss_label = label(h,h.root,"古脊暴君",Rect2(409,141,462,23),17,Color("#a24349"))
+    h.boss_label = label(h,h.root,"首领",Rect2(409,141,462,23),18,Color("#fff1cf"))
+    h.boss_label.add_theme_color_override("font_outline_color",Color("#4a2c27"))
+    h.boss_label.add_theme_constant_override("outline_size",5)
     h.boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     h.boss_bar = meter(h,h.root,Rect2(409,166,462,12),Color("#bd6575"))
     h.boss_label.visible = false

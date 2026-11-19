@@ -75,6 +75,32 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(8.8, 0), Vector2(0, -5.6), Vector2(-1, 0)]), Color("#ecffed"))
             canvas.draw_line(point - direction * 15 - normal * 4, point - direction * 15 + normal * 4, Color("#a7ffff"), 1.4, true)
         "hostile":
+            var style: String = str(projectile.get("hostile_style",""))
+            if style in ["quill", "reed"]:
+                var pigment := Color("#a7a66a") if style == "quill" else Color("#83aa80")
+                canvas.draw_line(point - direction * 23.0, point - direction * 3.0, Color(pigment,0.55),3.0,true)
+                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(13,0),Vector2(1,-5),Vector2(-12,-2),Vector2(-10,4),Vector2(1,6)]),INK)
+                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(10,0),Vector2(1,-3),Vector2(-8,0),Vector2(0,3)]),pigment)
+                canvas.draw_line(point - direction * 6.0,point + direction * 7.0,Color("#efe0b0"),1.6,true)
+                return true
+            if style == "sonic":
+                for i in range(3):
+                    var center: Vector2 = point - direction * (13.0 + 7.0 * i)
+                    var edge : Color = Color("#e4b170",0.90 - 0.19 * i)
+                    var sweep: float = direction.angle()
+                    canvas.draw_arc(center,19.0,sweep-0.63,sweep+0.63,10,Color("#684637",edge.a),6.2,true)
+                    canvas.draw_arc(center,19.0,sweep-0.63,sweep+0.63,10,edge,3.0,true)
+                return true
+            if style in ["spore","fire"]:
+                var pigment: Color = Color("#d47c42") if style == "fire" else Color("#8fa25b")
+                var glow: Color = Color("#f0c074") if style == "fire" else Color("#d6db9d")
+                for i in range(3):
+                    var spot: Vector2 = point - direction * (7.0 + i * 6.0) + normal * sin(elapsed * 21.0 + i * 2.0) * (i + 1)
+                    canvas.draw_circle(spot,5.0-i,Color(pigment,0.60-i*0.13),true,-1.0,true)
+                canvas.draw_circle(point,9.0,INK,true,-1.0,true)
+                canvas.draw_circle(point,6.6,pigment,true,-1.0,true)
+                canvas.draw_circle(point + Vector2(-1.8,-2.0),2.7,glow,true,-1.0,true)
+                return true
             if projectile.get("hostile_style","")=="stone":
                 canvas.draw_line(point-direction*24,point-direction*4,Color("#4f3e31"),5.5,true)
                 canvas.draw_line(point-direction*22,point-direction*6,Color("#d7b17f"),2.5,true)

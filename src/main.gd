@@ -26,6 +26,7 @@ const PickupRenderer=preload("res://src/pickup_renderer.gd")
 var pickup_renderer: Node2D
 const Evolution = preload("res://src/weapon_evolution.gd")
 const EnemyRoster = preload("res://src/enemy_roster.gd")
+const BiomeEncounters = preload("res://src/biome_encounters.gd")
 const FIELD: Rect2 = Rect2(42, 147, 1196, 514)
 const WAVE_SECONDS: float = 30.0
 const WAVE_BUFFER: float = 0.9
@@ -996,7 +997,7 @@ func update_hud() -> void:
             break
     var hud_is_boss: bool = boss_round and not boss_defeated
     var hud_stage_time: float = (WAVE_SECONDS - boss_clear_left) if (boss_round and boss_defeated) else wave_elapsed
-    hud.update_round(wave,hud_stage_time,hud_is_boss,coins,boss.get("hp",0.0),boss.get("max_hp",0.0))
+    hud.update_round(wave,hud_stage_time,hud_is_boss,coins,boss.get("hp",0.0),boss.get("max_hp",0.0), BiomeEncounters.boss_name(str(boss["form"])) if boss.has("form") else "")
     hud.update_world_status(WorldMap.BIOMES[WorldMap.biome_for_wave(wave)],dodge_cooldown,DODGE_COOLDOWN,available_links,link_hint_text())
     if combo_message_time > 0.0:
         hud.notice_label.text = combo_message
@@ -1238,7 +1239,7 @@ func simulate(delta: float, movement: Vector2) -> void:
     # grows +3/wave to 126 by wave 40, and the spawn interval keeps falling to
     # a 0.18 s floor by wave 33, so deep waves feel denser than wave 29 instead
     # of freezing at the wave-26 density.
-    var alive_cap: int = 42 + clampi((wave - 5) * 2, 0, 42) + clampi((wave - 26) * 3, 0, 42)
+    var alive_cap: int = enemy_limit()
     if spawn_clock <= 0.0 and enemies.size() < alive_cap and not boss_defeated:
         var spawn_interval: float = 0.62 - (wave - 1) * 0.10 if wave <= 3 else maxf(0.18, 0.42 - (wave - 3) * 0.008)
         spawn_clock = maxf(1.5, 3.4 - float(maxi(0, wave / 5 - 1)) * 0.28) if boss_round else spawn_interval
@@ -1249,11 +1250,6 @@ func simulate(delta: float, movement: Vector2) -> void:
             var capped_hp: float = Progression.cap_boss_hp(formula_hp, Progression.estimate_power(inventory,buff_levels,active_link))
             boss.hp=capped_hp
             boss.max_hp=capped_hp
-            # Later bosses are the same species but visibly bigger specimens:
-            # tier 2 (wave 10) +16% size, tier 3 (wave 15) +32%, and so on.
-            var boss_tier: int = maxi(1, wave / 5)
-            if boss_tier > 1 and boss.get("view") != null:
-                boss["view"].scale = Vector2.ONE * (1.0 + 0.16 * float(boss_tier - 1))
             boss.timer=1.6
             boss_pending=false
             if audio != null:
@@ -1735,9 +1731,13 @@ func hatch_enemy(enemy: Dictionary, fx: bool = true) -> void:
         effects.puff(enemy["position"], Color("#f3e2c4"), maxf(14.0, float(enemy.get("radius", 18.0)) * 0.9), absi(int(enemy.get("id", 0))) % 3)
         effects.burst(enemy["position"], Color("#d7b17a"), 10.0, "hit")
 
+func enemy_limit() -> int:
+    return 42 + clampi((wave - 5) * 2, 0, 42) + clampi((wave - 26) * 3, 0, 42)
+
 func spawn_enemy(kind: String, point: Vector2 = Vector2(INF, INF), wave_spawn: bool = false, arrival: String = "") -> void:
     map_view.set_view(player_position,wave)
-    var data: Dictionary = Catalog.DINOS[kind]
+    var data: Dictionary = Catalog.DINOS.get(kind, BiomeEncounters.MOBS.get(kind, {}))
+    var form: String = BiomeEncounters.boss_form(wave) if kind == "boss" else kind
     var placed: bool = point.is_finite()
     var mode: String = arrival
     if kind == "boss" and mode.is_empty():
@@ -1757,7 +1757,10 @@ func spawn_enemy(kind: String, point: Vector2 = Vector2(INF, INF), wave_spawn: b
     var profile: Dictionary = Progression.enemy_profile(wave, kind, enemy_adaptation, elite)
     var hp: float = profile["hp"]
     var view = DinoView.new()
-    view.setup(library, kind, data["size"] * (1.1 if elite else 1.0), elite)
+    view.setup(library, kind if Catalog.DINOS.has(kind) else "hunter", data["size"] * (1.1 if elite else 1.0), elite)
+    var encounter_art: String = BiomeEncounters.art_form(kind, form, wave)
+    if not encounter_art.is_empty():
+        view.set_encounter_art(encounter_art)
     var start_state: String = "walk"
     var start_timer: float = rng.randf_range(1.0, 2.0)
     if mode == "egg":
@@ -1770,7 +1773,7 @@ func spawn_enemy(kind: String, point: Vector2 = Vector2(INF, INF), wave_spawn: b
     point = map_view.move_body(point, point, data["radius"])
     view.position = point
     actors.add_child(view)
-    enemies.append({"id": enemy_serial, "kind": kind, "position": point, "hp": hp, "max_hp": hp, "elite": elite, "view": view, "radius": data["radius"], "state": start_state, "timer": start_timer, "direction": Vector2.RIGHT, "knock": Vector2.ZERO, "velocity": Vector2.ZERO, "attack_cycle":0, "slam_at":point, "arrival": mode})
+    enemies.append({"id": enemy_serial, "kind": kind, "position": point, "hp": hp, "max_hp": hp, "elite": elite, "view": view, "radius": data["radius"], "state": start_state, "timer": start_timer, "direction": Vector2.RIGHT, "knock": Vector2.ZERO, "velocity": Vector2.ZERO, "attack_cycle":0, "form":form, "arrival": mode})
     for key in ["damage", "dodge", "speed_multiplier", "bullet_multiplier"]:
         enemies.back()[key] = profile[key]
 
@@ -1823,58 +1826,47 @@ func update_enemies(delta: float) -> void:
         var distance: float = difference.length()
         var direction: Vector2 = difference.normalized() if distance > 0.001 else Vector2.RIGHT
         if enemy.get("state", "walk") == "enter":
-            var enter_speed: float = Catalog.DINOS[enemy["kind"]]["speed"] * float(enemy.get("speed_multiplier", 1.0))
+            var enter_speed: float = Catalog.DINOS.get(enemy["kind"], BiomeEncounters.MOBS.get(enemy["kind"], {}))["speed"] * float(enemy.get("speed_multiplier", 1.0))
             var enter_velocity: Vector2 = direction * enter_speed
             enemy["timer"] -= delta
             enemy["knock"] = enemy["knock"].move_toward(Vector2.ZERO, delta * 270.0)
             enter_velocity += enemy["knock"]
             enemy["velocity"] = enter_velocity
+            var enter_origin: Vector2 = enemy["position"]
             enemy["position"] = map_view.move_body(enemy["position"], enemy["position"] + enter_velocity * delta, enemy["radius"])
             var enter_view = enemy.get("view")
             if is_instance_valid(enter_view):
                 enter_view.position = enemy["position"]
                 enter_view.health_fraction = enemy["hp"] / enemy["max_hp"]
                 if view_rect.has_point(enemy["position"]):
-                    enter_view.animate(enter_velocity, delta, "walk")
+                    enter_view.animate(enter_velocity, delta, "walk", enter_origin.distance_to(enemy["position"]))
             if visible_world_rect().grow(-12.0).has_point(enemy["position"]):
                 enemy["state"] = "walk"
                 enemy["timer"] = rng.randf_range(0.35, 1.0)
             continue
-        var velocity: Vector2 = direction * Catalog.DINOS[enemy["kind"]]["speed"]
+        var velocity: Vector2 = direction * Catalog.DINOS.get(enemy["kind"], BiomeEncounters.MOBS.get(enemy["kind"], {}))["speed"]
         enemy["timer"] -= delta
-        var behavior: Dictionary=EnemyRoster.advance(self,enemy,delta)
+        var encounter: bool = BiomeEncounters.active(enemy)
+        var behavior: Dictionary = BiomeEncounters.advance(self, enemy, delta) if encounter else EnemyRoster.advance(self, enemy, delta)
         if not running: break
         if behavior.handled:
             velocity=behavior.velocity
-        elif enemy["kind"] == "boss" and enemy["state"] == "slam":
-            velocity = Vector2.ZERO
-            if enemy["timer"] <= 0.0:
-                var impact: Vector2 = enemy["slam_at"]
-                effects.burst(impact,Color("#d95770"),110.0,"blast")
-                if player_position.distance_to(impact) <= 110.0 + 19.0:
-                    hurt_player((player_position-impact).normalized(),enemy["damage"],true)
-                for index in range(8):
-                    var shot_direction: Vector2 = Vector2.from_angle(index * TAU / 8.0 + elapsed * 0.2)
-                    projectiles.append({"position":enemy["position"] + shot_direction * 60, "velocity":shot_direction*175, "damage":enemy["damage"]*0.55, "kind":"hostile", "life":3.0, "radius":6.5, "weapon_id":"", "from_combo":false, "boss":true})
-                enemy["state"] = "recover"
-                enemy["timer"] = 0.9
-        elif enemy["kind"] in ["charger","boss"]:
+        elif enemy["kind"] == "charger":
             match enemy["state"]:
                 "walk":
-                    if distance < (420.0 if enemy["kind"] == "boss" else 245.0) and enemy["timer"] <= 0.0:
+                    if distance < 245.0 and enemy["timer"] <= 0.0:
                         enemy["attack_cycle"] += 1
-                        enemy["state"] = "slam" if enemy["kind"] == "boss" and enemy["attack_cycle"] % 2 == 0 else "windup"
-                        enemy["timer"] = 1.0 if enemy["kind"] == "boss" else 0.65
-                        enemy["slam_at"] = player_position
+                        enemy["state"] = "windup"
+                        enemy["timer"] = 0.65
                         enemy["direction"] = direction
                         velocity = Vector2.ZERO
                 "windup":
                     velocity = Vector2.ZERO
                     if enemy["timer"] <= 0.0:
                         enemy["state"] = "dash"
-                        enemy["timer"] = 0.55 if enemy["kind"] == "boss" else CHARGE_DURATION
+                        enemy["timer"] = CHARGE_DURATION
                 "dash":
-                    velocity = enemy["direction"] * (420.0 if enemy["kind"] == "boss" else CHARGE_SPEED)
+                    velocity = enemy["direction"] * CHARGE_SPEED
                     if enemy["timer"] <= 0.0:
                         enemy["state"] = "recover"
                         enemy["timer"] = 0.6
@@ -1883,7 +1875,7 @@ func update_enemies(delta: float) -> void:
                     velocity = Vector2.ZERO
                     if enemy["timer"] <= 0.0:
                         enemy["state"] = "walk"
-                        enemy["timer"] = 1.8 if enemy["kind"] == "boss" else 1.4
+                        enemy["timer"] = 1.4
         elif enemy["kind"] == "spitter":
             if distance > 275:
                 velocity = direction * 62.0
@@ -1912,7 +1904,9 @@ func update_enemies(delta: float) -> void:
                 if offset_length_squared < 1500.0 and offset_length_squared > 0.01:
                     separation += offset.normalized() * 28.0
             velocity += separation.limit_length(48)
-        velocity += enemy["knock"]
+        if not encounter or enemy["state"] == "walk":
+            velocity += enemy["knock"]
+        var before_move: Vector2 = enemy["position"]
         enemy["velocity"] = velocity
         enemy["knock"] = enemy["knock"].move_toward(Vector2.ZERO, delta * 270.0)
         # A stationary enemy whose position was already resolved by move_body
@@ -1929,8 +1923,14 @@ func update_enemies(delta: float) -> void:
         # position and health stay current, and animation resumes (with the
         # 160px margin) before they can walk into view.
         if view_rect.has_point(enemy["position"]):
-            enemy["view"].animate(velocity, delta, behavior.get("pose",enemy["state"]))
-        if enemy["position"].distance_to(player_position) < enemy["radius"] + 18.0:
+            if encounter and enemy["state"] != "walk":
+                enemy["view"].face_attack(enemy["direction"])
+            enemy["view"].animate(velocity, delta, behavior.get("pose",enemy["state"]), before_move.distance_to(enemy["position"]))
+        if encounter:
+            BiomeEncounters.strike_travel(self, enemy, before_move)
+            if not running:
+                break
+        if (not encounter or enemy["state"] == "walk") and enemy["position"].distance_to(player_position) < enemy["radius"] + 18.0:
             hurt_player((player_position - enemy["position"]).normalized(), enemy["damage"], enemy["kind"] == "boss")
             if not running:
                 break
@@ -2501,6 +2501,8 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
         return
     var smashed_egg: bool = str(enemy.get("state", "")) == "egg"
     var neutral: bool = weapon_id == "terrain_lava"
+    if not neutral and BiomeEncounters.blocks(enemy, player_position):
+        damage *= 0.40
     var unavoidable: bool = neutral or weapon_id in ["powder","hammer"] or (weapon_id == "staff" and from_combo)
     var evade_chance: float = maxf(0.0, float(enemy.get("dodge", 0.0)) - stats["dodge_ignore"])
     if not unavoidable and evade_chance > 0.0 and rng.randf() < evade_chance:
@@ -2560,7 +2562,7 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
         if smashed_egg:
             effects.egg_smash(enemy["position"], enemy["view"].display_width)
         else:
-            effects.defeat(enemy["position"], direction, enemy["view"].display_width, enemy["view"].sprite.texture, library.region("dinosaurs",enemy["kind"]).size)
+            effects.defeat(enemy["position"], direction, enemy["view"].display_width, enemy["view"].sprite.texture, enemy["view"].body_dimensions)
         if audio != null:
             audio.play("boss_defeat" if boss else "enemy_death", -5.0 if boss else -8.0)
         if (not boss) and bool(enemy.get("elite", false)) and (force_elite_chests or rng.randf() < LootRules.ELITE_CHEST_CHANCE):
@@ -2698,7 +2700,7 @@ func _draw() -> void:
     for enemy in enemies:
         if enemy["hp"] <= 0.0:
             continue
-        if EnemyRoster.draw_warning(self,enemy): continue
+        if BiomeEncounters.draw_attack(self, enemy) or EnemyRoster.draw_warning(self,enemy): continue
         if enemy["state"] == "windup" or enemy["state"] == "dash":
             var start: Vector2 = enemy["position"]
             var direction: Vector2 = enemy["direction"]
@@ -2710,12 +2712,6 @@ func _draw() -> void:
             var outline: PackedVector2Array = polygon.duplicate()
             outline.append(polygon[0])
             draw_polyline(outline, Color(0.76, 0.36, 0.25, 0.62), 2.0, true)
-        elif enemy["state"] == "slam":
-            var danger: Vector2 = enemy["slam_at"]
-            draw_circle(danger,110.0,Color(0.70,0.12,0.26,0.15))
-            draw_arc(danger,110.0,0,TAU,48,Color("#bf3f5e"),3.5,true)
-            draw_line(danger+Vector2(-16,-16),danger+Vector2(16,16),Color("#b73558"),4.0,true)
-            draw_line(danger+Vector2(-16,16),danger+Vector2(16,-16),Color("#b73558"),4.0,true)
         elif enemy["state"] == "spit":
             draw_arc(enemy["position"] + (player_position - enemy["position"]).normalized() * 28.0, 12.0, 0.0, TAU, 24, Color("#b82f83"), 3.0, true)
     for projectile in projectiles:

@@ -67,13 +67,13 @@ static func enemy_profile(wave: int, kind: String, adaptive: float = 1.0, elite:
     var milestone_log: float = minf(float(milestones), 3.0) * log(1.18) + maxf(0.0, float(milestones) - 3.0) * log(1.10)
     var damage_scale: float = minf(1000000.0, (1.0 + 0.06 * (stage - 1)) * exp(minf(14.0, milestone_log)))
     var dodge: float = minf(0.22, maxf(0, stage - 2) * 0.006 + milestones * 0.012) if stage > 2 else 0.0
-    if kind in ["tank", "boss", "armored"]:
+    if kind in ["tank", "boss", "armored", "basaltroller"]:
         dodge *= 0.35
     elif kind == "charger":
         dodge *= 0.65
     if elite and stage > 2:
         dodge += 0.05
-    var data: Dictionary = Catalog.DINOS.get(kind, EnemyRoster.NEW_DATA.get(kind, Catalog.DINOS["hunter"]))
+    var data: Dictionary = Catalog.DINOS.get(kind, EnemyRoster.BiomeEncounters.MOBS.get(kind, Catalog.DINOS["hunter"]))
     return {
         "hp": data["hp"] * hp_scale * (1.8 if elite else 1.0),
         "damage": float(BASE_DAMAGE.get(kind, EnemyRoster.base_damage(kind))) * damage_scale * (1.35 if elite else 1.0),

@@ -4,6 +4,7 @@ const Catalog = preload("res://src/catalog.gd")
 const Growth = preload("res://src/growth.gd")
 const Progression = preload("res://src/progression.gd")
 const LootDrops = preload("res://src/loot_drops.gd")
+const BiomeEncounters = preload("res://src/biome_encounters.gd")
 
 static func point(value: Vector2) -> Array:
     return [value.x, value.y]
@@ -20,7 +21,12 @@ static func capture(world: Node, finished: bool = false) -> Dictionary:
     for enemy in world.enemies:
         if enemy["hp"] <= 0.0:
             continue
-        enemies.append({"id":enemy["id"], "kind":enemy["kind"], "position":point(enemy["position"]), "hp":enemy["hp"], "max_hp":enemy["max_hp"], "elite":enemy["elite"], "attack_cycle":enemy.get("attack_cycle",0)})
+        var entry := {"id":enemy["id"], "kind":enemy["kind"], "position":point(enemy["position"]), "hp":enemy["hp"], "max_hp":enemy["max_hp"], "elite":enemy["elite"], "attack_cycle":enemy.get("attack_cycle",0)}
+        if enemy.has("summoner_id"):
+            entry["summoner_id"] = enemy["summoner_id"]
+        if enemy.has("next_summon"):
+            entry["next_summon"] = enemy["next_summon"]
+        enemies.append(entry)
     var drops: Array = []
     for drop in world.pickups:
         var saved := {"kind":drop.get("kind","xp"), "position":point(drop["position"]), "value":drop["value"]}
@@ -89,7 +95,7 @@ static func apply(world: Node, state: Dictionary) -> bool:
     world.select_link(str(state.get("link_id","none")))
     for data in state.get("enemies",[]):
         var kind: String = str(data.get("kind",""))
-        if not Catalog.DINOS.has(kind):
+        if not Catalog.DINOS.has(kind) and not BiomeEncounters.MOBS.has(kind):
             continue
         world.spawn_enemy(kind,vector(data.get("position"),Vector2(300,300)))
         var enemy: Dictionary = world.enemies.back()
@@ -102,6 +108,10 @@ static func apply(world: Node, state: Dictionary) -> bool:
         enemy["max_hp"] = maxf(0.1,float(data.get("max_hp",enemy["max_hp"])))
         enemy["hp"] = clampf(float(data.get("hp",enemy["hp"])),0.0,enemy["max_hp"])
         enemy["attack_cycle"] = int(data.get("attack_cycle",0))
+        if data.has("summoner_id"):
+            enemy["summoner_id"] = int(data["summoner_id"])
+        if data.has("next_summon"):
+            enemy["next_summon"] = float(data["next_summon"])
         enemy["timer"] = 1.0
         enemy["view"].health_fraction = enemy["hp"] / enemy["max_hp"]
     world.enemy_serial = maxi(world.enemy_serial,int(state.get("enemy_serial",world.enemy_serial)))

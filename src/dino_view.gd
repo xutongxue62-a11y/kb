@@ -1,5 +1,27 @@
 extends Node2D
 
+const CreatureFrames = preload("res://src/creature_frames.gd")
+const BOSS_ATLAS = preload("res://assets/encounters/bosses.png")
+const MOB_ATLAS = preload("res://assets/encounters/creatures.png")
+const GAIT_PADDING := 56
+static var isolated_art: Dictionary = {}
+
+const ENCOUNTER_ART := {
+    "fernmask": Rect2(35, 40, 709, 428),
+    "cinderback": Rect2(784, 54, 729, 394),
+    "drumjaw": Rect2(27, 532, 706, 457),
+    "fernmask_dark": Rect2(780, 529, 729, 456),
+    "sidesnap": Rect2(43, 34, 466, 257),
+    "stonecrest": Rect2(577, 18, 321, 268),
+    "shieldback": Rect2(1021, 8, 462, 283),
+    "leafstalker": Rect2(23, 317, 508, 351),
+    "sporeback": Rect2(572, 340, 391, 321),
+    "bonecaller": Rect2(1052, 314, 374, 358),
+    "embersnout": Rect2(26, 753, 437, 237),
+    "ashhound": Rect2(487, 720, 502, 276),
+    "basaltroller": Rect2(1032, 711, 451, 284),
+}
+
 var sprite: Sprite2D
 var surface: Sprite2D
 var base_scale: Vector2
@@ -16,6 +38,15 @@ var asset_library
 var display_width: float = 60.0
 var shell: String = ""
 var crack_progress: float = 0.0
+var encounter_art: String = ""
+var encounter_tint: Color = Color.WHITE
+var pose_clock: float = 0.0
+var last_pose: String = ""
+var body_dimensions := Vector2.ZERO
+var foot_phase: float = 0.0
+var gait_amount: float = 0.0
+var frames: Node2D
+var facing: float = 1.0
 
 func setup(library, creature_kind: String, size: float, is_elite: bool) -> void:
     asset_library = library
@@ -27,21 +58,62 @@ func setup(library, creature_kind: String, size: float, is_elite: bool) -> void:
     # Padding enlarges only the draw quad. Body scale, origin and combat radius
     # continue to use the original region so silhouettes do not shrink.
     var dimensions: Vector2 = library.region("dinosaurs", kind).size
+    body_dimensions = dimensions
     base_scale = Vector2.ONE * size / maxf(dimensions.x, dimensions.y)
-    _update_outline()
     sprite.scale = base_scale
     display_width = size
     add_child(sprite)
     surface=Sprite2D.new()
     surface.name="SurfaceArt"
     surface.texture=library.EnemyArt.surface_texture(kind,dimensions)
-    surface.material=library.EnemyArt.surface_material(sprite.texture)
     sprite.add_child(surface)
+    surface.material = library.EnemyArt.surface_material(sprite.texture)
+    frames = CreatureFrames.new()
+    frames.configure(kind, size)
+    frames.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+    add_child(frames)
+    facing = -1.0 if kind in ["tank", "boss"] else 1.0
+    _update_outline()
     set_shell(shell)
 
 func _update_outline() -> void:
-    if sprite != null and asset_library != null:
+    if sprite != null:
         sprite.material = asset_library.team_material("dinosaurs", kind, "elite" if elite else "enemy", (2.2 if elite else 1.2) / base_scale.x)
+
+func set_encounter_art(form: String) -> void:
+    var key: String = form if ENCOUNTER_ART.has(form) else form.trim_suffix("_dark")
+    if not ENCOUNTER_ART.has(key):
+        frames.configure(form, display_width)
+        if frames.ready_to_draw:
+            encounter_art = form
+            set_shell(shell)
+        return
+    var bounds := Rect2i(ENCOUNTER_ART[key])
+    if not isolated_art.has(key):
+        var atlas: Texture2D = BOSS_ATLAS if key in ["fernmask", "cinderback", "drumjaw", "fernmask_dark"] else MOB_ATLAS
+        var padded := Image.create(bounds.size.x + GAIT_PADDING * 2, bounds.size.y + GAIT_PADDING * 2, false, Image.FORMAT_RGBA8)
+        padded.blit_rect(atlas.get_image(), bounds, Vector2i.ONE * GAIT_PADDING)
+        padded.fix_alpha_edges()
+        isolated_art[key] = ImageTexture.create_from_image(padded)
+    encounter_art = form
+    if form != key:
+        encounter_tint = Color("#ad8b9c")
+    sprite.texture = isolated_art[key]
+    body_dimensions = Vector2(bounds.size)
+    base_scale = Vector2.ONE * display_width / maxf(body_dimensions.x, body_dimensions.y)
+    _update_outline()
+    sprite.scale = base_scale
+    surface.hide()
+    frames.configure(form, display_width)
+    facing = 1.0
+    sprite.flip_h = false
+    set_shell(shell)
+
+func face_attack(direction: Vector2) -> void:
+    if absf(direction.x) > 0.05:
+        facing = signf(direction.x)
+        var source_left: bool = encounter_art.is_empty() and kind in ["tank", "boss"]
+        sprite.flip_h = facing > 0.0 if source_left else facing < 0.0
 
 func set_crack(progress: float) -> void:
     crack_progress = clampf(progress, 0.0, 1.0)
@@ -51,32 +123,34 @@ func set_shell(mode: String) -> void:
     shell = mode
     if mode != "egg":
         crack_progress = 0.0
-    if sprite != null:
-        sprite.visible = mode != "egg"
+    if frames != null:
+        frames.visible = mode != "egg" and frames.ready_to_draw
+        sprite.visible = mode != "egg" and not frames.ready_to_draw
     queue_redraw()
 
-func animate(velocity: Vector2, delta: float, state: String = "walk") -> void:
+func animate(velocity: Vector2, delta: float, state: String = "walk", travelled: float = -1.0) -> void:
     hit_time = maxf(hit_time - delta, 0.0)
     if shell == "egg":
         walk_time += delta * 2.2
         queue_redraw()
         return
     if absf(velocity.x) > 3.0:
-        sprite.flip_h = velocity.x > 0.0 if kind == "tank" else velocity.x < 0.0
+        face_attack(velocity)
     if surface!=null: surface.flip_h=sprite.flip_h
-    walk_time += velocity.length() * delta * 0.065
-    var amount: float = clampf(velocity.length() / 90.0, 0.0, 1.0)
-    var squash: float = sin(walk_time) * 0.035 * amount
-    if state == "windup":
-        squash = 0.13
-    elif state == "recover":
-        squash = 0.07
-    if hit_time > 0.0:
-        squash += hit_time * 0.5
-    sprite.scale = base_scale * Vector2(1.0 + squash, 1.0 - squash)
-    sprite.position.y = -absf(sin(walk_time)) * 1.3 * amount
-    sprite.rotation = sin(walk_time) * 0.022 * amount
-    sprite.modulate = Color(2.2, 2.0, 1.8) if hit_time > 0.13 else Color.WHITE
+    var distance: float = velocity.length() * delta if travelled < 0.0 else travelled
+    var amount: float = clampf(distance / maxf(delta * 85.0, 0.001), 0.0, 1.0)
+    var stepping: bool = state in ["walk", "dash", "charge"]
+    if stepping:
+        foot_phase = fposmod(foot_phase + distance * TAU / (display_width * 0.43), TAU)
+    gait_amount = move_toward(gait_amount, amount if stepping else 0.0, delta * 10.0)
+    if last_pose != state:
+        pose_clock = 0.0
+        last_pose = state
+    pose_clock += delta
+    frames.pose(foot_phase, stepping and distance > 0.001, state, pose_clock, facing)
+    var tint: Color = Color(2.0, 1.75, 1.55) if hit_time > 0.13 else encounter_tint
+    frames.modulate = tint
+    sprite.modulate = tint
     queue_redraw()
 
 func hit() -> void:
@@ -163,17 +237,13 @@ func _draw() -> void:
             draw_line(Vector2(-bar_width / 2, height), Vector2(bar_width / 2, height), Color("#4c2937"), 5.5, true)
             draw_line(Vector2(-bar_width / 2, height), Vector2(-bar_width / 2 + bar_width * maxf(0.0, health_fraction), height), Color("#f1798c"), 3.5, true)
         return
-    # Back plates and horns already come from the body sprite and surface layer.
-    # A second pass of triangular crests used to be drawn here; later-tier bosses
-    # scale this node up, so those leftover spikes became obvious.
-    if elite:
-        var face: float = -1.0 if sprite.flip_h else 1.0
-        var mid: Vector2 = Vector2(face * display_width * 0.13, sprite.position.y - display_width * 0.15)
-        for offset in [Vector2(face * -5.2, 0.6), Vector2(face * 6.0, -0.4)]:
-            var eye: Vector2 = mid + offset
-            draw_circle(eye, 4.5, Color("#2a0a0c"))
-            draw_circle(eye, 3.35, Color("#e01420"))
-            draw_circle(eye + Vector2(face * 0.8, -0.9), 1.15, Color("#ffd6d4"))
+    if elite or encounter_art.ends_with("_dark"):
+        var spot := Vector2(0, display_width * 0.30)
+        var color := Color("#ead5ac") if elite else Color("#71394d")
+        for x in [-1.0, 0.0, 1.0]:
+            var mark: Vector2 = spot + Vector2(x * 7.0, absf(x) * 2.0)
+            draw_line(mark + Vector2(-2.0, 4.0), mark + Vector2(2.0, -3.0), Color("#36271f"), 5.0, true)
+            draw_line(mark + Vector2(-2.0, 4.0), mark + Vector2(2.0, -3.0), color, 2.5, true)
     if health_fraction < 0.99:
         var bar_width: float = minf(display_width * 0.75, 55.0)
         var height: float = -display_width * 0.46 - 7.0

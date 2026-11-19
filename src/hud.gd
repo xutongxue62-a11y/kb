@@ -1378,7 +1378,7 @@ func configure_save(available: bool, autosave: bool, note: String = "", summary:
         autosave_toggle.set_pressed_no_signal(autosave_enabled)
         autosave_toggle.text = "开启" if autosave_enabled else "关闭"
 
-func update_round(stage: int, stage_time: float, is_boss: bool, coins: int, boss_hp: float = 0.0, boss_max: float = 0.0) -> void:
+func update_round(stage: int, stage_time: float, is_boss: bool, coins: int, boss_hp: float = 0.0, boss_max: float = 0.0, boss_name: String = "") -> void:
     var remaining: int = maxi(0,ceili(30.0-stage_time))
     timer_label.text = "第 %d 关 · Boss不限时" % stage if is_boss else "第 %d 关  %02d:%02d" % [stage,remaining/60,remaining%60]
     var urgent: bool = not is_boss and remaining <= 10
@@ -1398,7 +1398,7 @@ func update_round(stage: int, stage_time: float, is_boss: bool, coins: int, boss
     boss_label.visible = boss_bar.visible
     boss_bar.max_value = maxf(0.001,boss_max)
     boss_bar.value = maxf(0.0,boss_hp)
-    boss_label.text = "古脊暴君  ·  %.0f / %.0f" % [maxf(0,boss_hp),boss_max]
+    boss_label.text = "%s  ·  %.0f / %.0f" % ["首领" if boss_name.is_empty() else boss_name,maxf(0,boss_hp),boss_max]
     if boss_bar.visible and not was_boss:
         pop_in(boss_label, 0.0, 0.0)
         pop_in(boss_bar, 0.04, 0.0)

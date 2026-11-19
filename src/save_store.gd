@@ -2,6 +2,7 @@ extends RefCounted
 
 const VERSION: int = 1
 const Catalog = preload("res://src/catalog.gd")
+const BiomeEncounters = preload("res://src/biome_encounters.gd")
 const MAX_SAFE_INTEGER: int = 9007199254740991
 const MAX_PROGRESS: int = 1000000000
 const MAX_FILE_BYTES: int = 8 * 1024 * 1024
@@ -202,7 +203,7 @@ func _validate_enemies(enemies: Variant) -> String:
         if seen.has(enemy_id):
             return "存档敌人编号重复"
         seen[enemy_id] = true
-        if typeof(enemy["kind"]) != TYPE_STRING or not Catalog.DINOS.has(enemy["kind"]):
+        if typeof(enemy["kind"]) != TYPE_STRING or (not Catalog.DINOS.has(enemy["kind"]) and not BiomeEncounters.MOBS.has(enemy["kind"])):
             return "存档敌人种类无效"
         if not _valid_point(enemy["position"]) or typeof(enemy["elite"]) != TYPE_BOOL:
             return "存档敌人位置或精英标记无效"
@@ -212,6 +213,10 @@ func _validate_enemies(enemies: Variant) -> String:
             return "存档敌人生命超出上限"
         if enemy.has("attack_cycle") and not _integer_in_range(enemy["attack_cycle"], 0, MAX_SAFE_INTEGER):
             return "存档敌人攻击轮次无效"
+        if enemy.has("summoner_id") and not _integer_in_range(enemy["summoner_id"], 1, MAX_SAFE_INTEGER):
+            return "存档召唤者编号无效"
+        if enemy.has("next_summon") and not _number_in_range(enemy["next_summon"], 0.0, float(MAX_SAFE_INTEGER)):
+            return "存档召唤计时无效"
     return ""
 
 func _validate_pickups(pickups: Variant) -> String:

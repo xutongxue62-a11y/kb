@@ -2,6 +2,7 @@ extends RefCounted
 ## New enemy AI returns base velocity only. Main owns timer subtraction, speed
 ## multipliers, separation, knock, terrain movement, animation and contact hits.
 
+const BiomeEncounters = preload("res://src/biome_encounters.gd")
 const IDS = ["raptor", "thrower", "armored"]
 const NEW_DATA = {
     "raptor": {"hp": 7.5, "speed": 88.0, "radius": 18.0, "size": 70.0},
@@ -22,18 +23,15 @@ const QUAKE_RADIUS: float = 112.0
 const PLAYER_RADIUS: float = 18.0
 
 static func base_damage(kind: String) -> float:
-    return float(DAMAGE.get(kind, 1.0))
+    return float(DAMAGE.get(kind, BiomeEncounters.MOBS.get(kind, {}).get("damage", 1.0)))
 
 static func spawn_pool(wave: int, elapsed: float, trial: bool, boss_round: bool) -> Array:
     if trial:
-        return ["hunter", "hunter", "charger", "spitter", "tank", "raptor", "thrower", "armored"]
-    if boss_round:
-        var adds: Array = ["hunter", "hunter", "charger"]
-        if wave >= 5:
-            adds.append("raptor")
-        if wave >= 10:
-            adds.append("thrower")
-        return adds
+        return ["hunter", "hunter", "charger", "spitter", "tank", "raptor", "thrower", "armored"] + BiomeEncounters.GROVE + BiomeEncounters.VOLCANO
+    if wave >= 9:
+        return ["embersnout", "ashhound", "cindertusk"] if boss_round else ["embersnout", "embersnout", "ashhound", "ashhound", "basaltroller", "cindertusk"]
+    if wave >= 5:
+        return ["leafstalker", "sporeback", "reedspitter"] if boss_round else ["leafstalker", "leafstalker", "sporeback", "sporeback", "bonecaller", "reedspitter"]
     if wave <= 1:
         return ["hunter", "hunter"] if elapsed < 12.0 else ["hunter", "hunter", "charger"]
     var pool: Array = ["hunter", "hunter", "charger", "spitter", "tank", "raptor"]
