@@ -33,6 +33,7 @@ func _initialize() -> void:
     check_finished_run()
     check_invalid_writes()
     check_settings()
+    check_character_progress()
     check_music_settings()
     check_backups()
     check_corrupt_reads()
@@ -265,7 +266,7 @@ func check_optional_corruption() -> void:
         ["xp_needed", 0], ["xp_needed", 1.25], ["xp_needed", false],
         ["kills", []], ["kills", false], ["kills", -1], ["kills", 1.5],
         ["enemy_serial", []], ["enemy_serial", false], ["enemy_serial", -1], ["enemy_serial", 1.5],
-        ["starting_weapon", "staff"], ["starting_weapon", []], ["link_id", "unknown"], ["link_id", []],
+        ["starting_weapon", "axe"], ["starting_weapon", []], ["link_id", "unknown"], ["link_id", []],
         ["rng_state", 1], ["rng_state", ""], ["rng_state", "1.0"], ["rng_state", "1e4"], ["rng_state", "--1"], ["rng_state", " 12 "], ["rng_state", "9223372036854775808"],
         ["shop_stock", {}], ["shop_stock", [false]], ["shop_stock", [{}]],
         ["enemies", {}], ["enemies", [false]], ["enemies", [{}]],
@@ -412,4 +413,20 @@ func check_key_bindings() -> void:
     expect(store.write_settings({"autosave": true, "future": 3, "key_bindings": {"confirm": 75, "custom_future": 12}}).get("ok", false), "unknown nested binding keys are optional extras")
     var again: Dictionary = make_store("key_bindings").read_settings()
     expect(int(again.get("key_bindings", {}).get("custom_future", 0)) == 12 and again.get("future", 0) == 3, "unknown extras beside and inside key bindings are preserved")
+
+
+func check_character_progress() -> void:
+    var store = make_store("character_progress")
+    var settings: Dictionary = {"autosave": true, "music_enabled": true, "character_best_wave": {"caveman": 5, "chief": 8}}
+    expect(store.write_settings(settings).get("ok", false), "character best-wave progress can be stored with settings")
+    var loaded: Dictionary = make_store("character_progress").read_settings()
+    var loaded_progress: Dictionary = loaded.get("character_best_wave", {})
+    expect(int(loaded_progress.get("caveman", 0)) == 5 and int(loaded_progress.get("chief", 0)) == 8, "character best-wave progress round-trips")
+    var original_text: String = read_text("character_progress", "settings.json")
+    expect(not store.write_settings({"character_best_wave": {"unknown": 3}}).get("ok", true), "unknown character progress is rejected")
+    expect(not store.write_settings({"character_best_wave": {"caveman": -1}}).get("ok", true), "negative character progress is rejected")
+    expect(not store.write_settings({"character_best_wave": {"caveman": 1.5}}).get("ok", true), "non-integer character progress is rejected")
+    expect(not store.write_settings({"character_best_wave": []}).get("ok", true), "character progress must be an object")
+    expect(read_text("character_progress", "settings.json") == original_text, "invalid character progress leaves the last valid settings file")
+    expect(store.write_settings({"autosave": true, "character_best_wave": {}}).get("ok", false), "empty character progress is accepted")
 

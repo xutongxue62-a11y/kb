@@ -97,7 +97,7 @@ func record() -> void:
         expect(world.hud.screen == "cast", "native title click opens selection")
         if world.hud.screen != "cast": break
         var turns := 0
-        while world.hud.selected_character != id and turns < 3:
+        while world.hud.selected_character != id and turns < Catalog.CHARACTER_ORDER.size():
             await click("NextCharacter")
             turns += 1
         expect(world.hud.selected_character == id,"selection arrows reach " + id)

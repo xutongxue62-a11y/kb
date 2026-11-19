@@ -61,12 +61,19 @@ func advance(delta: float, hero: Vector2, enemies: Array, inventory: Array, stat
                 var previous: Vector2 = mount
                 var used: Array = []
                 var current: Dictionary = target
-                for jump in range(4 if stage>=1 else 3):
+                var mastery: Dictionary = Catalog.exclusive_bonus(str(stats.get("character_id", "")), key)
+                var jumps: int = 4 if stage>=1 else 3
+                var decay: float = 0.75
+                if mastery.has("chain_count"):
+                    jumps = maxi(jumps, int(mastery["chain_count"]))
+                if mastery.has("decay"):
+                    decay = float(mastery["decay"])
+                for jump in range(jumps):
                     if current.is_empty():
                         break
                     used.append(current["id"])
                     events.append({"type":"beam","start":previous,"end":current["position"],"color":Color("#83e2ee")})
-                    events.append(hit(current,damage*pow(0.75,jump),key,(current["position"]-previous).normalized()))
+                    events.append(hit(current,damage*pow(decay,jump),key,(current["position"]-previous).normalized()))
                     previous = current["position"]
                     if stage>=2:
                         var branch_candidates: Array=enemies.filter(func(e):return not used.has(e.id))
@@ -74,7 +81,7 @@ func advance(delta: float, hero: Vector2, enemies: Array, inventory: Array, stat
                         if not branch.is_empty():
                             used.append(branch.id)
                             events.append({"type":"beam","start":previous,"end":branch.position,"color":Color("#f0dbaa")})
-                            events.append(hit(branch,damage*0.35*pow(0.75,jump),key,(branch.position-previous).normalized()))
+                            events.append(hit(branch,damage*0.35*pow(decay,jump),key,(branch.position-previous).normalized()))
                     var candidates: Array = enemies.filter(func(enemy):return not used.has(enemy["id"]))
                     current = Rules.choose_target(previous,170.0,candidates,false)
             elif key == "boomerang":

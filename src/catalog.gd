@@ -42,8 +42,15 @@ const DINOS = {
     "armored": {"hp":24.0,"speed":29.0,"radius":29.0,"size":98.0}
 }
 
-const CHARACTER_ORDER = ["caveman", "chief", "barbarian"]
-const STARTER_WEAPONS = ["sling", "spear", "club"]
+const CHARACTER_ORDER = ["caveman", "chief", "barbarian", "hunter", "shaman", "firekeeper", "priest"]
+const STARTER_WEAPONS = ["sling", "spear", "club", "bonebow", "staff", "firepot", "totem"]
+static var PREVIEW_CHARACTER_UNLOCK: bool = true
+const CHARACTER_UNLOCKS = {
+    "hunter": {"required_character": "caveman", "required_wave": 5},
+    "shaman": {"required_character": "chief", "required_wave": 8},
+    "firekeeper": {"required_character": "barbarian", "required_wave": 8},
+    "priest": {"required_character": "shaman", "required_wave": 12}
+}
 const CHARACTERS = {
     "caveman": {
         "id": "caveman",
@@ -99,6 +106,79 @@ const CHARACTERS = {
             "close_damage_bonus": 0.20,
             "close_damage_range": 140.0
         }
+    },
+    "hunter": {
+        "id": "hunter",
+        "name": "猎手",
+        "portrait": "res://assets/characters/v14/hunter_portrait.png",
+        "body": "res://assets/characters/v13/hunter_body.png",
+        "starting_weapon": "bonebow",
+        "weapon_label": "骨弩",
+        "confirm_button": "StartBonebow",
+        "exclusive_weapon": "bonebow",
+        "weapon_blurb": "自动瞄准 · 贯穿直射",
+        "skills": [
+            {"id": "piercing_shot", "name": "穿林骨箭", "description": "持有骨弩时，穿透从 3 提升到 5，射程提高 20%。"},
+            {"id": "keen_eye", "name": "猎手锐目", "description": "攻速 +8%，更快抓住射击空档。"}
+        ],
+        "modifiers": {
+            "attack_speed_bonus": 0.08
+        }
+    },
+    "shaman": {
+        "id": "shaman",
+        "name": "巫师",
+        "portrait": "res://assets/characters/v14/shaman_portrait.png",
+        "body": "res://assets/characters/v13/shaman_body.png",
+        "starting_weapon": "staff",
+        "weapon_label": "魔法杖",
+        "confirm_button": "StartStaff",
+        "exclusive_weapon": "staff",
+        "weapon_blurb": "自动瞄准 · 符能散射",
+        "skills": [
+            {"id": "five_runes", "name": "五芒符阵", "description": "持有魔法杖时，符能从 3 枚增至 5 枚，伤害更高，弹道会轻微追踪。"},
+            {"id": "ritual_study", "name": "巫祭勤修", "description": "经验 +10%，成长来得稍快一些。"}
+        ],
+        "modifiers": {
+            "xp_multiplier": 1.10
+        }
+    },
+    "firekeeper": {
+        "id": "firekeeper",
+        "name": "掌火人",
+        "portrait": "res://assets/characters/v14/firekeeper_portrait.png",
+        "body": "res://assets/characters/v13/firekeeper_body.png",
+        "starting_weapon": "firepot",
+        "weapon_label": "火种壶",
+        "confirm_button": "StartFirepot",
+        "exclusive_weapon": "firepot",
+        "weapon_blurb": "自动瞄准 · 定点火场",
+        "skills": [
+            {"id": "living_ember", "name": "薪火更盛", "description": "持有火种壶时，火场更大、更久，灼伤更高。"},
+            {"id": "ashen_hide", "name": "灰烬护身", "description": "生命 +1，受伤减免 6%。"}
+        ],
+        "modifiers": {
+            "max_hp": 1.0,
+            "reduction": 0.06
+        }
+    },
+    "priest": {
+        "id": "priest",
+        "name": "祭祀",
+        "portrait": "res://assets/characters/v14/priest_portrait.png",
+        "body": "res://assets/characters/v13/priest_body.png",
+        "starting_weapon": "totem",
+        "weapon_label": "雷鸣图腾",
+        "confirm_button": "StartTotem",
+        "exclusive_weapon": "totem",
+        "weapon_blurb": "自动瞄准 · 连锁雷击",
+        "skills": [
+            {"id": "sky_chain", "name": "连天之雷", "description": "持有雷鸣图腾时，连锁从 3 提升到 5，伤害衰减更小。"},
+            {"id": "ward_chant", "name": "祭坛低诵", "description": "拾取范围 +24，掉落更容易收齐。"}
+        ],
+        "modifiers": {
+            "pickup_radius": 24.0
+        }
     }
 }
 
@@ -116,9 +196,62 @@ static func character_id_for_weapon(weapon_id: String) -> String:
 static func resolve_character_id(character_id: String, starting_weapon: String = "sling") -> String:
     if CHARACTERS.has(character_id):
         return character_id
-    if starting_weapon == "spear":
-        return "chief"
-    return "caveman"
+    return character_id_for_weapon(starting_weapon)
+
+static func normalized_best_waves(progress: Variant) -> Dictionary:
+    var result: Dictionary = {}
+    if typeof(progress) != TYPE_DICTIONARY:
+        return result
+    for key in progress:
+        if typeof(key) == TYPE_STRING and CHARACTERS.has(key):
+            result[key] = maxi(0, int(progress[key]))
+    return result
+
+static func best_wave_for(progress: Variant, character_id: String) -> int:
+    return int(normalized_best_waves(progress).get(character_id, 0))
+
+static func is_character_unlocked(character_id: String, progress: Variant = {}) -> bool:
+    if not CHARACTERS.has(character_id):
+        return false
+    if not CHARACTER_UNLOCKS.has(character_id):
+        return true
+    var requirement: Dictionary = CHARACTER_UNLOCKS[character_id]
+    return best_wave_for(progress, str(requirement.get("required_character", ""))) >= int(requirement.get("required_wave", 0))
+
+static func can_start_character(character_id: String, progress: Variant = {}) -> bool:
+    return is_character_unlocked(character_id, progress) or PREVIEW_CHARACTER_UNLOCK
+
+static func unlock_requirement_text(character_id: String) -> String:
+    if not CHARACTER_UNLOCKS.has(character_id):
+        return ""
+    var requirement: Dictionary = CHARACTER_UNLOCKS[character_id]
+    var required_id: String = str(requirement.get("required_character", ""))
+    var required_name: String = str(character(required_id).get("name", required_id))
+    return "用%s到达第 %d 关解锁" % [required_name, int(requirement.get("required_wave", 0))]
+
+static func shows_preview_unlock(character_id: String, progress: Variant = {}) -> bool:
+    return PREVIEW_CHARACTER_UNLOCK and CHARACTERS.has(character_id) and not is_character_unlocked(character_id, progress)
+
+static func exclusive_weapon_id(character_id: String) -> String:
+    return str(character(character_id).get("exclusive_weapon", ""))
+
+static func has_weapon_mastery(character_id: String, weapon_id: String) -> bool:
+    return not weapon_id.is_empty() and exclusive_weapon_id(character_id) == weapon_id
+
+static func exclusive_bonus(character_id: String, weapon_id: String) -> Dictionary:
+    if not has_weapon_mastery(character_id, weapon_id):
+        return {}
+    match weapon_id:
+        "bonebow":
+            return {"pierce_limit": 5, "range_multiplier": 1.20}
+        "staff":
+            return {"shot_count": 5, "damage_multiplier": 1.25, "homing": 1.6}
+        "firepot":
+            return {"area_multiplier": 1.25, "life_multiplier": 1.35, "damage_multiplier": 1.25}
+        "totem":
+            return {"chain_count": 5, "decay": 0.85}
+        _:
+            return {}
 
 static func is_starter_weapon(weapon_id: String) -> bool:
     return STARTER_WEAPONS.has(weapon_id)
@@ -136,4 +269,5 @@ static func apply_character_modifiers(stats: Dictionary, character_id: String) -
     stats["pickup_radius"] = float(stats.get("pickup_radius", 100.0)) + float(mods.get("pickup_radius", 0.0))
     stats["close_damage_bonus"] = float(mods.get("close_damage_bonus", 0.0))
     stats["close_damage_range"] = float(mods.get("close_damage_range", 140.0))
+    stats["character_id"] = str(profile.get("id", character_id))
     return stats

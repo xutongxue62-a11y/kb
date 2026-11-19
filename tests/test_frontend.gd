@@ -1,5 +1,7 @@
 extends SceneTree
 
+const Catalog = preload("res://src/catalog.gd")
+
 var checks := 0
 var failures := 0
 
@@ -51,14 +53,21 @@ func run_checks() -> void:
         expect(arrow is BaseButton, "character selection keeps a future navigation arrow: " + key)
         if arrow is BaseButton:
             expect(arrow.visible and not arrow.disabled, "multiple hunters keep class arrows available")
-    expect(find(hud.overlay, "StartSling") is BaseButton and find(hud.overlay, "StartClub") is BaseButton and find(hud.overlay, "StartSpear") is BaseButton, "all three class confirm buttons are present")
-    expect(copy(hud.overlay).contains("1 / 3") and copy(hud.overlay).contains("原始人") and copy(hud.overlay).contains("弹弓"), "the arrow page shows the default hunter and the page count")
+    var roster_size: int = Catalog.CHARACTER_ORDER.size()
+    var page := func(index: int) -> String: return "%d / %d" % [index, roster_size]
+    expect(find(hud.overlay, "StartSling") is BaseButton and find(hud.overlay, "StartClub") is BaseButton and find(hud.overlay, "StartSpear") is BaseButton, "original class confirm buttons are present")
+    for confirm_key in ["StartBonebow", "StartStaff", "StartFirepot", "StartTotem"]:
+        expect(find(hud.overlay, confirm_key) is BaseButton, "new class confirm button is present: " + confirm_key)
+    expect(copy(hud.overlay).contains(page.call(1)) and copy(hud.overlay).contains("原始人") and copy(hud.overlay).contains("弹弓"), "the arrow page shows the default hunter and the page count")
     await press(hud.overlay, "NextCharacter")
-    expect(hud.preview_character == "chief" and hud.selected_character == "caveman" and copy(hud.overlay).contains("酋长") and copy(hud.overlay).contains("骨矛") and copy(hud.overlay).contains("2 / 3"), "arrows switch to the chieftain page")
+    expect(hud.preview_character == "chief" and hud.selected_character == "caveman" and copy(hud.overlay).contains("酋长") and copy(hud.overlay).contains("骨矛") and copy(hud.overlay).contains(page.call(2)), "arrows switch to the chieftain page")
     await press(hud.overlay, "NextCharacter")
-    expect(hud.preview_character == "barbarian" and hud.selected_character == "caveman" and copy(hud.overlay).contains("野蛮人") and copy(hud.overlay).contains("木棒") and copy(hud.overlay).contains("3 / 3"), "arrows switch to the barbarian page")
-    await press(hud.overlay, "NextCharacter")
-    expect(hud.preview_character == "caveman" and hud.selected_character == "caveman" and copy(hud.overlay).contains("1 / 3"), "arrows wrap back to the default hunter")
+    expect(hud.preview_character == "barbarian" and hud.selected_character == "caveman" and copy(hud.overlay).contains("野蛮人") and copy(hud.overlay).contains("木棒") and copy(hud.overlay).contains(page.call(3)), "arrows switch to the barbarian page")
+    var turns: int = 0
+    while hud.preview_character != "caveman" and turns < roster_size:
+        await press(hud.overlay, "NextCharacter")
+        turns += 1
+    expect(hud.preview_character == "caveman" and hud.selected_character == "caveman" and copy(hud.overlay).contains(page.call(1)), "arrows wrap back to the default hunter")
     await press(hud.overlay, "Settings")
     expect(hud.screen == "settings", "settings open from character select")
     await press(hud.overlay, "Back")

@@ -16,6 +16,7 @@ var attack_hand: String = "right_hand"
 var hurt_time: float = 0.0
 var idle_time: float = 0.0
 var ground_shadow_origin: Vector2 = Vector2(0, 47)
+var show_locator_ring: bool = true
 
 func setup(asset_library, start_character: String = "caveman") -> void:
     library = asset_library
@@ -129,10 +130,11 @@ func _draw_ground_shadow(canvas) -> void:
             points.append(anchor + Vector2(cos(angle), sin(angle)) * extent)
         canvas.draw_colored_polygon(points, Color(0.12, 0.10, 0.08, 0.035 + layer * 0.014))
     # The marker stays on the ground plane rather than following the body gait.
-    var mark := PackedVector2Array()
-    for index in range(41):
-        var angle: float = float(index) * TAU / 40.0
-        mark.append(anchor + Vector2(cos(angle) * 30.0, sin(angle) * 10.0))
-    canvas.draw_polyline(mark, Color(0.36, 0.64, 0.55, 0.20), 7.0, true)
-    canvas.draw_polyline(mark, Color(0.60, 0.82, 0.69, 0.82), 2.2, true)
+    if show_locator_ring:
+        var mark := PackedVector2Array()
+        for index in range(41):
+            var angle: float = float(index) * TAU / 40.0
+            mark.append(anchor + Vector2(cos(angle) * 30.0, sin(angle) * 10.0))
+        canvas.draw_polyline(mark, Color(0.36, 0.64, 0.55, 0.20), 7.0, true)
+        canvas.draw_polyline(mark, Color(0.60, 0.82, 0.69, 0.82), 2.2, true)
 

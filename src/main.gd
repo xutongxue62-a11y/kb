@@ -146,6 +146,7 @@ func _ready() -> void:
         save_store = SaveStore.new()
     settings = save_store.read_settings()
     KeyBindings.apply_settings(settings)
+    sync_character_progress()
     music = Music.new()
     music_volume = clampf(float(settings.get("music_volume", 1.0)), 0.0, 1.0)
     sfx_volume = clampf(float(settings.get("sfx_volume", 1.0)), 0.0, 1.0)
@@ -392,6 +393,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     hud.hide_menu()
     update_hud()
     queue_redraw()
+    record_character_wave(wave)
     auto_save()
 
 func clear_enemies() -> void:
@@ -439,6 +441,10 @@ func begin_departure(trial: bool = false) -> void:
         character_id = hud.selected_character
         if not Catalog.CHARACTERS.has(character_id):
             character_id = "caveman"
+        if not Catalog.can_start_character(character_id, settings.get("character_best_wave", {})):
+            if hud.has_method("clear_launch_commit"):
+                hud.clear_launch_commit()
+            return
         starting_weapon = str(Catalog.character(character_id).get("starting_weapon", starting_weapon))
     var previous: Texture2D = hud.snapshot_ui()
     start_run(trial)
@@ -500,6 +506,7 @@ func continue_game() -> bool:
             enemy["view"].position = enemy["position"]
         update_hud()
         recover_elite_budget()
+        record_character_wave(wave)
     refresh_save_status(("已从有效备份恢复" if result.get("recovered",false) else "继续存档成功") if accepted else "存档内容无法恢复")
     return accepted
 
@@ -538,6 +545,30 @@ func _notification(what: int) -> void:
 func set_start_weapon(key: String) -> void:
     if Catalog.is_starter_weapon(key):
         starting_weapon = key
+
+func sync_character_progress() -> void:
+    if hud != null:
+        hud.character_best_wave = Catalog.normalized_best_waves(settings.get("character_best_wave", {}))
+
+func record_character_wave(reached: int = -1) -> void:
+    if trial_mode or demo or animation_demo or save_store == null:
+        return
+    if not Catalog.CHARACTERS.has(character_id):
+        return
+    var wave_reached: int = wave if reached < 0 else reached
+    if wave_reached <= 0:
+        return
+    var progress: Dictionary = Catalog.normalized_best_waves(settings.get("character_best_wave", {}))
+    if wave_reached <= int(progress.get(character_id, 0)):
+        sync_character_progress()
+        return
+    var backup: Dictionary = settings.duplicate(true)
+    progress[character_id] = wave_reached
+    settings["character_best_wave"] = progress
+    var result: Dictionary = save_store.write_settings(settings)
+    if not result.get("ok", false):
+        settings = backup
+    sync_character_progress()
 
 func refresh_stats() -> Dictionary:
     stats = Growth.stats(buff_levels)
@@ -1188,6 +1219,7 @@ func simulate(delta: float, movement: Vector2) -> void:
 func advance_wave(next_wave: int) -> void:
     var old_wave: int = wave
     wave = next_wave
+    record_character_wave(wave)
     var milestone: bool = wave / 5 > old_wave / 5
     if milestone:
         enemy_adaptation = Progression.adaptation(wave, Progression.estimate_power(inventory, buff_levels, active_link), enemy_adaptation)
@@ -2048,10 +2080,15 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
             # shell's origin and heading both sit on the barrel line.
             if key == "staff":
                 var count: int=Evolution.shot_count(key,item.level)
+                var staff_bonus: Dictionary = Catalog.exclusive_bonus(character_id, key)
+                var shot_damage: float = damage*(1.0 if count==3 else 0.85)
+                if not staff_bonus.is_empty():
+                    count = maxi(count, int(staff_bonus.get("shot_count", count)))
+                    shot_damage = damage * float(staff_bonus.get("damage_multiplier", 1.25))
                 for index in range(count):
                     var offset: float=index-(count-1)*0.5
                     var shot_aim: Vector2 = direction.rotated(offset * (0.055 if collapsed else 0.24))
-                    fire_projectile(muzzle, shot_aim, key, damage*(1.0 if count==3 else 0.85), attack_range)
+                    fire_projectile(muzzle, shot_aim, key, shot_damage, attack_range, false, false, float(staff_bonus.get("homing", 0.0)))
                 audio.play("magic", -2.0, 1.0)
                 flash_weapon(key)
             else:
@@ -2244,10 +2281,10 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
                 ids.append(owned["id"])
             apply_link(Rules.link_profile(desired, ids))
 
-func fire_projectile(point: Vector2, direction: Vector2, key: String, damage: float, attack_range: float, from_combo: bool = false, enchanted: bool = false) -> void:
+func fire_projectile(point: Vector2, direction: Vector2, key: String, damage: float, attack_range: float, from_combo: bool = false, enchanted: bool = false, homing: float = 0.0) -> void:
     var speed: float = Catalog.WEAPONS[key]["speed"] * stats["bullet_speed"]
     var aim: Vector2 = direction.normalized() if direction.length() > 0.001 else Vector2.RIGHT
-    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"]})
+    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"], "homing": homing})
     if not from_combo and weapon_level(key)>=5:
         if key=="sling": projectiles.back().bounces_left+=1
         if key=="staff": projectiles.back().pierce_left+=1
@@ -2260,7 +2297,8 @@ func update_projectiles(delta: float) -> void:
         # Cached once per projectile: the lambda filters below used to call
         # projectile.get("hit_ids", []) again for every candidate.
         var hit_ids: Array = projectile.get("hit_ids", [])
-        if projectile["kind"] != "hostile" and stats["homing"] > 0.0:
+        var homing: float = float(stats.get("homing", 0.0)) + float(projectile.get("homing", 0.0))
+        if projectile["kind"] != "hostile" and homing > 0.0:
             var candidates: Array = []
             for enemy in targets:
                 if not hit_ids.has(enemy["id"]):
@@ -2269,7 +2307,7 @@ func update_projectiles(delta: float) -> void:
             if not target.is_empty():
                 var speed: float = projectile["velocity"].length()
                 var desired: Vector2 = (target["position"] - projectile["position"]).normalized()
-                projectile["velocity"] = projectile["velocity"].normalized().lerp(desired, clampf(delta * stats["homing"], 0.0, 1.0)).normalized() * speed
+                projectile["velocity"] = projectile["velocity"].normalized().lerp(desired, clampf(delta * homing, 0.0, 1.0)).normalized() * speed
         var previous: Vector2 = projectile["position"]
         # A distant dinosaur must not make a reachable egg or rock immune.
         # Keep passing through secondary targets when a living target is reachable.

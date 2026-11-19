@@ -32,7 +32,10 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
     state["cooldown"] = maxf(0.0, state["cooldown"] - dt)
     state["age"] += dt
     var target_origin: Vector2=mount if key=="bonebow" else hero
+    var mastery: Dictionary = Catalog.exclusive_bonus(str(stats.get("character_id", "")), key)
     var reach: float = Rules.scaled_range(data, stats) * (area if key == "wardrum" else 1.0)
+    if key == "bonebow" and mastery.has("range_multiplier"):
+        reach *= float(mastery["range_multiplier"])
     var target: Dictionary = Rules.choose_target(target_origin, reach, targets, prefer_elite)
     if not target.is_empty():
         var aim: Vector2 = target["position"] - mount
@@ -53,13 +56,23 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                 for arrow in range(1+stage):
                     var side: Vector2=Vector2(state.direction).orthogonal()*((arrow-stage*0.5)*11.0)
                     var shot: Dictionary=projectile(mount+state.direction*22.0+side,state.direction,damage*(1.0 if stage==0 else (0.70 if stage==1 else 0.58)),data.speed*bullet_speed,reach,[])
-                    shot["pierce_limit"]=5 if stage>=2 else 3
+                    var pierce_limit: int = 5 if stage>=2 else 3
+                    if mastery.has("pierce_limit"):
+                        pierce_limit = maxi(pierce_limit, int(mastery["pierce_limit"]))
+                    shot["pierce_limit"]=pierce_limit
                     state.arrows.append(shot)
             "firepot":
                 var flight: float = clampf(mount.distance_to(target["position"]) / data["speed"], 0.32, 0.65)
                 for pot in range(1+stage):
                     var offset: Vector2=Vector2(state.direction).orthogonal()*((pot-stage*0.5)*48.0)
-                    state.pots.append({"from":mount,"position":target.position+offset,"age":0.0,"flight":flight,"damage":damage*(1.0 if stage==0 else (0.65 if stage==1 else 0.50)),"radius":56.0*area,"life":2.4 if stage>=2 else 1.85})
+                    var pot_damage: float = damage*(1.0 if stage==0 else (0.65 if stage==1 else 0.50))
+                    var pot_radius: float = 56.0*area
+                    var pot_life: float = 2.4 if stage>=2 else 1.85
+                    if not mastery.is_empty():
+                        pot_damage *= float(mastery.get("damage_multiplier", 1.0))
+                        pot_radius *= float(mastery.get("area_multiplier", 1.0))
+                        pot_life *= float(mastery.get("life_multiplier", 1.0))
+                    state.pots.append({"from":mount,"position":target.position+offset,"age":0.0,"flight":flight,"damage":pot_damage,"radius":pot_radius,"life":pot_life})
             "wardrum":
                 state["phase"] = "playing"
                 state["beat_count"] = 0

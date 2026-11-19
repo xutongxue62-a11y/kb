@@ -103,6 +103,7 @@ var bone: Color = Color("#f4ead6")
 var moss: Color = Color("#c5d4a8")
 var selected_character: String = "caveman"
 var preview_character: String = "caveman"
+var character_best_wave: Dictionary = {}
 var debug_cheats: bool = false
 var music_volume: float = 1.0
 var sfx_volume: float = 1.0
@@ -1015,17 +1016,22 @@ func add_cast_cutout(rect: Rect2) -> Control:
 func confirm_cast(weapon_id: String = "") -> void:
     if launch_committed or ui_busy():
         return
-    launch_committed = true
     if not weapon_id.is_empty():
         selected_character = Catalog.character_id_for_weapon(weapon_id)
         preview_character = selected_character
     else:
         selected_character = displayed_character()
         preview_character = selected_character
+    if not Catalog.can_start_character(selected_character, character_best_wave):
+        return
+    launch_committed = true
     var profile: Dictionary = Catalog.character(selected_character)
     var key: String = weapon_id if not weapon_id.is_empty() else str(profile.get("starting_weapon", "sling"))
     starter_selected.emit(key)
     start_requested.emit(false)
+
+func clear_launch_commit() -> void:
+    launch_committed = false
 
 func place_link_row(items: Array, origin: Vector2, height: float = 42.0, gap: float = 16.0) -> void:
     var cursor: float = origin.x

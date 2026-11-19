@@ -18,6 +18,7 @@ func render_portraits() -> void:
         root.add_child(viewport)
         var actor = Actor.new()
         actor.setup(library,id)
+        actor.show_locator_ring = false
         actor.position = Vector2(280,215)
         actor.scale = Vector2.ONE * 6.0
         actor.get_node("PlayerMarker").hide()

@@ -225,11 +225,8 @@ static func cast(h) -> void:
     label(h, body, "初始武器", Rect2(620, 132, 400, 32), 21, INK, true)
     weapon(h, body, Vector2(664, 212), starter, 76)
     label(h, body, weapon_name, Rect2(730, 168, 370, 50), 34, INK, true)
-    var blurb: String = "自动瞄准 · 快速连射"
-    if starter == "spear":
-        blurb = "自动瞄准 · 贯刺穿透"
-    elif starter == "club":
-        blurb = "自动瞄准 · 近战重击"
+    var blurbs := {"sling": "自动瞄准 · 快速连射", "spear": "自动瞄准 · 贯刺穿透", "club": "自动瞄准 · 近战重击", "bonebow": "自动瞄准 · 贯穿直射", "staff": "自动瞄准 · 符能散射", "firepot": "自动瞄准 · 定点火场", "totem": "自动瞄准 · 连锁雷击"}
+    var blurb: String = str(profile.get("weapon_blurb", blurbs.get(starter, "自动瞄准")))
     label(h, body, blurb, Rect2(730, 223, 388, 34), 20)
     line(body, Vector2(620, 281), 486, Color(INK, 0.6))
     label(h, body, "角色能力 / 技能", Rect2(620, 300, 486, 32), 22, INK, true)
@@ -239,6 +236,22 @@ static func cast(h) -> void:
         label(h, body, str(skill.get("description", "")), Rect2(626, y + 33, 470, 28), 16, Color("#506071"))
         y += 76
     KeyBindings.attach_to_button(button(h, h.overlay, "Back", "← 返回首页", Rect2(52, 705, 258, 52), func(): h.show_title(), false, 21), "cancel")
+    var progress: Dictionary = h.character_best_wave if h.get("character_best_wave") != null else {}
+    var unlocked: bool = Catalog.is_character_unlocked(shown, progress)
+    var can_start: bool = Catalog.can_start_character(shown, progress)
+    var note: String = ""
+    if Catalog.shows_preview_unlock(shown, progress):
+        note = "试玩提前解锁"
+    elif not unlocked:
+        note = Catalog.unlock_requirement_text(shown)
+    if not note.is_empty():
+        var note_label: Label = label(h, h.overlay, note, Rect2(848, 652, 380, 36), 22, RED if not can_start else IVORY, true)
+        note_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        note_label.name = "UnlockNote"
+        if Catalog.shows_preview_unlock(shown, progress):
+            var condition: Label = label(h, h.overlay, Catalog.unlock_requirement_text(shown), Rect2(848, 626, 380, 26), 16, Color("#d7c7ad"))
+            condition.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            condition.name = "UnlockCondition"
     for id in Catalog.CHARACTER_ORDER:
         var entry: Dictionary = Catalog.character(id)
         var key: String = str(entry.get("confirm_button", "StartSling"))
@@ -246,6 +259,9 @@ static func cast(h) -> void:
         var confirm: Button = button(h, h.overlay, key, "→  确认出发", Rect2(848, 694, 380, 66), func(): h.confirm_cast(weapon_id), true, 27)
         KeyBindings.attach_to_button(confirm, "confirm")
         confirm.visible = id == shown
+        if id == shown and not Catalog.can_start_character(id, progress):
+            confirm.disabled = true
+            confirm.tooltip_text = Catalog.unlock_requirement_text(id)
     h.stage_panel(body)
 
 static func modal(h, rect: Rect2):

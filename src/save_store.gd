@@ -286,6 +286,15 @@ func _validate_settings(settings: Variant) -> String:
     for key in ["music_volume", "sfx_volume"]:
         if settings.has(key) and not _number_in_range(settings[key], 0.0, 1.0):
             return "音量设置必须是 0 到 1 的数值"
+    if settings.has("character_best_wave"):
+        var progress: Variant = settings["character_best_wave"]
+        if typeof(progress) != TYPE_DICTIONARY or progress.size() > MAX_COLLECTION_SIZE:
+            return "角色关卡进度格式无效"
+        for key in progress:
+            if typeof(key) != TYPE_STRING or not Catalog.CHARACTERS.has(key):
+                return "角色关卡进度包含未知角色"
+            if not _integer_in_range(progress[key], 0, MAX_PROGRESS):
+                return "角色最高关卡无效：" + str(key)
     return ""
 
 func _validate_json(value: Variant, depth: int = 0, collection_limit: int = MAX_COLLECTION_SIZE) -> String:

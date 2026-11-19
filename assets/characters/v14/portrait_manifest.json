@@ -17,6 +17,30 @@
       "body_sha256": "33452c9d14c6d031b846f65c170548f5507701f360e26d6545b14e6c2c4afb2c",
       "portrait": "res://assets/characters/v14/chief_portrait.png",
       "portrait_sha256": "49402c07c32f84acd8a3fc51ad0479a42d2074b22f58d42084cee338d70e9c27"
+    },
+    "firekeeper": {
+      "body": "res://assets/characters/v13/firekeeper_body.png",
+      "body_sha256": "818d05f9a3e92d548806db8d208465318b8f94b1d1222b95f0dad655e6a4c9fa",
+      "portrait": "res://assets/characters/v14/firekeeper_portrait.png",
+      "portrait_sha256": "2484adf03e24add43bb6609fecb619960ee1528921eac68a40e52caa0c0d9ca7"
+    },
+    "hunter": {
+      "body": "res://assets/characters/v13/hunter_body.png",
+      "body_sha256": "ab25b82bebaf9b60c9c1295d1b5f11dc7255e1d5d3ba71fb67a6004ee8cd4240",
+      "portrait": "res://assets/characters/v14/hunter_portrait.png",
+      "portrait_sha256": "ac49e869eda7e11555b0177673ef8bef3ee1362649b43153d9929364811675c7"
+    },
+    "priest": {
+      "body": "res://assets/characters/v13/priest_body.png",
+      "body_sha256": "728dcce92f8ba264018296c944b5b99165d994a3267188d42551554fbb0e61f2",
+      "portrait": "res://assets/characters/v14/priest_portrait.png",
+      "portrait_sha256": "2d47e0e32b38b8833388ff006e7cce0ee861952bf1b50c0eb8729aaef7cd71bd"
+    },
+    "shaman": {
+      "body": "res://assets/characters/v13/shaman_body.png",
+      "body_sha256": "6b973a7bc31b067c19c559da317da2a10b38b056a20516633277a6069fbd42a2",
+      "portrait": "res://assets/characters/v14/shaman_portrait.png",
+      "portrait_sha256": "eb21d1071f1a23c119524084d0b3af2bd44f8963e7ad392f67ecd251d8d23bae"
     }
   },
   "method": "Native ActorView render; same body and limb rig as battle"
