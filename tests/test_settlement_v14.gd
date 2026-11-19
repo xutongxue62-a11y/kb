@@ -30,29 +30,21 @@ func run_checks() -> void:
     var before: Array = world.pickups.map(func(d):return d.position)
     world.simulate(0.25,Vector2.RIGHT)
     expect(world.wave_closing and not world.shop_open,"shop stays closed during the finish pause")
-    expect(world.pickups.map(func(d):return d.position)==before and world.coins==7 and is_equal_approx(world.xp,0.0),"leftover gems stay on the ground and are not absorbed")
+    expect(world.pickups.map(func(d):return d.position)==before and world.chest_marks.size()==1 and world.coins==7 and is_equal_approx(world.xp,0.0),"leftover gems and the ground chest stay put and are not absorbed")
     var partial: Dictionary = world.SessionState.capture(world)
     expect(world.save_store.write_run(partial).ok and world.continue_game(),"finish pause saves and resumes")
     world.simulate(1.0,Vector2.ZERO)
-    expect(world.pickups.is_empty() and world.chest_marks.is_empty() and world.coins==7 and is_equal_approx(world.xp,0.0),"uncollected 3 coin / 5 XP drops are discarded at settlement")
-    expect(world.upgrade_pending and world.upgrade_reason=="chest" and not world.shop_open,"remaining chest reward is resolved before opening the shop")
-    expect(world.save_store.write_run(world.SessionState.capture(world)).ok and world.continue_game(),"pending end-round chest survives save/continue")
-    world.simulate(0.02,Vector2.ZERO)
-    expect(world.upgrade_pending and world.upgrade_reason=="chest","the unchosen chest is still owed exactly once after reload")
-    if world.upgrade_pending: world.on_choice(world.upgrade_choices[0])
-    expect(world.shop_open and world.chest_queue==0 and not world.upgrade_pending and world.coins==7,"shop opens after one chest choice with gold already collected in combat")
+    expect(world.pickups.is_empty() and world.chest_marks.is_empty() and world.chest_queue==0 and world.coins==7 and is_equal_approx(world.xp,0.0) and world.shop_open and not world.upgrade_pending,"uncollected gems and the ground chest are discarded at settlement")
     world.start_run(false)
     world.clear_enemies()
     world.coins = 0
-    # Lv.1 needs 15 XP. The four leftover gems are discarded, so 14 XP is not enough to level up.
+    # Lv.1 needs 15 XP. Leftover gems and the ground chest are discarded, so 14 XP is not enough to level up.
     world.xp = 14.0
     world.spawn_loot({"coin":4,"xp":4},world.player_position+Vector2(500,0))
     world.chest_marks = [{"position":world.player_position+Vector2(0,200),"age":0.0}]
     world.start_wave_closing()
     world.simulate(1.1,Vector2.ZERO)
-    expect(world.upgrade_pending and world.upgrade_reason=="chest" and world.coins==0 and is_equal_approx(world.xp,14.0) and not world.shop_open,"uncollected gems are discarded, so only the already-earned 14 XP and the remaining chest remain")
-    if world.upgrade_pending: world.on_choice(world.upgrade_choices[0])
-    expect(world.shop_open and world.coins==0 and is_equal_approx(world.xp,14.0) and world.player_level==1 and world.chest_queue==0,"final shop totals exclude discarded leftover gems")
+    expect(world.shop_open and not world.upgrade_pending and world.coins==0 and is_equal_approx(world.xp,14.0) and world.player_level==1 and world.chest_queue==0 and world.chest_marks.is_empty(),"final shop totals exclude discarded leftover gems and the uncollected chest")
     world.queue_free()
     await process_frame
     print("SETTLEMENT V14 RESULT: %d checks, %d failures" % [checks,failures])

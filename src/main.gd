@@ -1251,8 +1251,9 @@ func collect_all_drops() -> void:
     pickups.clear()
 
 func discard_remaining_drops() -> void:
-    # Uncollected gems and blood packs are not vacuumed in at wave end.
+    # Uncollected gems, blood packs, and ground chests are not vacuumed in at wave end.
     pickups.clear()
+    chest_marks.clear()
 
 func dismiss_remaining_enemies() -> void:
     var animate: bool = DisplayServer.get_name() != "headless"
@@ -1317,20 +1318,15 @@ func _finish_wave_closing() -> void:
     wave_buffer = 0.0
     player_frozen = true
     discard_remaining_drops()
-    collect_round_chests()
     if demo:
         begin_round(wave + 1)
     else:
         continue_round_rewards()
 
 func absorb_round_resources(_delta: float) -> void:
-    # Leftover gems stay put during the finish pause and are discarded when it
-    # ends. Ground chests are queued afterwards, not pulled in during this beat.
+    # Leftover gems and ground chests stay put during the finish pause and are
+    # discarded when it ends. Only rewards already picked up in combat are kept.
     update_hud()
-
-func collect_round_chests() -> void:
-    chest_queue += chest_marks.size()
-    chest_marks.clear()
 
 func continue_round_rewards() -> void:
     if upgrade_pending or not running or shop_open:
@@ -1352,7 +1348,6 @@ func end_round() -> void:
     player_frozen = true
     dismiss_remaining_enemies()
     discard_remaining_drops()
-    collect_round_chests()
     continue_round_rewards()
 
 func open_round_shop() -> void:

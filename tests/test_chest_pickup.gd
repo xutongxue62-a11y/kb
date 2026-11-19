@@ -66,10 +66,9 @@ func run_checks() -> void:
         world.on_choice(world.upgrade_choices[0])
     expect(not world.upgrade_pending and world.chest_queue == 0, "reloaded rewards finish exactly once")
     world.end_round()
-    expect(world.chest_marks.is_empty() and world.upgrade_pending and world.upgrade_reason=="chest" and not world.shop_open,"round end absorbs the remaining ground chest before camp")
-    if world.upgrade_pending: world.on_choice(world.upgrade_choices[0])
+    expect(world.chest_marks.is_empty() and world.chest_queue==0 and world.shop_open and not world.upgrade_pending,"uncollected ground chest is discarded at round end")
     world.leave_shop()
-    expect(world.chest_marks.is_empty() and world.chest_queue==0 and not world.upgrade_pending, "absorbed end-round chest is paid once and cannot carry into the next round")
+    expect(world.chest_marks.is_empty() and world.chest_queue==0 and not world.upgrade_pending, "discarded end-round chest cannot carry into the next round")
     world.start_run(false)
     world.clear_enemies()
     world.spawn_clock = 999.0
