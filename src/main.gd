@@ -29,6 +29,7 @@ const EnemyRoster = preload("res://src/enemy_roster.gd")
 const FIELD: Rect2 = Rect2(42, 147, 1196, 514)
 const WAVE_SECONDS: float = 30.0
 const WAVE_BUFFER: float = 0.9
+const BOSS_CLEAR_SECONDS: float = 30.0
 const CHARGE_SPEED: float = 560.0
 const CHARGE_DURATION: float = 0.4
 const DODGE_DURATION: float = 0.20
@@ -71,6 +72,7 @@ var coins: int = 0
 var wave_elapsed: float = 0.0
 var boss_round: bool = false
 var boss_defeated: bool = false
+var boss_clear_left: float = 0.0
 var boss_pending: bool = false
 var shop_open: bool = false
 var shop_stock: Array = []
@@ -314,6 +316,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     wave_elapsed = 0.0
     boss_round = false
     boss_defeated = false
+    boss_clear_left = 0.0
     boss_pending = false
     shop_open = false
     shop_stock.clear()
@@ -991,7 +994,9 @@ func update_hud() -> void:
         if enemy["kind"] == "boss" and enemy["hp"] > 0.0:
             boss = enemy
             break
-    hud.update_round(wave,wave_elapsed,boss_round,coins,boss.get("hp",0.0),boss.get("max_hp",0.0))
+    var hud_is_boss: bool = boss_round and not boss_defeated
+    var hud_stage_time: float = (WAVE_SECONDS - boss_clear_left) if (boss_round and boss_defeated) else wave_elapsed
+    hud.update_round(wave,hud_stage_time,hud_is_boss,coins,boss.get("hp",0.0),boss.get("max_hp",0.0))
     hud.update_world_status(WorldMap.BIOMES[WorldMap.biome_for_wave(wave)],dodge_cooldown,DODGE_COOLDOWN,available_links,link_hint_text())
     if combo_message_time > 0.0:
         hud.notice_label.text = combo_message
@@ -1154,6 +1159,8 @@ func simulate(delta: float, movement: Vector2) -> void:
         return
     elapsed += delta
     wave_elapsed += delta
+    if boss_round and boss_defeated:
+        boss_clear_left = maxf(0.0, boss_clear_left - delta)
     _simulating = true
     _combat_targets_ready = false
     var terrain_exposure: float = maxf(0.0,delta-invulnerable)
@@ -1219,7 +1226,7 @@ func simulate(delta: float, movement: Vector2) -> void:
     enemies = living
     update_pickups(delta)
     update_chests(delta)
-    if (boss_round and boss_defeated) or (not boss_round and wave_elapsed >= WAVE_SECONDS - 0.000001):
+    if (boss_round and boss_defeated and boss_clear_left <= 0.000001) or (not boss_round and wave_elapsed >= WAVE_SECONDS - 0.000001):
         start_wave_closing()
         apply_weapon_glows(delta)
         update_hud()
@@ -1232,7 +1239,7 @@ func simulate(delta: float, movement: Vector2) -> void:
     # a 0.18 s floor by wave 33, so deep waves feel denser than wave 29 instead
     # of freezing at the wave-26 density.
     var alive_cap: int = 42 + clampi((wave - 5) * 2, 0, 42) + clampi((wave - 26) * 3, 0, 42)
-    if spawn_clock <= 0.0 and enemies.size() < alive_cap:
+    if spawn_clock <= 0.0 and enemies.size() < alive_cap and not boss_defeated:
         var spawn_interval: float = 0.62 - (wave - 1) * 0.10 if wave <= 3 else maxf(0.18, 0.42 - (wave - 3) * 0.008)
         spawn_clock = maxf(1.5, 3.4 - float(maxi(0, wave / 5 - 1)) * 0.28) if boss_round else spawn_interval
         if boss_pending:
@@ -1306,6 +1313,7 @@ func begin_round(stage: int) -> void:
     shop_open = false
     boss_round = wave % 5 == 0
     boss_defeated = false
+    boss_clear_left = 0.0
     spawn_clock = 0.55
     boss_pending=boss_round
     reset_elite_budget()
@@ -2543,6 +2551,7 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
         var boss: bool = enemy["kind"] == "boss"
         if boss:
             boss_defeated = true
+            boss_clear_left = BOSS_CLEAR_SECONDS
         spawn_loot(LootRules.enemy_reward(enemy.kind,wave,enemy.elite,enemy.view.display_width,rng),enemy.position)
         if not boss and not smashed_egg and LootRules.should_drop_blood_pack(str(enemy.kind), bool(enemy.get("elite", false)), rng):
             var blood_index: int = pickups.size()

@@ -261,6 +261,7 @@ func check_optional_corruption() -> void:
     var cases: Array = [
         ["player_position", "wrong"], ["player_position", [1]], ["player_position", [1, 2, 3]], ["player_position", [true, 2]],
         ["elapsed", -0.1], ["elapsed", "1"], ["wave_elapsed", -1], ["wave_elapsed", true],
+        ["boss_clear_left", -0.1], ["boss_clear_left", "1"], ["boss_clear_left", true], ["boss_clear_left", 30.1],
         ["shop_open", 1], ["boss_round", "false"], ["boss_defeated", null], ["collapsed", 0], ["prefer_elite", "true"],
         ["enemy_adaptation", 0.99], ["enemy_adaptation", 1.76], ["enemy_adaptation", "1.5"],
         ["xp_needed", 0], ["xp_needed", 1.25], ["xp_needed", false],
@@ -332,6 +333,7 @@ func check_optional_corruption() -> void:
     boundaries["enemy_adaptation"] = 1.65
     boundaries["wave_elapsed"] = 0.0
     boundaries["elapsed"] = 0.0
+    boundaries["boss_clear_left"] = 30.0
     boundaries["xp_needed"] = 1
     boundaries["rng_state"] = "9223372036854775807"
     many_enemies.pop_back()
@@ -348,7 +350,7 @@ func check_optional_corruption() -> void:
     var loaded: Dictionary = boundary_store.read_run()
     expect(loaded.get("ok", false) and loaded.get("state", {}).get("enemies", []).size() == 128 and loaded.get("state", {}).get("pickups", []).size() == 50000, "valid maximum encounter sizes round-trip with independent unit drops")
     var core_only: Dictionary = sample_state()
-    for key in ["player_position", "elapsed", "wave_elapsed", "shop_open", "boss_round", "boss_defeated", "collapsed", "prefer_elite", "enemy_adaptation", "shop_stock", "enemies", "pickups", "rng_state", "xp_needed"]:
+    for key in ["player_position", "elapsed", "wave_elapsed", "boss_clear_left", "shop_open", "boss_round", "boss_defeated", "collapsed", "prefer_elite", "enemy_adaptation", "shop_stock", "enemies", "pickups", "rng_state", "xp_needed"]:
         core_only.erase(key)
     expect(make_store("optional_absent").write_run(core_only).get("ok", false), "optional encounter fields may remain absent in a valid core save")
 

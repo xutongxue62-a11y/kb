@@ -42,7 +42,7 @@ static func capture(world: Node, finished: bool = false) -> Dictionary:
         "character_id":world.character_id,
         "collapsed":world.collapsed, "prefer_elite":world.prefer_elite, "link_id":world.active_link["id"],
         "enemy_adaptation":world.enemy_adaptation, "enemy_serial":world.enemy_serial, "enemies":enemies, "pickups":drops,
-        "boss_round":world.boss_round, "boss_defeated":world.boss_defeated, "shop_open":world.shop_open,
+        "boss_round":world.boss_round, "boss_defeated":world.boss_defeated, "boss_clear_left":world.boss_clear_left, "shop_open":world.shop_open,
         "shop_stock":world.shop_stock.duplicate(true), "rng_state":str(world.rng.state)
     }
 
@@ -114,6 +114,7 @@ static func apply(world: Node, state: Dictionary) -> bool:
     world.chest_queue = int(state.get("chest_queue", 0))
     world.boss_round = bool(state.get("boss_round",world.wave % 5 == 0))
     world.boss_defeated = bool(state.get("boss_defeated",false))
+    world.boss_clear_left = clampf(float(state.get("boss_clear_left", 0.0)), 0.0, world.BOSS_CLEAR_SECONDS) if world.boss_defeated else 0.0
     world.boss_pending = bool(state.get("boss_pending",world.boss_round and not world.boss_defeated and state.get("enemies",[]).is_empty()))
     world.wave_closing = bool(state.get("wave_closing",false))
     world.wave_buffer = clampf(float(state.get("wave_buffer",0.0)),0.0,world.WAVE_BUFFER) if world.wave_closing else 0.0

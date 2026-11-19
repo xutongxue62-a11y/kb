@@ -106,14 +106,31 @@ func run_checks() -> void:
     expect(world.wave == 5 and world.boss_round and not world.shop_open and world.wave_elapsed > 30.0, "a living Boss prevents timed advancement even after thirty seconds")
     world.hurt_enemy(boss, 20000.0, "powder", true, Vector2.RIGHT)
     world.demo = false
+    world.invulnerable = 999.0
     world.simulate(0.01, Vector2.ZERO)
+    expect(world.boss_defeated and not world.wave_closing and not world.shop_open and world.running, "Boss death does not immediately close the wave or open the shop")
+    expect(world.boss_clear_left > 29.0, "Boss death starts a thirty-second cleanup window")
+    world.xp_needed = 99999
+    var cleanup_guard: int = 0
+    while world.boss_clear_left > 0.05 and not world.wave_closing and not world.shop_open and cleanup_guard < 80:
+        cleanup_guard += 1
+        if world.upgrade_pending:
+            world.on_choice(world.upgrade_choices[0])
+            continue
+        world.chest_queue = 0
+        world.simulate(minf(0.5, world.boss_clear_left - 0.05), Vector2.ZERO)
+    expect(not world.wave_closing and not world.shop_open and world.boss_defeated, "cleanup combat continues until the thirty-second window ends")
+    if world.upgrade_pending:
+        world.on_choice(world.upgrade_choices[0])
+    world.simulate(0.2, Vector2.ZERO)
+    expect(world.wave_closing and not world.shop_open, "settlement starts only after the cleanup window")
     world.simulate(world.WAVE_BUFFER+0.01,Vector2.ZERO)
     var choices_resolved: int=0
     while world.upgrade_pending and choices_resolved<32:
         world.on_choice(world.upgrade_choices[0])
         choices_resolved+=1
     expect(world.shop_open and world.wave == 5 and not world.upgrade_pending, "defeating Boss resolves earned XP/chest rewards before opening its paid shop")
-    expect(world.coins >= wallet, "Boss kill drops are collected into shop wallet")
+    expect(world.coins >= wallet, "gold already collected before settlement remains in the shop wallet")
     world.start_run(false)
     world.coins = 37
     world.apply_buff("armor")

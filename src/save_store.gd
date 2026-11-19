@@ -129,6 +129,8 @@ func _validate_optional_run_fields(state: Dictionary) -> String:
     for key in ["elapsed", "wave_elapsed"]:
         if state.has(key) and not _number_in_range(state[key], 0.0, float(MAX_SAFE_INTEGER)):
             return "存档计时无效：" + key
+    if state.has("boss_clear_left") and not _number_in_range(state["boss_clear_left"], 0.0, 30.0):
+        return "存档 Boss 清场计时无效"
     for key in ["shop_open", "boss_round", "boss_defeated", "collapsed", "prefer_elite","wave_closing","boss_pending"]:
         if state.has(key) and typeof(state[key]) != TYPE_BOOL:
             return "存档开关格式无效：" + key
