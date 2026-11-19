@@ -34,6 +34,7 @@ func _initialize() -> void:
     check_invalid_writes()
     check_settings()
     check_character_progress()
+    check_seen_link_recipes()
     check_music_settings()
     check_backups()
     check_corrupt_reads()
@@ -432,3 +433,19 @@ func check_character_progress() -> void:
     expect(read_text("character_progress", "settings.json") == original_text, "invalid character progress leaves the last valid settings file")
     expect(store.write_settings({"autosave": true, "character_best_wave": {}}).get("ok", false), "empty character progress is accepted")
 
+
+func check_seen_link_recipes() -> void:
+    var store = make_store("seen_link_recipes")
+    expect(store.write_settings({"autosave": true, "music_enabled": true}).get("ok", false), "old settings without seen_link_recipes remain valid")
+    var loaded: Dictionary = make_store("seen_link_recipes").read_settings()
+    expect(not loaded.has("seen_link_recipes"), "missing seen_link_recipes stays absent and is treated as empty")
+    expect(store.write_settings({"autosave": true, "seen_link_recipes": ["rune_shell", "fire_cannon"]}).get("ok", false), "seen link recipe ids can be stored")
+    var again: Dictionary = make_store("seen_link_recipes").read_settings()
+    expect(again.get("seen_link_recipes", []) == ["rune_shell", "fire_cannon"], "seen link recipe ids round-trip")
+    var original_text: String = read_text("seen_link_recipes", "settings.json")
+    expect(not store.write_settings({"autosave": true, "seen_link_recipes": "rune_shell"}).get("ok", true), "seen link recipes must be an array")
+    expect(not store.write_settings({"autosave": true, "seen_link_recipes": ["unknown_link"]}).get("ok", true), "unknown link recipe ids are rejected")
+    expect(not store.write_settings({"autosave": true, "seen_link_recipes": ["none"]}).get("ok", true), "the empty link cannot be stored as a seen recipe")
+    expect(not store.write_settings({"autosave": true, "seen_link_recipes": ["rune_shell", "rune_shell"]}).get("ok", true), "duplicate seen recipe ids are rejected")
+    expect(read_text("seen_link_recipes", "settings.json") == original_text, "invalid seen link recipe writes preserve the last valid settings")
+    expect(store.write_settings({"autosave": true, "seen_link_recipes": []}).get("ok", false), "an empty seen link recipe list is accepted")

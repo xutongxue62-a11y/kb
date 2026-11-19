@@ -89,6 +89,12 @@ var active_link: Dictionary = {}
 var available_links: Array = []
 var pending_link: String = ""
 var burning_fields: Array = []
+var link_notice_open: bool = false
+var pending_link_notice: Array = []
+var _run_bootstrapping: bool = false
+var _link_notice_return: String = ""
+var _hinted_complete_links: Dictionary = {}
+var _pending_departure_discovery: bool = false
 var link_demo: bool = false
 var demo_link_stage: String = ""
 var inventory: Array = []
@@ -223,6 +229,10 @@ func _ready() -> void:
     hud.reroll_requested.connect(reroll_shop)
     hud.replace_requested.connect(confirm_replace)
     hud.replace_cancelled.connect(cancel_replace)
+    if hud.has_signal("link_discovery_enable"):
+        hud.link_discovery_enable.connect(_on_link_discovery_enable)
+    if hud.has_signal("link_discovery_closed"):
+        hud.link_discovery_closed.connect(_on_link_discovery_closed)
     hud.next_round_requested.connect(leave_shop)
     hud.save_requested.connect(save_game)
     hud.continue_requested.connect(begin_continue)
@@ -382,6 +392,11 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     running = true
     player_hp = stats["max_hp"]
     combo_message_time = 0.0
+    link_notice_open = false
+    pending_link_notice.clear()
+    _hinted_complete_links.clear()
+    _pending_departure_discovery = false
+    _run_bootstrapping = true
     hero.scale = Vector2.ONE * (3.0 if animation_demo else 1.0)
     hero.phase = 0.0
     hero.amplitude = 0.0
@@ -393,6 +408,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
             grant_weapon(key)
     else:
         grant_weapon(starting_weapon)
+    _run_bootstrapping = false
     set_loadout_visible(true)
     sync_idle_loadout()
     hud.hide_menu()
@@ -692,6 +708,8 @@ func grant_weapon(key: String, level: int = 1) -> bool:
                 item["level"] = clampi(level, 1, Growth.MAX_WEAPON_LEVEL)
                 break
     bind_weapon_view(key)
+    if not result.get("upgraded", false):
+        queue_link_discovery(key)
     rebuild_groups()
     return true
 
@@ -774,20 +792,114 @@ func switch_formation() -> void:
     update_hud()
 
 func announce_link_ready() -> void:
-    if available_links.size() <= 1 or bool(settings.get("seen_link_guide", false)):
+    if link_notice_open or available_links.size() <= 1:
         return
     var names: PackedStringArray = PackedStringArray()
     for recipe in available_links:
-        if str(recipe.get("id", "none")) != "none":
-            names.append(str(recipe.get("name", "")))
+        var link_id: String = str(recipe.get("id", "none"))
+        if link_id == "none" or _hinted_complete_links.has(link_id):
+            continue
+        _hinted_complete_links[link_id] = true
+        names.append(str(recipe.get("name", "")))
     if names.is_empty():
         return
-    combo_message = "已集齐联动（%s）。按 Q 切换；锁链从火药筒炮口弹出。暂停菜单的「帮助」里有完整说明。" % " / ".join(names)
-    combo_message_time = 6.5
-    settings["seen_link_guide"] = true
+    combo_message = "已可启用「%s」。不会自动开启，按 Q 切换或在说明中选择启用。" % " / ".join(names)
+    combo_message_time = 3.2
+
+func _seen_link_ids() -> Array:
+    var seen: Array = []
+    var raw: Variant = settings.get("seen_link_recipes", [])
+    if typeof(raw) == TYPE_ARRAY:
+        for entry in raw:
+            var link_id: String = str(entry)
+            if Catalog.LINKS.has(link_id) and link_id != "none" and not seen.has(link_id):
+                seen.append(link_id)
+    return seen
+
+func queue_link_discovery(weapon_id: String) -> void:
+    if weapon_id.is_empty() or not Catalog.WEAPONS.has(weapon_id):
+        return
+    var seen: Array = _seen_link_ids()
+    for recipe in Catalog.recipes_for_weapon(weapon_id):
+        var link_id: String = str(recipe.get("id", ""))
+        if link_id.is_empty() or seen.has(link_id):
+            continue
+        var already: bool = false
+        for pending in pending_link_notice:
+            if str(pending.get("id", "")) == link_id:
+                already = true
+                break
+        if already:
+            continue
+        pending_link_notice.append(recipe)
+
+func try_present_link_discovery(force: bool = false) -> bool:
+    if link_notice_open or pending_link_notice.is_empty() or not running:
+        return false
+    if not force and (_run_bootstrapping or departure_left > 0.0 or demo or animation_demo or trial_mode or restoring):
+        return false
+    if hud == null or not hud.has_method("show_link_discovery"):
+        return false
+    if upgrade_pending and replace_pending.is_empty():
+        return false
+    var recipes: Array = pending_link_notice.duplicate(true)
+    var owned: Array = Catalog.inventory_ids(inventory)
+    _link_notice_return = "shop" if shop_open else str(hud.screen)
+    link_notice_open = true
+    player_frozen = true
+    if not shop_open and not upgrade_pending and audio != null and not paused:
+        audio.set_paused(true)
+    hud.show_link_discovery(recipes, owned)
+    pending_link_notice.clear()
+    update_hud()
+    return true
+
+func _mark_link_recipes_seen(recipes: Array) -> void:
+    var previous: Array = _seen_link_ids()
+    var seen: Array = previous.duplicate()
+    var changed: bool = false
+    for recipe in recipes:
+        var link_id: String = str(recipe) if typeof(recipe) == TYPE_STRING else str(recipe.get("id", ""))
+        if not Catalog.LINKS.has(link_id) or link_id == "none" or seen.has(link_id):
+            continue
+        seen.append(link_id)
+        changed = true
+    if not changed:
+        return
+    settings["seen_link_recipes"] = seen
     var result: Dictionary = save_store.write_settings(settings)
     if not result.get("ok", false):
-        settings["seen_link_guide"] = false
+        settings["seen_link_recipes"] = previous
+
+func _close_link_discovery_ui() -> void:
+    var reopen_shop: bool = shop_open
+    link_notice_open = false
+    if not shop_open and not upgrade_pending and not paused and audio != null:
+        audio.set_paused(false)
+    if player_hp > 0.0 and running and not wave_closing:
+        player_frozen = false
+    if hud != null and hud.has_method("hide_link_discovery"):
+        hud.hide_link_discovery(reopen_shop)
+        if reopen_shop:
+            show_current_shop(false)
+        elif hud.screen != "combat" and not upgrade_pending and not shop_open:
+            hud.hide_menu()
+    update_hud()
+
+func _on_link_discovery_enable(link_id: String) -> void:
+    if not link_notice_open:
+        return
+    if hud != null:
+        _mark_link_recipes_seen(hud.link_discovery_recipes() if hud.has_method("link_discovery_recipes") else pending_link_notice)
+    select_link(link_id)
+    _close_link_discovery_ui()
+
+func _on_link_discovery_closed() -> void:
+    if not link_notice_open:
+        return
+    if hud != null:
+        _mark_link_recipes_seen(hud.link_discovery_recipes() if hud.has_method("link_discovery_recipes") else [])
+    _close_link_discovery_ui()
 
 func toggle_hud_hidden() -> void:
     if hud == null or not running or shop_open or upgrade_pending or not hud.has_method("toggle_hud_hidden"):
@@ -822,7 +934,7 @@ func toggle_pause() -> void:
     if hud.screen in ["help", "settings", "continue"]:
         hud.close_front_modal()
         return
-    if not running or upgrade_pending or shop_open or animation_demo:
+    if not running or upgrade_pending or shop_open or animation_demo or link_notice_open:
         return
     paused = not paused
     audio.set_paused(paused)
@@ -841,6 +953,8 @@ func finish_run(won: bool) -> void:
     wave_closing = false
     wave_buffer = 0.0
     player_frozen = false
+    link_notice_open = false
+    pending_link_notice.clear()
     impact_strength = 0.0
     position = Vector2.ZERO
     if world_camera != null:
@@ -954,6 +1068,8 @@ func _finish_successful_choice() -> void:
     hud.hide_menu()
     update_hud()
     auto_save()
+    if try_present_link_discovery():
+        return
     if wave_closing and wave_buffer <= 0.000001:
         continue_round_rewards()
     else:
@@ -1056,6 +1172,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
             hud.cancel_restart()
         elif hud != null and hud.screen == "help_confirm" and hud.has_method("cancel_help_trial"):
             hud.cancel_help_trial()
+        elif link_notice_open and hud != null and hud.has_method("cancel_link_discovery"):
+            hud.cancel_link_discovery()
         else:
             toggle_pause()
         return
@@ -1070,6 +1188,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
                     hud.confirm_replace_choice()
                 "help_confirm":
                     hud.confirm_help_trial()
+                "link_discover":
+                    if hud.has_method("confirm_link_discovery"):
+                        hud.confirm_link_discovery()
                 "pause":
                     toggle_pause()
                 "shop":
@@ -1092,7 +1213,7 @@ func read_movement() -> Vector2:
         float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)) - float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))+touch_input
 
 func request_dodge(direction: Vector2 = Vector2.ZERO) -> bool:
-    if not running or player_hp <= 0.0 or paused or shop_open or upgrade_pending or stats_open or player_frozen or wave_closing or departure_left > 0.0 or animation_demo:
+    if not running or player_hp <= 0.0 or paused or shop_open or upgrade_pending or stats_open or player_frozen or link_notice_open or wave_closing or departure_left > 0.0 or animation_demo:
         return false
     if dodge_cooldown > 0.000001 or dodge_left > 0.000001:
         return false
@@ -1127,6 +1248,9 @@ func _physics_process(delta: float) -> void:
     else:
         movement = read_movement()
     simulate(delta, movement)
+    if _pending_departure_discovery and departure_left <= 0.0:
+        _pending_departure_discovery = false
+        try_present_link_discovery()
 
 func simulate(delta: float, movement: Vector2) -> void:
     if hurt_flash > 0.0:
@@ -1143,11 +1267,12 @@ func simulate(delta: float, movement: Vector2) -> void:
         hud.update_departure(departure_left)
         if is_zero_approx(departure_left):
             hud.hide_menu()
+            _pending_departure_discovery = true
         return
     if animation_demo:
         animate_showcase(delta)
         return
-    if not running or paused or upgrade_pending or shop_open:
+    if not running or paused or upgrade_pending or shop_open or link_notice_open:
         return
     if player_frozen:
         movement = Vector2.ZERO
@@ -1310,6 +1435,10 @@ func begin_round(stage: int) -> void:
     advance_wave(stage)
     wave_elapsed = 0.0
     shop_open = false
+    if link_notice_open:
+        _on_link_discovery_closed()
+    link_notice_open = false
+    player_frozen = false
     boss_round = wave % 5 == 0
     boss_defeated = false
     boss_clear_left = 0.0
@@ -1483,7 +1612,7 @@ func link_hint_text() -> String:
             if str(recipe.get("id", "none")) != "none":
                 names.append(str(recipe.get("name", "")))
         var current: String = str(active_link.get("name", "不联动"))
-        return "已可联动：按 Q 切换（当前：%s）。锁链从火药筒炮口弹出。帮助里有完整配方。" % current
+        return "已可联动：按 Q 切换（当前：%s）。锁链从火药筒炮口弹出。" % current
     for link_id in Catalog.LINK_ORDER:
         if link_id == "none":
             continue
@@ -1527,6 +1656,7 @@ func buy_shop_item(index: int) -> bool:
     show_current_shop(false, index)
     update_hud()
     auto_save()
+    try_present_link_discovery()
     return true
 
 func begin_replace(pending: Dictionary) -> void:
@@ -1559,6 +1689,7 @@ func confirm_replace(remove_id: String) -> bool:
         return false
     unbind_weapon_view(remove_id)
     bind_weapon_view(new_id)
+    queue_link_discovery(new_id)
     rebuild_groups()
     coins += refund
     if source == "shop":
@@ -1568,6 +1699,7 @@ func confirm_replace(remove_id: String) -> bool:
         show_current_shop(false, shop_index)
         update_hud()
         auto_save()
+        try_present_link_discovery()
         return true
     _finish_successful_choice()
     return true
@@ -2000,11 +2132,14 @@ func update_armory(delta: float) -> void:
                     if not neighbor.is_empty():
                         effects.beam(command.enemy.position,neighbor.position,Color("#f3d89b"))
                         hurt_enemy(neighbor,command.damage*0.45,"totem",true,command.direction)
+                apply_weapon_link_hit(command.enemy.position, str(command.get("weapon_id", "")))
                 flash_weapon(command["weapon_id"])
             "area":
                 damage_area(command["position"],command["radius"]*stats["area_multiplier"],command["damage"],command["weapon_id"],true,Color("#e8c783"), "quake")
                 audio.play("stone_hit", 0.0, 0.72)
                 flash_weapon(command.get("weapon_id", "hammer"))
+                if str(command.get("weapon_id", "")) == "hammer" and float(command.get("radius", 0.0)) <= 80.0:
+                    apply_weapon_link_hit(command["position"], "hammer")
             "beam":
                 effects.lightning(command["start"],command["end"],command["color"])
                 audio.play("magic_hit", -2.0, 1.08)
@@ -2154,13 +2289,18 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
                 for index in range(count):
                     var offset: float=(index-(count-1)*0.5)*0.13
                     var shot_aim: Vector2 = direction.rotated(offset)
-                    fire_projectile(muzzle, shot_aim, key, damage*(1.0 if count==1 else (0.70 if count==2 else 0.61)), attack_range, false, key == "powder" and active_link["kind"] == "rune")
+                    var enchanted_shot: bool = (key == "powder" and active_link["kind"] == "rune") or _host_is_enchanted(key)
+                    fire_projectile(muzzle, shot_aim, key, damage*(1.0 if count==1 else (0.70 if count==2 else 0.61)), attack_range, false, enchanted_shot)
                 audio.play("powder" if key == "powder" else "sling", 0.0 if key == "powder" else -2.0, 0.86 if key == "powder" else 1.0)
                 flash_weapon(key)
                 if key == "powder" and active_link["kind"] == "rune":
                     effects.rune_ignition(mounts.get("staff", player_position + Rules.ranged_mount("staff")), muzzle)
                     audio.play("magic", -2.0)
-        var penalty: float = active_link["cooldown_multiplier"] if key == "powder" and active_link["weapons"].has("powder") else 1.0
+        var penalty: float = 1.0
+        if key == str(active_link.get("reload_weapon", "")):
+            penalty = float(active_link.get("cooldown_multiplier", 1.0))
+        elif key == "powder" and active_link["weapons"].has("powder"):
+            penalty = float(active_link.get("cooldown_multiplier", 1.0))
         runtime["cooldown"] = data["cooldown"] * penalty / (1.0 + (item["level"] - 1) * 0.12)
         runtime["recoil"] = 0.12
         hero.recoil(direction)
@@ -2404,6 +2544,8 @@ func update_projectiles(delta: float) -> void:
                         projectile["hit_ids"] = []
                     projectile["hit_ids"].append(enemy["id"])
                     hurt_enemy(enemy, projectile["damage"], projectile["weapon_id"], projectile["from_combo"], projectile["velocity"].normalized())
+                    if not projectile.get("from_combo", false):
+                        apply_weapon_link_hit(enemy["position"], str(projectile.get("weapon_id", projectile["kind"])))
                     if projectile["kind"] == "staff":
                         audio.play("magic_hit", -5.0)
                         effects.burst(enemy["position"], Color("#67effa"), 24, "ring")
@@ -2428,21 +2570,66 @@ func update_projectiles(delta: float) -> void:
             remaining.append(projectile)
     projectiles = remaining
 
+
+func _host_is_enchanted(weapon_id: String) -> bool:
+    var kind: String = str(active_link.get("kind", "none"))
+    return kind in ["fire_enchant", "rune_enchant"] and str(active_link.get("reload_weapon", "")) == weapon_id
+
+func apply_weapon_link_hit(point: Vector2, weapon_id: String) -> void:
+    if weapon_id.is_empty() or not _host_is_enchanted(weapon_id):
+        return
+    var kind: String = str(active_link.get("kind", "none"))
+    if kind == "fire_enchant":
+        _spawn_attachment_fire(point, weapon_id)
+    elif kind == "rune_enchant":
+        _apply_rune_burst(point)
+
+func _spawn_attachment_fire(point: Vector2, host_id: String) -> void:
+    for field in burning_fields:
+        if bool(field.get("from_link", false)) and float(field.get("age", 1.0)) <= 0.04 and Vector2(field.get("position", point)).distance_squared_to(point) <= 36.0:
+            return
+    var pot_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "firepot")
+    var radius: float = (56.0 if host_id == "powder" or host_id == "hammer" else 38.0) * float(stats.get("area_multiplier", 1.0)) * float(pot_bonus.get("area_multiplier", 1.0))
+    var life: float = (1.35 if host_id == "powder" or host_id == "hammer" else 1.05) * float(pot_bonus.get("life_multiplier", 1.0))
+    var damage: float = 0.55 * (1.0 + (weapon_level("firepot") - 1) * 0.25) * float(pot_bonus.get("damage_multiplier", 1.0))
+    burning_fields.append({"position": point, "age": 0.0, "life": life, "tick": 0.18, "radius": radius, "damage": damage, "weapon_id": "firepot", "from_link": true})
+    if burning_fields.size() > 12:
+        burning_fields.pop_front()
+    effects.burst(point, Color("#ffad40"), radius * 0.7, "blast")
+
+func _apply_rune_burst(point: Vector2) -> void:
+    var staff_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "staff")
+    var damage: float = 1.6 * (1.0 + (weapon_level("staff") - 1) * 0.25) * float(staff_bonus.get("damage_multiplier", 1.0))
+    var radius: float = 34.0 * float(stats.get("area_multiplier", 1.0))
+    damage_area(point, radius, damage, "staff", true, Color("#6ee7f2"), "rune_blast")
+    audio.play("magic_hit", -6.0)
+
 func explode_powder(projectile: Dictionary) -> void:
     var enchanted: bool = projectile.get("enchanted", false)
     var point: Vector2 = projectile["position"]
     damage_area(point, (85.0 if enchanted else 63.0) * stats["area_multiplier"], projectile["damage"] * (1.2 if enchanted else 1.0), "powder", true, Color("#ffad40") if not enchanted else Color("#6ee7f2"), "rune_blast" if enchanted else "blast")
     audio.play("blast", 0.0, 0.88)
     var stage: int=Evolution.tier(weapon_level("powder"))
-    if stage>=1 and not enchanted:
-        burning_fields.append({"position":point,"age":0.0,"life":1.4,"tick":0.18,"radius":56.0*stats.area_multiplier,"damage":projectile.damage*0.16,"weapon_id":"powder"})
+    var fire_cannon: bool = _host_is_enchanted("powder") and str(active_link.get("kind", "")) == "fire_enchant"
+    if (stage>=1 and not enchanted) or fire_cannon:
+        var field_damage: float = projectile.damage*0.16
+        var field_radius: float = 56.0*stats.area_multiplier
+        var field_life: float = 1.4
+        if fire_cannon:
+            var pot_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "firepot")
+            field_damage *= float(pot_bonus.get("damage_multiplier", 1.0))
+            field_radius *= float(pot_bonus.get("area_multiplier", 1.0))
+            field_life *= float(pot_bonus.get("life_multiplier", 1.0))
+        burning_fields.append({"position":point,"age":0.0,"life":field_life,"tick":0.18,"radius":field_radius,"damage":field_damage,"weapon_id":"powder" if not fire_cannon else "firepot","from_link":fire_cannon})
     if stage>=2:
         for shard in range(4):
             fire_projectile(point,Vector2.from_angle(TAU*shard/4.0),"sling",projectile.damage*0.25,190.0,true)
             projectiles.back().weapon_id="powder"
     if burning_fields.size()>12: burning_fields.pop_front()
     if enchanted:
-        burning_fields.append({"position": point, "age": 0.0, "life": 1.1, "tick": 0.18, "radius": 61.0 * stats["area_multiplier"], "damage": 0.7 * (1.0 + (weapon_level("staff") - 1) * 0.25)})
+        var staff_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "staff")
+        var rune_damage: float = 0.7 * (1.0 + (weapon_level("staff") - 1) * 0.25) * float(staff_bonus.get("damage_multiplier", 1.0))
+        burning_fields.append({"position": point, "age": 0.0, "life": 1.1, "tick": 0.18, "radius": 61.0 * stats["area_multiplier"], "damage": rune_damage, "weapon_id": "staff", "from_link": true})
         if burning_fields.size() > 12:
             burning_fields.pop_front()
         effects.burst(point, Color("#65e7ec"), 45.0, "ring")
@@ -2602,7 +2789,7 @@ func damage_area(point: Vector2, radius: float, damage: float, weapon_id: String
 # Environmental DPS is the same for both teams: no armor, random dodge,
 # weapon bonuses or criticals. Timed hero immunity still protects a short dodge.
 func update_terrain_damage(delta: float, player_exposure: float = -1.0) -> void:
-    if delta <= 0.0 or not running or paused or shop_open or upgrade_pending or stats_open or player_frozen or wave_closing or departure_left > 0.0 or animation_demo:
+    if delta <= 0.0 or not running or paused or shop_open or upgrade_pending or stats_open or player_frozen or link_notice_open or wave_closing or departure_left > 0.0 or animation_demo:
         return
     var exposure: float = (delta if invulnerable <= 0.0 else 0.0) if player_exposure < 0.0 else player_exposure
     if exposure > 0.0 and not demo and player_hp > 0.0:

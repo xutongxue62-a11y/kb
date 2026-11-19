@@ -60,6 +60,10 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                     if mastery.has("pierce_limit"):
                         pierce_limit = maxi(pierce_limit, int(mastery["pierce_limit"]))
                     shot["pierce_limit"]=pierce_limit
+                    var link_kind: String = str(stats.get("link_kind", "none"))
+                    if str(stats.get("reload_weapon", "")) == "bonebow" and link_kind in ["fire_enchant", "rune_enchant"]:
+                        shot["enchanted"] = true
+                        shot["link_kind"] = link_kind
                     state.arrows.append(shot)
             "firepot":
                 var flight: float = clampf(mount.distance_to(target["position"]) / data["speed"], 0.32, 0.65)
@@ -206,9 +210,15 @@ static func draw(canvas: Node2D, key: String, state: Dictionary) -> void:
                 var point: Vector2 = arrow["position"]
                 var direction: Vector2 = arrow["direction"]
                 var side: Vector2 = direction.orthogonal()
+                var shaft: Color = Color("#e5c794")
+                var tip: Color = Color("#f1dfb9")
+                if arrow.get("enchanted", false):
+                    shaft = Color("#f3a15a") if str(arrow.get("link_kind", "")) == "fire_enchant" else Color("#6ee7f2")
+                    tip = shaft.lightened(0.18)
+                    canvas.draw_line(point - direction * 31.0, point + direction * 11.0, Color(shaft, 0.42), 11.0, true)
                 canvas.draw_line(point - direction * 29.0, point + direction * 9.0, INK, 7.0, true)
-                canvas.draw_line(point - direction * 29.0, point + direction * 9.0, Color("#e5c794"), 3.5, true)
-                outlined_polygon(canvas, PackedVector2Array([point + direction * 19.0, point + direction * 4.0 + side * 7.0, point + direction * 6.0, point + direction * 4.0 - side * 7.0]), Color("#f1dfb9"))
+                canvas.draw_line(point - direction * 29.0, point + direction * 9.0, shaft, 3.5, true)
+                outlined_polygon(canvas, PackedVector2Array([point + direction * 19.0, point + direction * 4.0 + side * 7.0, point + direction * 6.0, point + direction * 4.0 - side * 7.0]), tip)
                 canvas.draw_line(point - direction * 20.0, point - direction * 29.0 + side * 7.0, INK, 4.0, true)
                 canvas.draw_line(point - direction * 20.0, point - direction * 29.0 - side * 7.0, INK, 4.0, true)
         "firepot":

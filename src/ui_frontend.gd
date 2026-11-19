@@ -477,11 +477,11 @@ static func help_page(h, page: String, in_run: bool) -> void:
     var heading: String = "按键操作" if page == "keys" else ("武器联动" if page == "links" else "玩法说明")
     label(h, body, heading, Rect2(40, 20, 800, 65), 40, INK, true)
     line(body, Vector2(40, 100), 904, RED)
-    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后按 %s 切换联动。屏幕下方会提示还差哪一件。\n锁链类联动会从火药筒炮口弹出。详情见「武器联动」。\n按 %s 可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("hide_ui")]
+    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后按 %s 切换联动。屏幕下方会提示还差哪一件。\n获得有配方的武器时会弹出说明，写出优点和缺点。锁链类联动会从火药筒炮口弹出。\n按 %s 可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("hide_ui")]
     if page == "keys":
         text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒（不可改）\n← / → 翻页预览角色，点击画像确认选择\n%s 确认出发 · %s 返回 / 暂停\n%s 角色属性 · %s 手动保存 · %s 隐藏或显示界面\n%s 散射 / 集火切换 · %s 切换武器联动 · %s 切换瞄准目标\n%s / %s / %s 选择成长 · 商店按栏位键直接购买 · 结算页按 %s 再出发" % [KeyBindings.caption_for("confirm"), KeyBindings.caption_for("cancel"), KeyBindings.caption_for("stats"), KeyBindings.caption_for("save"), KeyBindings.caption_for("hide_ui"), KeyBindings.caption_for("scatter"), KeyBindings.caption_for("link"), KeyBindings.caption_for("aim"), KeyBindings.caption_for("shop_1"), KeyBindings.caption_for("shop_2"), KeyBindings.caption_for("shop_3"), KeyBindings.caption_for("confirm")]
     elif page == "links":
-        text = "集齐配对武器后，按 %s 在「不联动」和联动之间切换。下方提示会写还差哪一件。\n\n火药筒 + 木棒 / 石斧 / 骨刃 → 锁链武器。\n锁链从火药筒炮口弹出并弹射往返；木棒不再环绕，火药筒不再发普通炮弹。\n火药筒 + 法杖 → 符火炮弹。火种壶 + 雷鸣图腾等也有各自配方。\n\n每一种联动都有代价，切换前请看说明。战斗界面不再长期放置联动按钮，请用 %s 切换。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("link")]
+        text = "集齐配对武器后，按 %s 在「不联动」和联动之间切换。第一次获得有配方的武器时会弹出说明，写出两件武器、联动名称、优点和缺点。商店和升级卡片也会标明「可联动」或还差哪一件。\n\n火药筒 + 木棒 / 石斧 / 骨刃 → 锁链武器。\n锁链从火药筒炮口弹出并弹射往返；被联动的近战不再环绕，火药筒不再发普通炮弹。\n火药筒 + 魔法杖 → 魔法炮。炮弹化为符能爆炸并留下灼烧，但魔法杖停止独立发射。\n火种壶可附着到火药筒、骨弩、弹弓、石槌或骨镖上，把攻击变成带火的联动。魔法杖也可附着到骨弩、弹弓或骨镖上，让弹道附上符能。\n火种壶 + 战鼓、骨弩 + 图腾、图腾 + 晶簇也有各自配方。\n\n同一时间一把武器只能参加一组联动。每一种联动都有代价，默认不会自动启用。之后可用 %s 切换或关闭。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("link")]
     var copy: Label = label(h, body, text, Rect2(44, 118, 894, 378), 20)
     copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     button(h, body, "HelpGameplay", "玩法", Rect2(40, 508, 110, 43), func(): h.show_help("gameplay", in_run), false, 18)

@@ -39,6 +39,8 @@ signal volume_changed(kind: String, value: float)
 signal damage_numbers_changed(enabled: bool)
 signal display_mode_changed(fullscreen: bool)
 signal key_bindings_changed
+signal link_discovery_enable(link_id)
+signal link_discovery_closed
 
 var library
 var root: Control
@@ -83,6 +85,11 @@ var replace_stage_view: int = 1
 var replace_chosen: String = ""
 var replace_confirm_dim: ColorRect = null
 var replace_confirm_column: VBoxContainer = null
+var link_discover_dim: ColorRect = null
+var link_discover_column: VBoxContainer = null
+var link_discover_recipes: Array = []
+var link_discover_complete: Array = []
+var link_discover_over_shop: bool = false
 var ink: Color = Color("#17253a")
 var cream: Color = Color("#f4ead6")
 var stamp: Color = Color("#c0453a")
@@ -837,6 +844,10 @@ func update_state(hp: float, elapsed: float, kills: int, xp: float, xp_needed: i
             var tag: String = ""
             if link["kind"] == "rune" and item["id"] == "staff":
                 tag = " · 注能"
+            elif str(link.get("kind", "")) in ["fire_enchant", "rune_enchant"] and item["id"] == str(link.get("reload_weapon", "")):
+                tag = " · 附着"
+            elif str(link.get("kind", "")) in ["fire_enchant", "rune_enchant", "rune"] and link.get("suppressed", []).has(item["id"]):
+                tag = " · 附着"
             elif link["kind"] == "chain" and item["id"] == link["weapons"][1]:
                 tag = " · 弹射"
             slot["level"].text = "Lv.%d" % item["level"] + (" · 觉醒" if item.level>=5 else (" · 进阶" if item.level>=3 else "")) + tag
@@ -1469,6 +1480,125 @@ func confirm_restart() -> void:
     if screen == "restart_confirm":
         restart_requested.emit()
 
+func show_link_discovery(recipes: Array, owned: Array) -> void:
+    link_discover_recipes = []
+    link_discover_complete = []
+    for recipe in recipes:
+        if typeof(recipe) != TYPE_DICTIONARY:
+            continue
+        var copy: Dictionary = recipe.duplicate(true)
+        link_discover_recipes.append(copy)
+        if Catalog.recipe_complete(copy, owned):
+            link_discover_complete.append(str(copy.get("id", "")))
+    if link_discover_recipes.is_empty():
+        return
+    link_discover_over_shop = screen == "shop"
+    _close_link_discovery_layer()
+    if not link_discover_over_shop:
+        reset_overlay()
+        set_battle_visible(true)
+        present_backdrop("none")
+        overlay.color = Color(0.04, 0.08, 0.13, 0.64)
+        overlay.visible = true
+        overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+    else:
+        link_discover_dim = ColorRect.new()
+        link_discover_dim.name = "LinkDiscoverDim"
+        link_discover_dim.color = Color(0.04, 0.08, 0.13, 0.55)
+        link_discover_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+        link_discover_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+        overlay.add_child(link_discover_dim)
+    screen = "link_discover"
+    var column: VBoxContainer = parchment_column(720, 80)
+    link_discover_column = column
+    column.get_meta("scroll_frame").name = "LinkDiscoverSheet"
+    column.get_meta("scroll_frame").opening_mode = "fold"
+    column.add_theme_constant_override("separation", 10)
+    var title: Label = make_display("发现武器联动", 30)
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(title)
+    var intro: Label = make_label("这两件武器可以搭配使用。优点和缺点都写在下面。不会自动启用，需要你选择后才会生效。", 16, Color("#66705e"))
+    intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    intro.custom_minimum_size = Vector2(620, 44)
+    column.add_child(intro)
+    for recipe in link_discover_recipes:
+        var weapons: Array = recipe.get("weapons", [])
+        var first: String = Catalog.weapon_name(str(weapons[0])) if weapons.size() > 0 else ""
+        var second: String = Catalog.weapon_name(str(weapons[1])) if weapons.size() > 1 else ""
+        var ready: bool = link_discover_complete.has(str(recipe.get("id", "")))
+        var status: String = "现在可启用" if ready else ("还差%s" % (second if not owned.has(str(weapons[1])) else first))
+        if not ready:
+            var missing: PackedStringArray = PackedStringArray()
+            for weapon_id in weapons:
+                if not owned.has(str(weapon_id)):
+                    missing.append(Catalog.weapon_name(str(weapon_id)))
+            if not missing.is_empty():
+                status = "还差%s" % "、".join(missing)
+        var block: Label = make_label("%s + %s  →  %s\n优点：%s\n缺点：%s\n%s" % [first, second, str(recipe.get("name", "")), Catalog.benefit_text(recipe), Catalog.cost_text(recipe), status], 16, Color("#3a2a1c"))
+        block.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        block.custom_minimum_size = Vector2(620, 92)
+        column.add_child(block)
+    if not link_discover_complete.is_empty():
+        if link_discover_complete.size() == 1:
+            var only: String = str(link_discover_complete[0])
+            var name: String = str(Catalog.LINKS.get(only, {}).get("name", only))
+            bind_shortcut(action(column, "LinkEnable", "启用·%s" % name, func(): _emit_link_enable(only), Color("#b4583e")), "confirm")
+        else:
+            for link_id in link_discover_complete:
+                var name: String = str(Catalog.LINKS.get(link_id, {}).get("name", link_id))
+                action(column, "LinkEnable_%s" % link_id, "启用·%s" % name, func(): _emit_link_enable(str(link_id)), Color("#b4583e"))
+        bind_shortcut(action(column, "LinkDecline", "先不用", func(): cancel_link_discovery()), "cancel")
+    else:
+        bind_shortcut(action(column, "LinkDismiss", "知道了", func(): cancel_link_discovery()), "confirm")
+    open_parchment(column, true)
+    call_deferred("_center_parchment_vertical", column)
+
+func link_discovery_recipes() -> Array:
+    return link_discover_recipes.duplicate(true)
+
+func _emit_link_enable(link_id: String) -> void:
+    if screen != "link_discover":
+        return
+    link_discovery_enable.emit(link_id)
+
+func confirm_link_discovery() -> void:
+    if screen != "link_discover":
+        return
+    if link_discover_complete.size() == 1:
+        _emit_link_enable(str(link_discover_complete[0]))
+    else:
+        cancel_link_discovery()
+
+func cancel_link_discovery() -> void:
+    if screen != "link_discover":
+        return
+    link_discovery_closed.emit()
+
+func hide_link_discovery(keep_shop: bool = false) -> void:
+    _close_link_discovery_layer()
+    link_discover_recipes.clear()
+    link_discover_complete.clear()
+    if keep_shop or link_discover_over_shop:
+        screen = "shop"
+        link_discover_over_shop = false
+        return
+    link_discover_over_shop = false
+    if screen == "link_discover":
+        hide_menu()
+
+func _close_link_discovery_layer() -> void:
+    if link_discover_column != null and is_instance_valid(link_discover_column):
+        var frame = link_discover_column.get_meta("scroll_frame", null)
+        if frame != null and is_instance_valid(frame):
+            frame.queue_free()
+        elif is_instance_valid(link_discover_column):
+            link_discover_column.queue_free()
+    link_discover_column = null
+    if link_discover_dim != null and is_instance_valid(link_discover_dim):
+        link_discover_dim.queue_free()
+    link_discover_dim = null
+
 func shop_index_available(index: int) -> bool:
     # Mirrors the shop card's mouse disabled state (ui_offer_layout.shop):
     # sold out, unaffordable, or a heal at full HP cannot be picked.
@@ -1677,6 +1807,14 @@ func handle_front_key(code: int) -> bool:
         if KeyBindings.matches_code(code, "confirm"):
             confirm_restart()
             return true
+    if screen == "link_discover":
+        if KeyBindings.matches_code(code, "cancel"):
+            cancel_link_discovery()
+            return true
+        if KeyBindings.matches_code(code, "confirm"):
+            confirm_link_discovery()
+            return true
+        return true
     if screen == "cast":
         if code == KEY_LEFT or code == KEY_RIGHT:
             change_character(-1 if code == KEY_LEFT else 1)
@@ -2092,10 +2230,10 @@ func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: f
         KeyBindings.attach_to_button(combo_button, "link")
     if links.size() <= 1:
         if combo_button != null:
-            combo_button.tooltip_text = "获得火药筒 + 法杖可选符火；火药筒 + 木棒/石斧/骨刃可选锁链。按 %s 切换，保留改造代价。" % KeyBindings.caption_for("link")
+            combo_button.tooltip_text = "获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 切换，不会自动开启。" % KeyBindings.caption_for("link")
         # When the player already holds one half of a recipe, main passes a
         # hint naming the missing piece instead of the generic recipe list.
-        combo_label.text = link_hint if link_hint != "" else ("联动配方：火药筒 + 法杖 / 近战武器；集齐后按 %s 切换。帮助里有炮口与配方说明。" % KeyBindings.caption_for("link"))
+        combo_label.text = link_hint if link_hint != "" else ("获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 切换。" % KeyBindings.caption_for("link"))
     elif link_hint != "":
         combo_label.text = link_hint
 

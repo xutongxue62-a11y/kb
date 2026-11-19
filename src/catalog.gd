@@ -21,16 +21,24 @@ const WEAPONS = {
     "crystal": {"name": "晶簇", "kind": "special", "damage": 7.0, "cooldown": 2.30, "range": 290.0, "speed": 420.0, "size": 45.0, "color": Color("#b09cdb"), "description": "布置晶簇 · 近敌触发\n六向碎晶，各沿弹道"}
 }
 const LINKS = {
-    "none": {"id": "none", "name": "不联动", "kind": "none", "weapons": [], "suppressed": [], "cooldown_multiplier": 1.0, "range": 395.0, "enchanted": false, "summary": "不联动\n六件武器独立攻击", "cost": "无联动改造"},
-    "rune_shell": {"id": "rune_shell", "name": "符火炮弹", "kind": "rune", "weapons": ["powder", "staff"], "suppressed": ["staff"], "cooldown_multiplier": 1.5, "range": 395.0, "enchanted": true, "summary": "符火炮弹\n范围灼烧；装填更慢\n法杖不再独立发射", "cost": "魔法杖停止独立发射，火药筒装填间隔增加50%"},
-    "chain_club": {"id": "chain_club", "name": "锁链木棒", "kind": "chain", "weapons": ["powder", "club"], "suppressed": ["club"], "cooldown_multiplier": 1.15, "range": 210.0, "enchanted": false, "summary": "锁链木棒\n弹射往返；射程缩短\n失去环绕和普通炮弹", "cost": "木棒不再环绕护身，火药筒不发普通炮弹；射程缩至210"},
-    "chain_axe": {"id": "chain_axe", "name": "锁链石斧", "kind": "chain", "weapons": ["powder", "axe"], "suppressed": ["axe"], "cooldown_multiplier": 1.15, "range": 210.0, "enchanted": false, "summary": "锁链石斧\n弹射往返；射程缩短\n失去环绕和普通炮弹", "cost": "石斧不再环绕护身，火药筒不发普通炮弹；射程缩至210"},
-    "chain_blade": {"id": "chain_blade", "name": "锁链骨刃", "kind": "chain", "weapons": ["powder", "blade"], "suppressed": ["blade"], "cooldown_multiplier": 1.15, "range": 210.0, "enchanted": false, "summary": "锁链骨刃\n弹射往返；射程缩短\n失去环绕和普通炮弹", "cost": "骨刃不再环绕护身，火药筒不发普通炮弹；射程缩至210"},
-    "fire_drum": {"id":"fire_drum","name":"鼓风燎原","kind":"fire_drum","weapons":["firepot","wardrum"],"suppressed":[],"cooldown_multiplier":1.15,"reload_weapon":"firepot","range":300.0,"enchanted":false,"summary":"鼓风燎原\n鼓波扩散现有火场\n火种壶装填慢15%","cost":"仅鼓波接触的已有火场增强一次；火种壶装填慢15%"},
-    "thunder_crystal": {"id":"thunder_crystal","name":"雷晶共鸣","kind":"thunder_crystal","weapons":["totem","crystal"],"suppressed":[],"cooldown_multiplier":1.15,"reload_weapon":"totem","range":320.0,"enchanted":false,"summary":"雷晶共鸣\n雷击充能附近晶簇\n图腾施法慢15%","cost":"雷击需落在晶簇附近；图腾施法慢15%，不强化无关武器"},
-    "storm_arrow": {"id":"storm_arrow","name":"导雷骨箭","kind":"storm_arrow","weapons":["bonebow","totem"],"suppressed":["totem"],"cooldown_multiplier":1.18,"reload_weapon":"bonebow","range":430.0,"enchanted":false,"summary":"导雷骨箭\n弩箭命中后导雷\n图腾改为给骨弩注能","cost":"图腾停止独立攻击；骨弩装填慢18%，命中才导雷"}
+    "none": {"id": "none", "name": "不联动", "kind": "none", "weapons": [], "suppressed": [], "cooldown_multiplier": 1.0, "range": 395.0, "enchanted": false, "summary": "不联动\n六件武器独立攻击", "benefit": "各武器保持独立攻击", "cost": "无联动改造"},
+    "rune_shell": {"id": "rune_shell", "name": "魔法炮", "kind": "rune", "weapons": ["powder", "staff"], "suppressed": ["staff"], "cooldown_multiplier": 1.5, "range": 395.0, "enchanted": true, "summary": "魔法炮\n炮弹化为符能爆炸并留下灼烧\n魔法杖停止独立发射", "benefit": "魔法杖与火药筒组成魔法炮，炮弹化为符能爆炸并留下灼烧", "cost": "魔法杖停止独立发射，火药筒装填间隔增加50%"},
+    "chain_club": {"id": "chain_club", "name": "锁链木棒", "kind": "chain", "weapons": ["powder", "club"], "suppressed": ["club"], "cooldown_multiplier": 1.15, "range": 210.0, "enchanted": false, "summary": "锁链木棒\n弹射往返；射程缩短\n失去环绕和普通炮弹", "benefit": "木棒从火药筒炮口弹出并弹射往返", "cost": "木棒不再环绕护身，火药筒不发普通炮弹；射程缩至210"},
+    "chain_axe": {"id": "chain_axe", "name": "锁链石斧", "kind": "chain", "weapons": ["powder", "axe"], "suppressed": ["axe"], "cooldown_multiplier": 1.15, "range": 210.0, "enchanted": false, "summary": "锁链石斧\n弹射往返；射程缩短\n失去环绕和普通炮弹", "benefit": "石斧从火药筒炮口弹出并弹射往返", "cost": "石斧不再环绕护身，火药筒不发普通炮弹；射程缩至210"},
+    "chain_blade": {"id": "chain_blade", "name": "锁链骨刃", "kind": "chain", "weapons": ["powder", "blade"], "suppressed": ["blade"], "cooldown_multiplier": 1.15, "range": 210.0, "enchanted": false, "summary": "锁链骨刃\n弹射往返；射程缩短\n失去环绕和普通炮弹", "benefit": "骨刃从火药筒炮口弹出并弹射往返", "cost": "骨刃不再环绕护身，火药筒不发普通炮弹；射程缩至210"},
+    "fire_drum": {"id":"fire_drum","name":"鼓风燎原","kind":"fire_drum","weapons":["firepot","wardrum"],"suppressed":[],"cooldown_multiplier":1.15,"reload_weapon":"firepot","range":300.0,"enchanted":false,"summary":"鼓风燎原\n鼓波扩散现有火场\n火种壶装填慢15%","benefit":"鼓波扩散并增强已有火场","cost":"仅鼓波接触的已有火场增强一次；火种壶装填慢15%"},
+    "thunder_crystal": {"id":"thunder_crystal","name":"雷晶共鸣","kind":"thunder_crystal","weapons":["totem","crystal"],"suppressed":[],"cooldown_multiplier":1.15,"reload_weapon":"totem","range":320.0,"enchanted":false,"summary":"雷晶共鸣\n雷击充能附近晶簇\n图腾施法慢15%","benefit":"雷击为附近晶簇充能，触发更强碎晶","cost":"雷击需落在晶簇附近；图腾施法慢15%，不强化无关武器"},
+    "storm_arrow": {"id":"storm_arrow","name":"导雷骨箭","kind":"storm_arrow","weapons":["bonebow","totem"],"suppressed":["totem"],"cooldown_multiplier":1.18,"reload_weapon":"bonebow","range":430.0,"enchanted":false,"summary":"导雷骨箭\n弩箭命中后导雷\n图腾改为给骨弩注能","benefit":"骨箭命中后向附近敌人导雷","cost":"图腾停止独立攻击；骨弩装填慢18%，命中才导雷"},
+    "fire_cannon": {"id":"fire_cannon","name":"烈焰火炮","kind":"fire_enchant","weapons":["firepot","powder"],"suppressed":["firepot"],"cooldown_multiplier":1.18,"reload_weapon":"powder","range":395.0,"enchanted":false,"summary":"烈焰火炮\n炮弹爆炸始终留下火场\n火种壶停止独立投掷","benefit":"火药筒爆炸始终留下燃烧火场","cost":"火种壶停止独立投掷，火药筒装填变慢"},
+    "fire_arrow": {"id":"fire_arrow","name":"燃骨箭","kind":"fire_enchant","weapons":["firepot","bonebow"],"suppressed":["firepot"],"cooldown_multiplier":1.18,"reload_weapon":"bonebow","range":430.0,"enchanted":false,"summary":"燃骨箭\n骨箭命中点燃并留下火场\n火种壶停止独立投掷","benefit":"骨箭命中点燃敌人，并留下小片火场","cost":"火种壶停止独立投掷，骨弩装填变慢"},
+    "fire_sling": {"id":"fire_sling","name":"燃石弹","kind":"fire_enchant","weapons":["firepot","sling"],"suppressed":["firepot"],"cooldown_multiplier":1.18,"reload_weapon":"sling","range":360.0,"enchanted":false,"summary":"燃石弹\n石弹命中点燃并留下火场\n火种壶停止独立投掷","benefit":"石弹命中点燃并留下小片火场","cost":"火种壶停止独立投掷，弹弓装填变慢"},
+    "fire_hammer": {"id":"fire_hammer","name":"熔火重砸","kind":"fire_enchant","weapons":["firepot","hammer"],"suppressed":["firepot"],"cooldown_multiplier":1.20,"reload_weapon":"hammer","range":140.0,"enchanted":false,"summary":"熔火重砸\n砸击落点留下火场\n火种壶停止独立投掷","benefit":"石槌砸地会在落点留下火场","cost":"火种壶停止独立投掷，石槌挥击变慢"},
+    "fire_boomerang": {"id":"fire_boomerang","name":"焚风骨镖","kind":"fire_enchant","weapons":["firepot","boomerang"],"suppressed":["firepot"],"cooldown_multiplier":1.18,"reload_weapon":"boomerang","range":300.0,"enchanted":false,"summary":"焚风骨镖\n往返命中留下小片火场\n火种壶停止独立投掷","benefit":"骨镖往返命中时留下小片火场","cost":"火种壶停止独立投掷，骨镖装填变慢"},
+    "rune_arrow": {"id":"rune_arrow","name":"符能骨箭","kind":"rune_enchant","weapons":["staff","bonebow"],"suppressed":["staff"],"cooldown_multiplier":1.16,"reload_weapon":"bonebow","range":430.0,"enchanted":true,"summary":"符能骨箭\n骨箭命中追加符能爆发\n魔法杖停止独立发射","benefit":"骨箭附上符能，命中时额外爆发魔力","cost":"魔法杖停止独立发射，骨弩装填变慢"},
+    "rune_sling": {"id":"rune_sling","name":"符能弹","kind":"rune_enchant","weapons":["staff","sling"],"suppressed":["staff"],"cooldown_multiplier":1.16,"reload_weapon":"sling","range":360.0,"enchanted":true,"summary":"符能弹\n石弹命中追加符能爆发\n魔法杖停止独立发射","benefit":"石弹附上符能，命中时额外爆发魔力","cost":"魔法杖停止独立发射，弹弓装填变慢"},
+    "rune_boomerang": {"id":"rune_boomerang","name":"符能骨镖","kind":"rune_enchant","weapons":["staff","boomerang"],"suppressed":["staff"],"cooldown_multiplier":1.16,"reload_weapon":"boomerang","range":300.0,"enchanted":true,"summary":"符能骨镖\n骨镖命中追加符能爆发\n魔法杖停止独立发射","benefit":"骨镖附上符能，命中时额外爆发魔力","cost":"魔法杖停止独立发射，骨镖装填变慢"}
 }
-const LINK_ORDER = ["none", "rune_shell", "chain_club", "chain_axe", "chain_blade", "fire_drum", "thunder_crystal", "storm_arrow"]
+const LINK_ORDER = ["none", "rune_shell", "chain_club", "chain_axe", "chain_blade", "fire_drum", "thunder_crystal", "storm_arrow", "fire_cannon", "fire_arrow", "fire_sling", "fire_hammer", "fire_boomerang", "rune_arrow", "rune_sling", "rune_boomerang"]
 const DINOS = {
     "hunter": {"hp": 5.0, "speed": 112.0, "radius": 22.0, "size": 62.0},
     "charger": {"hp": 10.0, "speed": 66.0, "radius": 28.0, "size": 78.0},
@@ -271,3 +279,96 @@ static func apply_character_modifiers(stats: Dictionary, character_id: String) -
     stats["close_damage_range"] = float(mods.get("close_damage_range", 140.0))
     stats["character_id"] = str(profile.get("id", character_id))
     return stats
+
+static func weapon_name(weapon_id: String) -> String:
+    return str(WEAPONS[weapon_id]["name"]) if WEAPONS.has(weapon_id) else weapon_id
+
+static func inventory_ids(inventory: Array) -> Array:
+    var ids: Array = []
+    for item in inventory:
+        var key: String = str(item.get("id", "")) if typeof(item) == TYPE_DICTIONARY else str(item)
+        if not key.is_empty() and not ids.has(key):
+            ids.append(key)
+    return ids
+
+static func recipes_for_weapon(weapon_id: String) -> Array:
+    var result: Array = []
+    if weapon_id.is_empty() or not WEAPONS.has(weapon_id):
+        return result
+    for key in LINK_ORDER:
+        if key == "none":
+            continue
+        var recipe: Dictionary = LINKS[key]
+        if recipe["weapons"].has(weapon_id):
+            result.append(recipe.duplicate(true))
+    return result
+
+static func partner_id(recipe: Dictionary, weapon_id: String) -> String:
+    var weapons: Array = recipe.get("weapons", [])
+    if weapons.size() != 2:
+        return ""
+    if str(weapons[0]) == weapon_id:
+        return str(weapons[1])
+    if str(weapons[1]) == weapon_id:
+        return str(weapons[0])
+    return ""
+
+static func recipe_complete(recipe: Dictionary, owned_ids: Array) -> bool:
+    var weapons: Array = recipe.get("weapons", [])
+    if weapons.is_empty():
+        return false
+    for weapon_id in weapons:
+        if not owned_ids.has(str(weapon_id)):
+            return false
+    return true
+
+static func benefit_text(recipe: Dictionary) -> String:
+    var text: String = str(recipe.get("benefit", "")).strip_edges()
+    if not text.is_empty():
+        return text
+    return str(recipe.get("summary", "")).replace("\n", "；")
+
+static func cost_text(recipe: Dictionary) -> String:
+    return str(recipe.get("cost", "")).strip_edges()
+
+static func completing_recipes(weapon_id: String, owned_ids: Array) -> Array:
+    var result: Array = []
+    if weapon_id.is_empty() or owned_ids.has(weapon_id) or not WEAPONS.has(weapon_id):
+        return result
+    var held: Array = owned_ids.duplicate()
+    held.append(weapon_id)
+    for recipe in recipes_for_weapon(weapon_id):
+        if recipe_complete(recipe, held) and not recipe_complete(recipe, owned_ids):
+            result.append(recipe)
+    return result
+
+static func offer_link_text(weapon_id: String, owned_ids: Array) -> String:
+    if not WEAPONS.has(weapon_id):
+        return ""
+    if owned_ids.has(weapon_id):
+        return ""
+    var ready: Array = completing_recipes(weapon_id, owned_ids)
+    if not ready.is_empty():
+        var names: PackedStringArray = PackedStringArray()
+        for recipe in ready:
+            names.append(str(recipe.get("name", "")))
+        var first: Dictionary = ready[0]
+        return "可联动：%s｜优点：%s｜缺点：%s" % ["、".join(names), benefit_text(first), cost_text(first)]
+    var partners: PackedStringArray = PackedStringArray()
+    for recipe in recipes_for_weapon(weapon_id):
+        var partner: String = partner_id(recipe, weapon_id)
+        var label: String = weapon_name(partner)
+        if not partner.is_empty() and not partners.has(label):
+            partners.append(label)
+    if partners.is_empty():
+        return ""
+    if partners.size() > 2:
+        return "可与%s、%s等搭配" % [partners[0], partners[1]]
+    return "可与%s搭配" % "、".join(partners)
+
+static func link_details_text(weapon_id: String) -> String:
+    var lines: PackedStringArray = PackedStringArray()
+    for recipe in recipes_for_weapon(weapon_id):
+        var partner: String = weapon_name(partner_id(recipe, weapon_id))
+        lines.append("与%s组成「%s」。优点：%s。缺点：%s" % [partner, str(recipe.get("name", "")), benefit_text(recipe), cost_text(recipe)])
+    return "\n".join(lines)

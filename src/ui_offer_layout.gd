@@ -71,6 +71,23 @@ static func description(h, parent: Control, copy: String, rect: Rect2, size: int
 static func milestones(key: String, shown: int, owned: int) -> String:
     return Details.abilities(key,shown,owned).replace(" · ","·").replace("\n","｜")
 
+static func fit_row(node: Label, rect: Rect2) -> void:
+    node.autowrap_mode = TextServer.AUTOWRAP_OFF
+    node.clip_text = true
+    node.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    node.clip_contents = true
+    node.custom_minimum_size = rect.size
+    node.size = rect.size
+
+static func link_badge(h, item: Control, key: String, inventory: Array, rect: Rect2) -> void:
+    var copy: String = Catalog.offer_link_text(key, Catalog.inventory_ids(inventory))
+    if copy.is_empty():
+        return
+    var node: Label = text(h, item, copy, rect, 11, Color("#59351f"), true, false)
+    node.name = "OfferLink"
+    fit_row(node, rect)
+    node.add_theme_constant_override("line_spacing", 0)
+
 static func card(h,parent: Node,key: String,size: Vector2) -> Button:
     var node: Button = h.make_button("")
     node.custom_minimum_size = size
@@ -135,12 +152,24 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
         description(h,item,Details.attack(key,shown) if weapon else BuffDetails.detail(key),body_rect,13 if compact else 15)
         if weapon:
             text(h,item,Details.stats_line(key,shown),Rect2(12,179,276,23) if compact else Rect2(12,243,276,24),13 if compact else 15,Color("#75442c"),true)
+            var link_copy: String = Catalog.offer_link_text(key, Catalog.inventory_ids(inventory))
             if compact:
-                text(h,item,milestones(key,shown,level),Rect2(8,202,284,23),12,Color("#59462f"))
+                var mile: String = link_copy if not link_copy.is_empty() else milestones(key,shown,level)
+                var mile_label: Label = text(h,item,mile,Rect2(8,202,284,23),12,Color("#59351f") if not link_copy.is_empty() else Color("#59462f"))
+                if not link_copy.is_empty():
+                    mile_label.name = "OfferLink"
+                    fit_row(mile_label, Rect2(8,202,284,23))
             else:
-                var tiers: PackedStringArray = Details.abilities(key,shown,level).split("\n")
-                for tier in range(tiers.size()):
-                    text(h,item,tiers[tier],Rect2(12,268+tier*23,276,23),13,Color("#59462f"))
+                if not link_copy.is_empty():
+                    var link_label: Label = text(h,item,link_copy,Rect2(12,268,276,46),13,Color("#59351f"),true,true)
+                    link_label.name = "OfferLink"
+                    link_label.clip_text = true
+                    link_label.custom_minimum_size = Vector2(276, 46)
+                    link_label.size = Vector2(276, 46)
+                else:
+                    var tiers: PackedStringArray = Details.abilities(key,shown,level).split("\n")
+                    for tier in range(tiers.size()):
+                        text(h,item,tiers[tier],Rect2(12,268+tier*23,276,23),13,Color("#59462f"))
             var replace_offer: bool = level==0 and inventory.size() >= 6
             var status: String = "直接升级 · 不占新槽" if level>0 else ("槽位已满 · 需更换一件" if replace_offer else "新武器 · 装入空槽")
             text(h,item,status,Rect2(12,225,276,24) if compact else Rect2(12,315,276,26),15 if compact else 17,Color("#923f29") if replace_offer else Color("#3e5439"),true)
@@ -200,7 +229,12 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
         description(h,item,body,Rect2(14,143 if weapon else 168,320,41),13)
         if weapon:
             text(h,item,Details.stats_line(key,shown),Rect2(12,184,324,23),13,Color("#75442c"),true).name = "OfferStats"
-            text(h,item,milestones(key,shown,owned),Rect2(12,207,324,23),12,Color("#59462f")).name = "OfferAbilities"
+            var shop_link: String = Catalog.offer_link_text(key, Catalog.inventory_ids(inventory))
+            var shop_extra: String = shop_link if not shop_link.is_empty() else milestones(key,shown,owned)
+            var extra: Label = text(h,item,shop_extra,Rect2(12,207,324,23),12,Color("#59351f") if not shop_link.is_empty() else Color("#59462f"))
+            extra.name = "OfferLink" if not shop_link.is_empty() else "OfferAbilities"
+            if not shop_link.is_empty():
+                fit_row(extra, Rect2(12,207,324,23))
         var action_text: String
         var action_hint: String
         if sold:
@@ -271,7 +305,13 @@ static func replace(h,pending: Dictionary,inventory: Array,stage: int=1) -> void
     var incoming_type: String = Details.attack_type(new_id) + "    ｜    " + Details.stats_line(new_id,offered)
     text(h,incoming,incoming_type,Rect2(120,76,840,23),14,Color("#704127"),true).name = "IncomingWeaponType"
     var attack_text: String=Details.attack(new_id,offered).replace("\n","")
-    text(h,incoming,attack_text,Rect2(120,99,840,22),14).name = "IncomingWeaponAttack"
+    var incoming_link: String = Catalog.offer_link_text(new_id, Catalog.inventory_ids(inventory))
+    if not incoming_link.is_empty():
+        attack_text = attack_text + "  " + incoming_link
+    var incoming_attack: Label = text(h,incoming,attack_text,Rect2(120,99,840,22),14)
+    incoming_attack.name = "IncomingWeaponAttack" if incoming_link.is_empty() else "IncomingWeaponLink"
+    incoming_attack.clip_text = true
+    incoming_attack.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
     var grid:=GridContainer.new()
     grid.columns=3
     grid.add_theme_constant_override("h_separation",14)

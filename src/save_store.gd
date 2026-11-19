@@ -279,6 +279,17 @@ func _validate_settings(settings: Variant) -> String:
         return "全屏设置必须是布尔值"
     if settings.has("seen_link_guide") and typeof(settings["seen_link_guide"]) != TYPE_BOOL:
         return "联动引导记录必须是布尔值"
+    if settings.has("seen_link_recipes"):
+        var seen_links: Variant = settings["seen_link_recipes"]
+        if typeof(seen_links) != TYPE_ARRAY or seen_links.size() > MAX_COLLECTION_SIZE:
+            return "联动配方已读记录格式无效"
+        var used: Dictionary = {}
+        for entry in seen_links:
+            if typeof(entry) != TYPE_STRING or not Catalog.LINKS.has(entry) or entry == "none":
+                return "联动配方已读记录包含未知配方"
+            if used.has(entry):
+                return "联动配方已读记录包含重复项"
+            used[entry] = true
     if settings.has("key_bindings"):
         if typeof(settings["key_bindings"]) != TYPE_DICTIONARY:
             return "按键设置必须是对象"

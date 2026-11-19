@@ -45,7 +45,7 @@ func _initialize() -> void:
         expect(option["weapons"].size() == 0 or option["weapons"].size() == 2, "every recipe uses exactly two weapons")
     expect(rules.link_options(["club", "staff"]).size() == 1, "missing powder cannot activate a recipe")
     var rune: Dictionary = rules.link_profile("rune_shell", ids)
-    expect(rune["weapons"] == ["powder", "staff"], "magic cannon consists of powder and staff only")
+    expect(rune["name"] == "魔法炮" and rune["weapons"] == ["powder", "staff"], "magic cannon consists of powder and staff only and is named 魔法炮")
     expect(rune["suppressed"].has("staff") and rune["cooldown_multiplier"] > 1.0, "magic cannon really pays staff-fire and reload costs")
     var chain: Dictionary = rules.link_profile("chain_axe", ids)
     expect(chain["weapons"] == ["powder", "axe"] and chain["range"] < 395.0, "chain axe is a shorter-range two-piece recipe")
@@ -146,6 +146,64 @@ func scene_checks() -> void:
     expect(world.inventory.size() == 6 and world.weapon_views.size() == 6, "links preserve the six original weapons")
     world.start_run(false)
     expect(world.burning_fields.is_empty() and world.active_link["id"] == "none", "restart clears link hazards")
+    expect(world.grant_weapon("powder") and world.grant_weapon("firepot"), "powder and firepot can be granted together")
+    world.select_link("fire_cannon")
+    expect(world.active_link["id"] == "fire_cannon" and world.active_link["suppressed"].has("firepot"), "flame cannon suppresses the firepot")
+    expect(world.active_link.get("cooldown_multiplier", 1.0) > 1.0, "flame cannon modestly slows the powder host")
+    world.projectiles.clear()
+    world.burning_fields.clear()
+    world.weapon_runtime["powder"]["cooldown"] = 0.0
+    for enemy in world.enemies:
+        enemy["view"].queue_free()
+    world.enemies.clear()
+    world.spawn_enemy("tank", world.player_position + Vector2(140, 0))
+    world.enemies[0]["hp"] = 1000.0
+    world.enemies[0]["max_hp"] = 1000.0
+    world.update_weapons(0.05)
+    var pot_threw: bool = false
+    if world.armory.states.has("firepot"):
+        pot_threw = not world.armory.states["firepot"].get("pots", []).is_empty() or not world.armory.states["firepot"].get("fires", []).is_empty()
+    expect(not pot_threw, "firepot stops independent throws as a real cost")
+    var shell: Dictionary = {}
+    for projectile in world.projectiles:
+        if projectile["weapon_id"] == "powder":
+            shell = projectile
+            break
+    expect(not shell.is_empty(), "powder still fires shells under the flame cannon")
+    if not shell.is_empty():
+        world.explode_powder(shell)
+    var left_fire: bool = false
+    for field in world.burning_fields:
+        if str(field.get("weapon_id", "")) in ["powder", "firepot"]:
+            left_fire = true
+    expect(left_fire, "flame cannon explosions always leave a burning field")
+    var fire_count: int = world.inventory.size()
+    world.select_link("none")
+    expect(world.grant_weapon("staff") and world.grant_weapon("sling"), "staff and sling can be granted together")
+    world.select_link("rune_sling")
+    expect(world.active_link["id"] == "rune_sling" and world.active_link["suppressed"].has("staff"), "rune sling suppresses the staff")
+    world.projectiles.clear()
+    world.weapon_runtime["staff"]["cooldown"] = 0.0
+    world.weapon_runtime["sling"]["cooldown"] = 0.0
+    world.update_weapons(0.05)
+    var staff_shot: bool = false
+    var enchanted_stone: bool = false
+    var stone: Dictionary = {}
+    for projectile in world.projectiles:
+        if projectile["weapon_id"] == "staff":
+            staff_shot = true
+        if projectile["weapon_id"] == "sling":
+            enchanted_stone = bool(projectile.get("enchanted", false))
+            stone = projectile
+    expect(not staff_shot, "staff stops independent firing under a rune attachment")
+    expect(enchanted_stone, "sling stones become enchanted under the rune attachment")
+    var before_hp: float = world.enemies[0]["hp"]
+    if not stone.is_empty():
+        stone["position"] = world.enemies[0]["position"]
+        world.hurt_enemy(world.enemies[0], stone["damage"], "sling", false, Vector2.RIGHT)
+        world.apply_weapon_link_hit(world.enemies[0]["position"], "sling")
+    expect(world.enemies[0]["hp"] < before_hp, "rune sling applies an extra magic burst on hit")
+    expect(world.inventory.size() >= fire_count and world.active_link["id"] == "rune_sling", "rune attachment preserves the owned weapons")
     check_ranged_torso_clearance(world)
     world.queue_free()
     await process_frame

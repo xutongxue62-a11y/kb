@@ -38,6 +38,9 @@ static func stats_line(key: String, level: int) -> String:
     if key == "staff":
         return "每弹伤害 %.1f × %d 弹｜间隔 %.2f 秒" % [damage, Evolution.shot_count(key, lvl), interval]
     return "伤害 %.1f · 间隔 %.2f 秒" % [damage, interval]
+static func links(key: String) -> String:
+    return Catalog.link_details_text(key)
+
 static func attack(key: String,level: int) -> String:
     if key=="spear" and level>=3: return "朝目标扇面刺出骨矛，\n贯穿扇面内的沿途敌人。"
     if key=="totem" and level>=5: return "四跃连锁并向旁侧分叉，\n每次跳跃伤害逐步递减。"
