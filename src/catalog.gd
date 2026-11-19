@@ -6,16 +6,16 @@ const EXPANDED_IDS = ["bonebow", "firepot", "wardrum", "crystal"]
 const IDS = ["club", "axe", "blade", "sling", "powder", "staff", "spear", "hammer", "boomerang", "totem", "bonebow", "firepot", "wardrum", "crystal"]
 const WEAPONS = {
     "club": {"name": "木棒", "kind": "melee", "damage": 8.5, "cooldown": 0.40, "orbit_speed": 10.0, "size": 43.0, "color": Color("#d9a65c"), "description": "8.5 重击 · 一击小怪\n快速环绕，强力击退"},
-    "axe": {"name": "石斧", "kind": "melee", "damage": 12.0, "cooldown": 0.60, "orbit_speed": 8.2, "size": 46.0, "color": Color("#e8d8b2"), "description": "12 劈砍 · 近身高伤\n重斧破阵，大片斩击"},
-    "blade": {"name": "骨刃", "kind": "melee", "damage": 6.0, "cooldown": 0.20, "orbit_speed": 14.0, "size": 38.0, "color": Color("#a2e6ec"), "description": "6 切割 · 高频环绕\n近距离连续收割"},
+    "axe": {"name": "石斧", "kind": "melee", "damage": 15.0, "cooldown": 0.52, "orbit_speed": 8.2, "size": 46.0, "color": Color("#e8d8b2"), "description": "15 劈砍 · 近身高伤\n重斧破阵，大片斩击"},
+    "blade": {"name": "骨刃", "kind": "melee", "damage": 7.5, "cooldown": 0.20, "orbit_speed": 14.0, "size": 38.0, "color": Color("#a2e6ec"), "description": "7.5 切割 · 高频环绕\n近距离连续收割"},
     "sling": {"name": "弹弓", "kind": "ranged", "damage": 3.2, "cooldown": 0.42, "range": 360.0, "speed": 620.0, "size": 33.0, "color": Color("#b88b5b"), "description": "3.2 石弹 · 快速连射\n安全射程，自动瞄准"},
     "powder": {"name": "木质火药筒", "kind": "ranged", "damage": 5.0, "cooldown": 1.15, "range": 395.0, "speed": 330.0, "size": 43.0, "color": Color("#d48a52"), "description": "5 炮击 · 范围爆炸\n火焰冲击与烟尘"},
     "staff": {"name": "魔法杖", "kind": "ranged", "damage": 2.0, "cooldown": 0.78, "range": 300.0, "speed": 450.0, "size": 42.0, "color": Color("#8db49b"), "description": "每弹 2 · 三枚符能\n展开散射 / 收束集中"},
     "spear": {"name": "骨矛", "kind": "special", "damage": 9.0, "cooldown": 0.72, "range": 185.0, "speed": 600.0, "size": 58.0, "color": Color("#edddb3"), "description": "定向贯刺 · 一线穿敌\n保持距离，刺出收回"},
-    "hammer": {"name": "石槌", "kind": "special", "damage": 16.0, "cooldown": 1.4, "range": 140.0, "speed": 500.0, "size": 50.0, "color": Color("#b5a98c"), "description": "蓄势重砸 · 范围震击\n清理近处成群恐龙"},
+    "hammer": {"name": "石槌", "kind": "special", "damage": 16.0, "cooldown": 1.25, "range": 140.0, "speed": 500.0, "size": 50.0, "color": Color("#b5a98c"), "description": "蓄势重砸 · 范围震击\n清理近处成群恐龙"},
     "boomerang": {"name": "回旋骨镖", "kind": "special", "damage": 4.5, "cooldown": 1.05, "range": 300.0, "speed": 540.0, "size": 42.0, "color": Color("#ebcc87"), "description": "掷出再返回身边\n往返各可命中一次"},
     "totem": {"name": "雷鸣图腾", "kind": "special", "damage": 3.5, "cooldown": 0.95, "range": 320.0, "speed": 600.0, "size": 48.0, "color": Color("#78bac3"), "description": "连锁雷击 · 最多三敌\n每次跳跃伤害递减"},
-    "bonebow": {"name": "骨弩", "kind": "special", "damage": 6.0, "cooldown": 0.90, "range": 430.0, "speed": 660.0, "size": 48.0, "color": Color("#e8d8ad"), "description": "骨箭直射 · 穿透三敌\n真实飞行，沿途贯穿"},
+    "bonebow": {"name": "骨弩", "kind": "special", "damage": 5.0, "cooldown": 0.90, "range": 430.0, "speed": 660.0, "size": 48.0, "color": Color("#e8d8ad"), "description": "骨箭直射 · 穿透三敌\n真实飞行，沿途贯穿"},
     "firepot": {"name": "火种壶", "kind": "special", "damage": 2.6, "cooldown": 2.20, "range": 300.0, "speed": 340.0, "size": 43.0, "color": Color("#e89a4c"), "description": "抛壶落地 · 延迟燃烧\n定点火场，持续灼伤"},
     "wardrum": {"name": "战鼓", "kind": "special", "damage": 3.8, "cooldown": 1.75, "range": 148.0, "speed": 440.0, "size": 49.0, "color": Color("#d5ac64"), "description": "三拍鼓震 · 近身扩环\n声波逐圈扫过敌人"},
     "crystal": {"name": "晶簇", "kind": "special", "damage": 7.0, "cooldown": 2.30, "range": 290.0, "speed": 420.0, "size": 45.0, "color": Color("#b09cdb"), "description": "布置晶簇 · 近敌触发\n六向碎晶，各沿弹道"}
