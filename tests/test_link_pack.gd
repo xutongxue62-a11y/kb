@@ -50,6 +50,7 @@ func run_checks() -> void:
     await check_open_close_and_no_cycle()
     await check_drop_unlink_error_and_swap()
     await check_attributes_and_freeze()
+    await check_copy_not_clipped()
     await check_discovery_still_works()
     await check_help_and_hints()
     await check_blocked_screens()
@@ -146,7 +147,143 @@ func check_attributes_and_freeze() -> void:
     world.queue_free()
     await process_frame
 
+func find_labels(node: Node, label_name: String) -> Array:
+    var found: Array = []
+    if node is Label and str(node.name) == label_name:
+        found.append(node)
+    for child in node.get_children():
+        found.append_array(find_labels(child, label_name))
+    return found
+
+func wrap_flags(mode: int) -> int:
+    if mode == TextServer.AUTOWRAP_ARBITRARY:
+        return TextServer.BREAK_MANDATORY | TextServer.BREAK_GRAPHEME_BOUND
+    if mode == TextServer.AUTOWRAP_WORD:
+        return TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND
+    if mode == TextServer.AUTOWRAP_WORD_SMART:
+        return TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
+    return TextServer.BREAK_MANDATORY
+
+func label_fits(label: Label) -> bool:
+    if label == null or str(label.text).is_empty():
+        return true
+    if label.get_line_count() > label.get_visible_line_count():
+        return false
+    var font: Font = label.get_theme_font("font")
+    var font_size: int = label.get_theme_font_size("font_size")
+    if font == null:
+        return false
+    var needed: Vector2 = font.get_multiline_string_size(label.text, label.horizontal_alignment, maxf(1.0, label.size.x), font_size, -1, wrap_flags(label.autowrap_mode))
+    return needed.x <= label.size.x + 1.5 and needed.y <= label.size.y + 1.5
+
+func expect_label_visible(label: Label, expected: String, context: String) -> void:
+    expect(label != null, context + " exists")
+    if label == null:
+        return
+    expect(label.text.contains(expected), context + " shows the full copy: " + expected)
+    expect(not label.clip_text, context + " does not enable clip_text")
+    if expected.length() > 4:
+        expect(label.autowrap_mode == TextServer.AUTOWRAP_ARBITRARY, context + " wraps Chinese with AUTOWRAP_ARBITRARY")
+    expect(label.get_line_count() == label.get_visible_line_count(), context + " shows every laid-out line (%d/%d): %s" % [label.get_visible_line_count(), label.get_line_count(), label.text])
+    expect(label_fits(label), context + " box fits the laid-out text (%s in %s): %s" % [str(label.size), context, label.text])
+
+func expect_inside(inner: Control, outer: Control, context: String, pad: float = 2.0) -> void:
+    expect(inner != null and outer != null, context + " has both rects")
+    if inner == null or outer == null:
+        return
+    var box: Rect2 = Rect2(Vector2(pad, pad), outer.size - Vector2(pad * 2.0, pad * 2.0))
+    var child: Rect2 = Rect2(inner.position, inner.size)
+    expect(box.encloses(child) or (inner.position.x >= 0.0 and inner.position.y >= 0.0 and inner.position.x + inner.size.x <= outer.size.x + 1.5 and inner.position.y + inner.size.y <= outer.size.y + 1.5), context + " stays inside its panel")
+
+func assert_pack_copy_visible(ui, context: String) -> void:
+    var copy: String = ui.displayed_text()
+    for weapon_id in ui.weapon_ids():
+        var info: Dictionary = ui.node_info(weapon_id)
+        var card: Control = ui.cards.get(weapon_id, null)
+        expect(card != null, context + " has a card for " + weapon_id)
+        if card == null:
+            continue
+        var hint: Label = card.find_child("CardHint", true, false)
+        var expected_hint: String = "已联动" if bool(info.get("linked", false)) else str(info.get("hint", ""))
+        if not expected_hint.is_empty():
+            expect(copy.contains(expected_hint), context + " displayed_text includes the hint for " + weapon_id)
+            expect_label_visible(hint, expected_hint, context + " " + weapon_id + " hint")
+            expect_inside(hint, card, context + " " + weapon_id + " hint in card", 6.0)
+        var stats: Label = card.find_child("CardStats", true, false)
+        if stats != null and not str(stats.text).is_empty():
+            expect_label_visible(stats, str(info.get("stats", "")), context + " " + weapon_id + " stats")
+            expect_inside(stats, card, context + " " + weapon_id + " stats in card", 6.0)
+    var recipe: Dictionary = ui._active_recipe()
+    if recipe.is_empty() or str(recipe.get("id", "none")) == "none":
+        return
+    var benefit: String = Catalog.benefit_text(recipe)
+    var cost: String = Catalog.cost_text(recipe)
+    expect(copy.contains(str(recipe.get("name", ""))) and copy.contains(benefit) and copy.contains(cost), context + " displayed_text includes official name, benefit, and cost")
+    var mid: Node = ui.find_child("LinkDetails", true, false)
+    expect(mid != null, context + " has a cluster mid panel")
+    if mid == null:
+        return
+    var name_label: Label = mid.find_child("ClusterName", true, false)
+    var benefit_label: Label = mid.find_child("ClusterBenefit", true, false)
+    var cost_label: Label = mid.find_child("ClusterCost", true, false)
+    var benefit_title: Label = mid.find_child("ClusterBenefitTitle", true, false)
+    var cost_title: Label = mid.find_child("ClusterCostTitle", true, false)
+    expect(benefit_title != null and benefit_title.text.contains("优点"), context + " keeps 优点 as its own label")
+    expect(cost_title != null and cost_title.text.contains("缺点"), context + " keeps 缺点 as its own label")
+    expect_label_visible(name_label, str(recipe.get("name", "")), context + " cluster name")
+    expect_label_visible(benefit_label, benefit, context + " cluster benefit")
+    expect_label_visible(cost_label, cost, context + " cluster cost")
+    for label in [name_label, benefit_label, cost_label, benefit_title, cost_title]:
+        if label != null:
+            expect_inside(label, mid, context + " " + str(label.name) + " in mid", 4.0)
+
+func check_copy_not_clipped() -> void:
+    var world = make_world("layout")
+    world.start_run(true)
+    expect(world.open_link_pack(), "pack opens for a six-weapon layout check")
+    var ui = pack(world)
+    await process_frame
+    await process_frame
+    assert_pack_copy_visible(ui, "six-weapon trial unlinked")
+    var rune: Dictionary = ui.try_drop("powder", "staff")
+    expect(rune.get("ok", false) and world.active_link["id"] == "rune_shell", "layout check can form 魔法炮")
+    await process_frame
+    await process_frame
+    assert_pack_copy_visible(ui, "after linking rune_shell")
+    expect(ui.displayed_text().contains("魔法杖停止独立发射，火药筒装填间隔增加50%"), "魔法炮 cost is complete, not cut at 火")
+    var chain: Dictionary = ui.try_drop("powder", "axe")
+    expect(chain.get("ok", false) and world.active_link["id"] == "chain_axe", "layout check can swap to 锁链石斧")
+    await process_frame
+    await process_frame
+    assert_pack_copy_visible(ui, "after linking chain_axe")
+    expect(ui.displayed_text().contains("石斧从火药筒炮口弹出并弹射往返"), "锁链石斧 benefit is complete")
+    expect(ui.displayed_text().contains("石斧不再环绕护身，火药筒不发普通炮弹；射程缩至210"), "锁链石斧 cost is complete, not cut at 火药筒")
+    for key in Catalog.LINK_ORDER:
+        if key == "none":
+            continue
+        var recipe: Dictionary = Catalog.LINKS[key]
+        var mid: Panel = ui.make_link_details(recipe)
+        mid.position = Vector2(-2400, 0)
+        ui.add_child(mid)
+        await process_frame
+        var benefit: String = Catalog.benefit_text(recipe)
+        var cost: String = Catalog.cost_text(recipe)
+        var name_label: Label = mid.find_child("ClusterName", true, false)
+        var benefit_label: Label = mid.find_child("ClusterBenefit", true, false)
+        var cost_label: Label = mid.find_child("ClusterCost", true, false)
+        expect_label_visible(name_label, str(recipe.get("name", "")), "official " + key + " name")
+        expect_label_visible(benefit_label, benefit, "official " + key + " benefit")
+        expect_label_visible(cost_label, cost, "official " + key + " cost")
+        expect_inside(benefit_label, mid, "official " + key + " benefit in mid", 4.0)
+        expect_inside(cost_label, mid, "official " + key + " cost in mid", 4.0)
+        mid.queue_free()
+        await process_frame
+    world.close_link_pack()
+    world.queue_free()
+    await process_frame
+
 func check_discovery_still_works() -> void:
+
     var world = make_world("discover")
     world.start_run(false)
     expect(world.active_link["id"] == "none", "a normal run still defaults to 不联动")

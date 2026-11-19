@@ -7,10 +7,11 @@ const KeyBindings = preload("res://src/key_bindings.gd")
 const GameFonts = preload("res://src/game_fonts.gd")
 
 const ERROR_INCOMPATIBLE := "这两件武器不能联动"
-const CARD_SIZE := Vector2(196, 172)
-const CLUSTER_MID := Vector2(176, 172)
-const BOARD_SIZE := Vector2(992, 468)
+const CARD_SIZE := Vector2(220, 200)
+const CLUSTER_MID := Vector2(360, 220)
+const BOARD_SIZE := Vector2(992, 504)
 const UNLINK_DISTANCE := 86.0
+const PACK_WRAP := TextServer.AUTOWRAP_ARBITRARY
 
 signal closed
 
@@ -219,8 +220,11 @@ func refresh() -> void:
         board.add_child(card)
         cards[weapon_id] = card
         card.set_meta("home", card.position)
+    _relock_pack_copy(self)
     _set_status(_status_copy())
     _apply_drag_highlights()
+    if is_inside_tree():
+        call_deferred("_relock_pack_copy", self)
 
 func _apply_drop(weapon_a: String, weapon_b: String) -> Dictionary:
     if host == null:
@@ -319,8 +323,8 @@ func _build() -> void:
     sheet.name = "LinkPackSheet"
     sheet.opening_mode = "fold"
     sheet.reveal = 1.0
-    sheet.position = Vector2(76, 36)
-    sheet.size = Vector2(1128, 728)
+    sheet.position = Vector2(76, 32)
+    sheet.size = Vector2(1128, 708)
     sheet.set_meta("full_width", 1128)
     add_child(sheet)
     var title: Label = _label("武器背包", 32, Color("#17253a"), true)
@@ -330,8 +334,7 @@ func _build() -> void:
     sheet.content.add_child(title)
     var hint: Label = _label("把可以搭配的两件武器拖到一起即可联动；把已经联动的武器拖开即可断开。不能搭配的拖在一起会提示错误。", 16, Color("#66705e"), false)
     hint.position = Vector2(64, 72)
-    hint.size = Vector2(880, 44)
-    hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _prepare_pack_copy(hint, 880, 44)
     sheet.content.add_child(hint)
     var close_btn := Button.new()
     close_btn.name = "CloseLinkPack"
@@ -352,10 +355,10 @@ func _build() -> void:
     sheet.content.add_child(board)
     status_label = _label("", 16, Color("#66705e"), false)
     status_label.name = "LinkPackStatus"
-    status_label.position = Vector2(64, 608)
-    status_label.size = Vector2(1000, 44)
-    status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    status_label.position = Vector2(64, 640)
+    _prepare_pack_copy(status_label, 1000, 48)
     sheet.content.add_child(status_label)
+    _relock_pack_copy(self)
 
 func _label(text: String, size: int, color: Color, display: bool) -> Label:
     var result: Label = Label.new()
@@ -389,6 +392,7 @@ func _make_card(weapon_id: String, in_cluster: bool) -> Panel:
     card.name = "WeaponCard_%s" % weapon_id
     card.size = CARD_SIZE
     card.custom_minimum_size = CARD_SIZE
+    card.clip_contents = false
     card.mouse_filter = Control.MOUSE_FILTER_STOP
     card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
     card.set_meta("weapon_id", weapon_id)
@@ -396,8 +400,9 @@ func _make_card(weapon_id: String, in_cluster: bool) -> Panel:
     card.gui_input.connect(func(event): _on_card_input(weapon_id, card, event))
     _paint_card(card, weapon_id, "idle")
     var info: Dictionary = node_info(weapon_id)
+    var text_width: float = CARD_SIZE.x - 20.0
     var icon := TextureRect.new()
-    icon.position = Vector2(62, 10)
+    icon.position = Vector2((CARD_SIZE.x - 72.0) * 0.5, 10)
     icon.size = Vector2(72, 44)
     icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -411,42 +416,59 @@ func _make_card(weapon_id: String, in_cluster: bool) -> Panel:
     card.add_child(icon)
     var title: Label = _label(str(info["name"]), 17, Color("#3a2a1c"), true)
     title.position = Vector2(10, 56)
-    title.size = Vector2(176, 24)
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _prepare_pack_copy(title, text_width, 24)
     card.add_child(title)
-    var stats: Label = _label(str(info["stats"]), 13, Color("#5a4a36"), false)
+    var stats_copy: String = str(info["stats"])
+    var stats: Label = _label(stats_copy, 13, Color("#5a4a36"), false)
+    stats.name = "CardStats"
     stats.position = Vector2(10, 80)
-    stats.size = Vector2(176, 44)
     stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    var stats_height: float = maxf(40.0, _wrapped_size(stats_copy, 13, text_width).y + 6.0)
+    _prepare_pack_copy(stats, text_width, stats_height)
     card.add_child(stats)
     var hint_copy: String = str(info["hint"])
     if in_cluster:
         hint_copy = "已联动"
     var hint: Label = _label(hint_copy, 12, Color("#704127") if not in_cluster else Color("#7a4a22"), false)
-    hint.position = Vector2(10, 126)
-    hint.size = Vector2(176, 36)
-    hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     hint.name = "CardHint"
+    hint.position = Vector2(10, stats.position.y + stats_height + 4.0)
+    hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    var hint_height: float = maxf(44.0, _wrapped_size(hint_copy, 12, text_width).y + 8.0)
+    _prepare_pack_copy(hint, text_width, hint_height)
     card.add_child(hint)
+    var needed_height: float = hint.position.y + hint_height + 10.0
+    if needed_height > card.size.y:
+        card.size = Vector2(CARD_SIZE.x, needed_height)
+        card.custom_minimum_size = card.size
     cards[weapon_id] = card
     return card
 
 func _make_cluster(recipe: Dictionary, first_id: String, second_id: String) -> Control:
     var cluster := Control.new()
     cluster.name = "LinkCluster_%s" % str(recipe.get("id", "link"))
-    var width: float = CARD_SIZE.x * 2.0 + CLUSTER_MID.x + 16.0
-    cluster.size = Vector2(width, CARD_SIZE.y)
+    cluster.clip_contents = false
     cluster.mouse_filter = Control.MOUSE_FILTER_PASS
+    var mid: Panel = make_link_details(recipe)
+    var width: float = CARD_SIZE.x * 2.0 + mid.size.x + 16.0
+    var height: float = maxf(CARD_SIZE.y, mid.size.y + 12.0)
+    cluster.size = Vector2(width, height)
     var left: Panel = _make_card(first_id, true)
     left.position = Vector2.ZERO
     cluster.add_child(left)
     left.set_meta("home", left.position)
+    mid.position = Vector2(CARD_SIZE.x + 8, 6)
+    cluster.add_child(mid)
+    var right: Panel = _make_card(second_id, true)
+    right.position = Vector2(CARD_SIZE.x + mid.size.x + 16, 0)
+    cluster.add_child(right)
+    right.set_meta("home", right.position)
+    return cluster
+
+func make_link_details(recipe: Dictionary) -> Panel:
     var mid := Panel.new()
     mid.name = "LinkDetails"
-    mid.position = Vector2(CARD_SIZE.x + 8, 6)
-    mid.size = Vector2(CLUSTER_MID.x, CARD_SIZE.y - 12)
+    mid.clip_contents = false
     mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
     var mid_box := StyleBoxFlat.new()
     mid_box.bg_color = Color("#efe0be")
@@ -454,22 +476,74 @@ func _make_cluster(recipe: Dictionary, first_id: String, second_id: String) -> C
     mid_box.set_border_width_all(2)
     mid_box.set_corner_radius_all(3)
     mid.add_theme_stylebox_override("panel", mid_box)
+    var pad := 12.0
+    var text_width: float = CLUSTER_MID.x - pad * 2.0
+    var cursor := 8.0
     var name_label: Label = _label(str(recipe.get("name", "")), 17, Color("#9a3b2c"), true)
-    name_label.position = Vector2(8, 6)
-    name_label.size = Vector2(CLUSTER_MID.x - 16, 28)
+    name_label.name = "ClusterName"
+    name_label.position = Vector2(pad, cursor)
     name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _prepare_pack_copy(name_label, text_width, 28)
     mid.add_child(name_label)
-    var body: Label = _label("优点：%s\n缺点：%s" % [Catalog.benefit_text(recipe), Catalog.cost_text(recipe)], 12, Color("#3a2a1c"), false)
-    body.position = Vector2(8, 36)
-    body.size = Vector2(CLUSTER_MID.x - 16, 120)
-    body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    cursor += 32.0
+    cursor += _add_detail_block(mid, "优点", Catalog.benefit_text(recipe), "ClusterBenefit", pad, cursor, text_width)
+    cursor += 10.0
+    cursor += _add_detail_block(mid, "缺点", Catalog.cost_text(recipe), "ClusterCost", pad, cursor, text_width)
+    cursor += 12.0
+    mid.size = Vector2(CLUSTER_MID.x, maxf(CLUSTER_MID.y, cursor))
+    mid.custom_minimum_size = mid.size
+    if mid.is_inside_tree():
+        _relock_pack_copy(mid)
+    else:
+        mid.ready.connect(_relock_pack_copy.bind(mid), CONNECT_ONE_SHOT)
+    return mid
+
+func _add_detail_block(mid: Panel, title_copy: String, body_copy: String, body_name: String, pad: float, cursor: float, text_width: float) -> float:
+    var title: Label = _label(title_copy, 14, Color("#9a3b2c"), true)
+    title.name = body_name + "Title"
+    title.position = Vector2(pad, cursor)
+    _prepare_pack_copy(title, text_width, 24)
+    mid.add_child(title)
+    var body_height: float = maxf(26.0, _wrapped_size(body_copy, 13, text_width).y + 8.0)
+    var body: Label = _label(body_copy, 13, Color("#3a2a1c"), false)
+    body.name = body_name
+    body.position = Vector2(pad, cursor + 24.0)
+    _prepare_pack_copy(body, text_width, body_height)
     mid.add_child(body)
-    cluster.add_child(mid)
-    var right: Panel = _make_card(second_id, true)
-    right.position = Vector2(CARD_SIZE.x + CLUSTER_MID.x + 16, 0)
-    cluster.add_child(right)
-    right.set_meta("home", right.position)
-    return cluster
+    return 24.0 + body_height
+
+func _prepare_pack_copy(label: Label, width: float, height: float) -> void:
+    label.autowrap_mode = PACK_WRAP
+    label.clip_text = false
+    label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+    var wanted := Vector2(width, height)
+    label.custom_minimum_size = Vector2.ZERO
+    label.custom_minimum_size = Vector2(wanted.x, 0)
+    label.size = wanted
+    if label.size != wanted:
+        label.custom_minimum_size = Vector2(wanted.x, 0)
+        label.size = wanted
+    label.set_meta("pack_copy_size", wanted)
+
+func _relock_pack_copy(node: Node = null) -> void:
+    var root: Node = self if node == null else node
+    if not is_instance_valid(root):
+        return
+    if root is Label and root.has_meta("pack_copy_size"):
+        var wanted: Vector2 = root.get_meta("pack_copy_size")
+        root.custom_minimum_size = Vector2(wanted.x, 0)
+        root.size = wanted
+        if root.autowrap_mode == PACK_WRAP:
+            root.clip_text = false
+            root.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+    for child in root.get_children():
+        _relock_pack_copy(child)
+
+func _wrapped_size(text: String, font_size: int, width: float) -> Vector2:
+    var font: Font = body_font
+    if font == null or text.is_empty():
+        return Vector2(width, float(font_size + 8))
+    return font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, maxf(1.0, width), font_size, -1, TextServer.BREAK_MANDATORY | TextServer.BREAK_GRAPHEME_BOUND)
 
 func _paint_card(card: Panel, _weapon_id: String, mode: String) -> void:
     var box := StyleBoxFlat.new()
