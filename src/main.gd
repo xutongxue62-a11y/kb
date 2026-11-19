@@ -469,10 +469,9 @@ func save_game(finished: bool = false) -> bool:
     if result.get("ok", false):
         # A finished run is sealed, not continuable; saying 已保存 here made
         # players think they could pick the run back up from the death screen.
-        # During the end-of-wave absorb, pending coins are already flying in and
-        # will appear on the HUD immediately after this save, so the toast uses
-        # the same total the wallet is about to show.
-        var shown_coins: int = coins + (pending_pickup_coins() if wave_closing else 0)
+        # Leftover gems on the ground are discarded at wave end, so the toast
+        # only shows coins already in the wallet.
+        var shown_coins: int = coins
         note = "本局已结束 · 战绩已记录" if finished else "已保存 · 第%d关 · %d金币" % [wave, shown_coins]
     refresh_save_status(note)
     return result.get("ok",false)
@@ -731,13 +730,6 @@ func switch_elite() -> void:
 
 func restart_current_run() -> void:
     start_run(trial_mode, trial_preset if trial_mode else "")
-
-func pending_pickup_coins() -> int:
-    var total: int = 0
-    for drop in pickups:
-        if str(drop.get("kind", "xp")) == "coin":
-            total += int(drop.get("value", 0))
-    return total
 
 func toggle_pause() -> void:
     if departure_left > 0.0 or wave_closing:
@@ -1258,6 +1250,10 @@ func collect_all_drops() -> void:
             xp += LootDrops.experience_value(drop) * stats["xp_multiplier"]
     pickups.clear()
 
+func discard_remaining_drops() -> void:
+    # Uncollected gems and blood packs are not vacuumed in at wave end.
+    pickups.clear()
+
 func dismiss_remaining_enemies() -> void:
     var animate: bool = DisplayServer.get_name() != "headless"
     for enemy in enemies:
@@ -1320,26 +1316,16 @@ func start_wave_closing() -> void:
 func _finish_wave_closing() -> void:
     wave_buffer = 0.0
     player_frozen = true
-    collect_all_drops()
+    discard_remaining_drops()
     collect_round_chests()
     if demo:
         begin_round(wave + 1)
     else:
         continue_round_rewards()
 
-func absorb_round_resources(delta: float) -> void:
-    var fraction: float = clampf(delta / maxf(wave_buffer,0.000001),0.0,1.0)
-    for drop in pickups:
-        drop.position = Vector2(drop.position).lerp(player_position,fraction)
-    update_pickups(0.0)
-    var remaining: Array = []
-    for chest in chest_marks:
-        chest.position = Vector2(chest.position).lerp(player_position,fraction)
-        if Vector2(chest.position).distance_squared_to(player_position) <= 28.0*28.0:
-            chest_queue += 1
-        else:
-            remaining.append(chest)
-    chest_marks = remaining
+func absorb_round_resources(_delta: float) -> void:
+    # Leftover gems stay put during the finish pause and are discarded when it
+    # ends. Ground chests are queued afterwards, not pulled in during this beat.
     update_hud()
 
 func collect_round_chests() -> void:
@@ -1365,7 +1351,7 @@ func end_round() -> void:
     wave_buffer = 0.0
     player_frozen = true
     dismiss_remaining_enemies()
-    collect_all_drops()
+    discard_remaining_drops()
     collect_round_chests()
     continue_round_rewards()
 
@@ -1373,7 +1359,7 @@ func open_round_shop() -> void:
     wave_closing = false
     wave_buffer = 0.0
     player_frozen = true
-    collect_all_drops()
+    discard_remaining_drops()
     clear_enemies()
     expire_combat_fx()
     armory.reset()
