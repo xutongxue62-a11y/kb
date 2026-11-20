@@ -89,14 +89,17 @@ func check_multi_attach_and_residuals(world: Node) -> void:
     expect(residual_kinds(world).has("fire") and not residual_kinds(world).has("rune"), "fire-enchanted cannon residual is fire, not blue")
     if world.grant_weapon("staff"):
         world.select_link("rune_shell")
-        expect(world.has_active_link("fire_cannon") and world.has_active_link("rune_shell"), "fire and magic can enchant the same cannon together")
+        expect(world.has_active_link("rune_shell") and not world.has_active_link("fire_cannon"), "a new enchantment on the same cannon replaces the old one")
         world.projectiles.clear()
         world.burning_fields.clear()
         world.weapon_runtime["powder"]["cooldown"] = 0.0
         world.update_weapons(0.05)
-        var both: Dictionary = explode_current_shell(world)
-        expect(not both.is_empty() and bool(both.get("enchanted", false)), "a dual-enchanted cannon shell is still a magic shell")
-        expect(residual_kinds(world).has("fire") and residual_kinds(world).has("rune"), "dual-enchanted cannon leaves both fire and blue residuals")
+        var replaced: Dictionary = explode_current_shell(world)
+        expect(not replaced.is_empty() and bool(replaced.get("enchanted", false)), "the replacement magic cannon shell is a magic shell")
+        expect(residual_kinds(world).has("rune") and not residual_kinds(world).has("fire"), "replacing fire with magic leaves only the blue residual")
+        expect(world.grant_weapon("sling"), "another host can be granted for the displaced firepot")
+        world.select_link("fire_sling")
+        expect(world.has_active_link("rune_shell") and world.has_active_link("fire_sling") and not world.has_active_link("fire_cannon"), "the displaced firepot can attach to another weapon")
 
 func check_ranged_torso_clearance(world: Node) -> void:
     world.start_run(true)
@@ -143,9 +146,12 @@ func _initialize() -> void:
     expect(rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["chain_axe"]), "magic cannon and a powder chain cannot coexist")
     expect(not rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["rune_sling"]), "staff can attach to powder and sling together")
     expect(not rules.recipes_conflict(Catalog.LINKS["fire_cannon"], Catalog.LINKS["fire_sling"]), "fire can attach to several hosts at once")
-    expect(not rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["fire_cannon"]), "magic and fire can both enchant the cannon")
+    expect(rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["fire_cannon"]), "the same cannon cannot take magic and fire enchantments together")
+    expect(not rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["fire_sling"]), "magic on the cannon can coexist with fire on the sling")
     var added: Dictionary = rules.add_link_ids(["rune_shell"], "rune_sling", ids)
     expect(added["ids"].has("rune_shell") and added["ids"].has("rune_sling") and added.get("dropped", []).is_empty(), "adding a coexisting recipe keeps the first")
+    var host_swap: Dictionary = rules.add_link_ids(["rune_shell", "rune_sling"], "fire_cannon", ids + ["firepot"])
+    expect(host_swap["ids"].has("fire_cannon") and host_swap["ids"].has("rune_sling") and host_swap["dropped"].has("rune_shell"), "enchanting the cannon with fire replaces only the cannon's old magic and keeps the staff on sling")
     var replaced: Dictionary = rules.add_link_ids(["rune_shell", "rune_sling"], "chain_axe", ids)
     expect(replaced["ids"].has("chain_axe") and replaced["ids"].has("rune_sling") and replaced["dropped"].has("rune_shell"), "a powder chain replaces only the conflicting cannon recipe")
     for id in ["powder", "staff", "sling"]:

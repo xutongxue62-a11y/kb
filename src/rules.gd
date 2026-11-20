@@ -130,14 +130,34 @@ static func link_profile(link_id: String, owned: Array) -> Dictionary:
     return Catalog.LINKS["none"].duplicate(true)
 
 # Powder can either fire shells or launch one chained melee weapon, not both,
-# and it can launch only one chain recipe at a time. Catalyst attachments
-# (fire / magic / thunder) may coexist with each other and with a non-conflicting
-# powder mode.
+# and it can launch only one chain recipe at a time. A catalyst (fire / magic /
+# thunder) may attach to several hosts at once, but one host accepts only one
+# enchantment; a new compatible attachment replaces the old one on that host.
 static func uses_powder_shells(recipe: Dictionary) -> bool:
     return str(recipe.get("id", "")) in ["rune_shell", "fire_cannon"]
 
 static func is_chain_recipe(recipe: Dictionary) -> bool:
     return str(recipe.get("kind", "")) == "chain"
+
+static func is_catalyst_weapon(weapon_id: String) -> bool:
+    return weapon_id in ["staff", "firepot", "totem"]
+
+static func recipe_catalyst_id(recipe: Dictionary) -> String:
+    for weapon_id in recipe.get("weapons", []):
+        var key: String = str(weapon_id)
+        if is_catalyst_weapon(key):
+            return key
+    return ""
+
+static func enchant_host_id(recipe: Dictionary) -> String:
+    var catalyst: String = recipe_catalyst_id(recipe)
+    if catalyst.is_empty():
+        return ""
+    for weapon_id in recipe.get("weapons", []):
+        var key: String = str(weapon_id)
+        if key != catalyst:
+            return key
+    return ""
 
 static func recipes_conflict(first: Dictionary, second: Dictionary) -> bool:
     var first_id: String = str(first.get("id", ""))
@@ -149,6 +169,10 @@ static func recipes_conflict(first: Dictionary, second: Dictionary) -> bool:
     if first_chain and second_chain:
         return true
     if (first_chain and uses_powder_shells(second)) or (second_chain and uses_powder_shells(first)):
+        return true
+    var first_host: String = enchant_host_id(first)
+    var second_host: String = enchant_host_id(second)
+    if not first_host.is_empty() and first_host == second_host:
         return true
     return false
 

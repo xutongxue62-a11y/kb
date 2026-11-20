@@ -14,7 +14,8 @@ const BOARD_SIZE := Vector2(1136, 590)
 const BOARD_MARGIN := 10.0
 const CARD_GAP := 8.0
 const MIN_DETAILS_WIDTH := 360.0
-const UNLINK_DISTANCE := 86.0
+const UNLINK_DISTANCE := 56.0
+const ROW_UNLINK_CLEARANCE := 28.0
 const PACK_WRAP := TextServer.AUTOWRAP_ARBITRARY
 const EDGE_ZONE := 28.0
 const RESULT_SIZE := Vector2(128, 38)
@@ -349,7 +350,12 @@ func _apply_drop(weapon_a: String, weapon_b: String) -> Dictionary:
 	var previous_ids: Array = _current_link_ids()
 	var wanted: String = str(recipe.get("id", "none"))
 	if previous_ids.has(wanted):
-		return {"ok": true, "link_id": wanted, "link_ids": previous_ids, "toast": "已在使用「%s」" % str(recipe.get("name", "")), "unchanged": true}
+		var cancelled: Dictionary = _apply_unlink(weapon_a, wanted)
+		cancelled["cancelled"] = cancelled.get("ok", false)
+		cancelled["unlinked"] = cancelled.get("ok", false)
+		if cancelled.get("ok", false) and str(cancelled.get("toast", "")).is_empty():
+			cancelled["toast"] = "已断开「%s」" % str(recipe.get("name", "联动"))
+		return cancelled
 	var resolution: Dictionary = Rules.add_link_ids(previous_ids, wanted, owned)
 	var before: Array = previous_ids.duplicate()
 	host.select_link(wanted)
@@ -472,7 +478,7 @@ func _recipes_for_weapon(weapon_id: String) -> Array:
 	return result
 
 func _is_catalyst(weapon_id: String) -> bool:
-	return weapon_id in ["staff", "firepot", "totem"]
+	return Rules.is_catalyst_weapon(weapon_id)
 
 func _owned_level(weapon_id: String) -> int:
 	if host == null:
@@ -495,7 +501,7 @@ func _status_copy() -> String:
 		return last_error
 	if not last_toast.is_empty():
 		return last_toast
-	return "把能搭配的两件拖到卡面上即可连上，拖到侧边或空档可调换位置；把其中一对拖开只断开这一组。优点缺点把鼠标放到结果上再看。"
+	return "把能搭配的两件拖到卡面上即可连上；再拖到已连上的那一件上可取消这一组。拖离绳子或底排也能断开。同一件武器同时只接受一种附魔，新的会顶掉旧的。"
 
 func _set_status(text: String) -> void:
 	if status_label != null and is_instance_valid(status_label):
@@ -522,7 +528,7 @@ func _build() -> void:
 	title.size = Vector2(860, 42)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	sheet.content.add_child(title)
-	var hint: Label = _label("把能搭配的两件拖到卡面上，就会用绳子连上。拖到卡片侧边或空档可以调换位置，方便整理。已有的其他联动会保留；把其中一对拖开只断开这一组。把鼠标放到结果节点上，再看优点和缺点。", 16, Color("#66705e"), false)
+	var hint: Label = _label("把能搭配的两件拖到卡面上，就会用绳子连上；再拖到已连上的那一件上，可以取消这一组。拖离绳子或底排也能断开，只断这一分支。同一件武器同时只接受一种附魔，新的会顶掉旧的；触媒仍可给多件武器附着。拖到侧边或空档可调换位置。把鼠标放到结果上，再看优点和缺点。", 16, Color("#66705e"), false)
 	hint.position = Vector2(44, 54)
 	_prepare_pack_copy(hint, 1020, 52)
 	sheet.content.add_child(hint)
@@ -1194,7 +1200,7 @@ func _begin_drag(weapon_id: String, card: Control, local_pos: Vector2) -> void:
 	last_error = ""
 	_apply_drag_highlights()
 	_on_drag_moved()
-	_set_status("拖到可搭配的卡面上即可联动；拖到侧边或空档可调换位置；拖开已连上的那一对即可断开。")
+	_set_status("拖到可搭配的卡面上即可联动；再叠到已连上的那一件上可取消这一组；拖离绳子或底排也能断开；拖到侧边或空档可调换位置。")
 
 func _on_drag_moved() -> void:
 	_apply_drag_highlights()
@@ -1274,19 +1280,73 @@ func _intent_at(global_pos: Vector2, source_id: String) -> Dictionary:
 	var hit: Dictionary = _hit_card_zone(global_pos, source_id, ids)
 	if not hit.is_empty():
 		return hit
+	var above_row: bool = _pointer_above_row(global_pos)
+	if above_row and not _recipes_for_weapon(source_id).is_empty():
+		return {"kind": "unlink", "link_id": _branch_to_unlink(source_id, global_pos)}
 	var row: Dictionary = _hit_row_gap(global_pos, source_id, ids)
 	if not row.is_empty():
 		return row
 	var source_card: Control = cards.get(source_id, null)
 	if source_card != null and is_instance_valid(source_card) and not _recipes_for_weapon(source_id).is_empty():
 		var home: Vector2 = source_card.get_meta("home", drag_home)
-		var home_center: Vector2 = source_card.global_position - source_card.position + home + source_card.size * 0.5
+		var origin: Vector2 = source_card.global_position - source_card.position
+		var home_center: Vector2 = origin + home + source_card.size * 0.5
+		var home_rect := Rect2(origin + home, source_card.size).grow(-8.0)
+		if home_rect.has_point(global_pos):
+			return {"kind": "cancel"}
 		var moved: bool = source_card.position.distance_to(home) >= UNLINK_DISTANCE
 		var pointer_away: bool = global_pos.distance_to(home_center) >= UNLINK_DISTANCE
 		if moved or pointer_away:
-			var unlink_id: String = str(source_card.get_meta("unlink_id", ""))
-			return {"kind": "unlink", "link_id": unlink_id}
+			return {"kind": "unlink", "link_id": _branch_to_unlink(source_id, global_pos)}
 	return {"kind": "cancel"}
+
+func _pointer_above_row(global_pos: Vector2) -> bool:
+	var ids: Array = weapon_ids()
+	if ids.is_empty() or board == null:
+		return false
+	var first: Control = cards.get(ids[0], null)
+	if first == null or not is_instance_valid(first):
+		return false
+	var row_top: float = first.get_global_rect().position.y
+	return global_pos.y < row_top - ROW_UNLINK_CLEARANCE
+
+func _branch_to_unlink(source_id: String, global_pos: Vector2) -> String:
+	var involved: Array = _recipes_for_weapon(source_id)
+	if involved.is_empty():
+		return ""
+	if involved.size() == 1:
+		return str(involved[0].get("id", ""))
+	var best_id: String = ""
+	var best_dist: float = INF
+	var second_dist: float = INF
+	for recipe in involved:
+		var link_id: String = str(recipe.get("id", ""))
+		var other: String = Catalog.partner_id(recipe, source_id)
+		var point := Vector2.ZERO
+		var found := false
+		var card: Control = cards.get(other, null)
+		if card != null and is_instance_valid(card):
+			point = card.get_global_rect().get_center()
+			found = true
+		var node: Control = results.get(link_id, null)
+		if node != null and is_instance_valid(node):
+			var mid: Vector2 = node.get_global_rect().get_center()
+			point = mid if not found else (point + mid) * 0.5
+			found = true
+		if not found:
+			continue
+		var dist: float = point.distance_to(global_pos)
+		if dist < best_dist:
+			second_dist = best_dist
+			best_dist = dist
+			best_id = link_id
+		elif dist < second_dist:
+			second_dist = dist
+	if best_id.is_empty():
+		return ""
+	if second_dist < INF and second_dist - best_dist < 36.0:
+		return ""
+	return best_id
 
 func _hit_card_zone(global_pos: Vector2, source_id: String, ids: Array) -> Dictionary:
 	for index in range(ids.size()):
@@ -1313,8 +1373,8 @@ func _hit_row_gap(global_pos: Vector2, source_id: String, ids: Array) -> Diction
 	var first: Control = cards.get(ids[0], null)
 	if first == null or not is_instance_valid(first):
 		return {}
-	var top: float = first.get_global_rect().position.y - 18.0
-	var bottom: float = first.get_global_rect().end.y + 18.0
+	var top: float = first.get_global_rect().position.y - 6.0
+	var bottom: float = first.get_global_rect().end.y + 12.0
 	if global_pos.y < top or global_pos.y > bottom:
 		return {}
 	var count: int = ids.size()
