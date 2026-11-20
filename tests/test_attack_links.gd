@@ -101,6 +101,70 @@ func check_multi_attach_and_residuals(world: Node) -> void:
         world.select_link("fire_sling")
         expect(world.has_active_link("rune_shell") and world.has_active_link("fire_sling") and not world.has_active_link("fire_cannon"), "the displaced firepot can attach to another weapon")
 
+func _clear_combat(world: Node) -> void:
+    world.projectiles.clear()
+    world.burning_fields.clear()
+    for enemy in world.enemies:
+        enemy["view"].queue_free()
+    world.enemies.clear()
+
+func check_named_host_combat_effects(world: Node) -> void:
+    # Fire on the named melee/ranged hosts leaves a fire field.
+    world.start_run(false)
+    for weapon_id in ["firepot", "axe", "blade", "hammer"]:
+        expect(world.grant_weapon(weapon_id) or Catalog.inventory_ids(world.inventory).has(weapon_id), "fire combat owns " + weapon_id)
+    for link_id in ["fire_axe", "fire_blade", "fire_hammer", "fire_sling"]:
+        world.select_link(link_id)
+        expect(world.has_active_link(link_id), "can enable " + link_id + " for combat")
+        _clear_combat(world)
+        world.spawn_enemy("tank", world.player_position + Vector2(80, 0))
+        world.enemies[0]["hp"] = 1000.0
+        world.enemies[0]["max_hp"] = 1000.0
+        var host: String = str(Catalog.LINKS[link_id]["weapons"][1])
+        world.apply_weapon_link_hit(world.enemies[0]["position"], host, str(world.enemies[0]["id"]), 8.0)
+        expect(residual_kinds(world).has("fire"), link_id + " leaves a fire field on hit")
+    # Rune melee burst still uses the staff explosion.
+    world.start_run(false)
+    expect(world.grant_weapon("staff") and world.grant_weapon("axe"), "rune axe combat owns staff and axe")
+    world.select_link("rune_axe")
+    _clear_combat(world)
+    world.spawn_enemy("tank", world.player_position + Vector2(40, 0))
+    world.enemies[0]["hp"] = 1000.0
+    world.enemies[0]["max_hp"] = 1000.0
+    var before_hp: float = world.enemies[0]["hp"]
+    world.apply_weapon_link_hit(world.enemies[0]["position"], "axe", str(world.enemies[0]["id"]), 8.0)
+    expect(world.enemies[0]["hp"] < before_hp, "符能石斧 applies a rune burst on hit")
+    # Thunder jump on the user-named hosts (cannon, sling, hammer, axe, blade).
+    world.start_run(false)
+    for weapon_id in ["totem", "powder", "hammer", "axe", "blade"]:
+        expect(world.grant_weapon(weapon_id) or Catalog.inventory_ids(world.inventory).has(weapon_id), "thunder combat owns " + weapon_id)
+    for link_id in ["thunder_shell", "thunder_sling", "thunder_hammer", "thunder_axe", "thunder_blade"]:
+        world.select_link(link_id)
+        expect(world.has_active_link(link_id), "can enable " + link_id + " for combat")
+        _clear_combat(world)
+        world.spawn_enemy("tank", world.player_position + Vector2(80, 0))
+        world.spawn_enemy("tank", world.player_position + Vector2(140, 0))
+        world.enemies[0]["hp"] = 1000.0
+        world.enemies[0]["max_hp"] = 1000.0
+        world.enemies[1]["hp"] = 1000.0
+        world.enemies[1]["max_hp"] = 1000.0
+        var host_id: String = "powder" if link_id == "thunder_shell" else str(Catalog.LINKS[link_id]["reload_weapon"])
+        var neighbor_before: float = world.enemies[1]["hp"]
+        if link_id == "thunder_shell":
+            world.projectiles.clear()
+            world.weapon_runtime["powder"]["cooldown"] = 0.0
+            world.update_weapons(0.05)
+            var shell: Dictionary = explode_current_shell(world)
+            expect(not shell.is_empty(), "导雷火炮 still fires a shell")
+            var jumped: bool = false
+            for enemy in world.enemies:
+                if float(enemy["hp"]) < 1000.0:
+                    jumped = true
+            expect(jumped, "导雷火炮 jumps lightning to a nearby enemy")
+        else:
+            world.apply_weapon_link_hit(world.enemies[0]["position"], host_id, str(world.enemies[0]["id"]), 10.0)
+            expect(world.enemies[1]["hp"] < neighbor_before, link_id + " jumps lightning to a nearby enemy")
+
 func check_ranged_torso_clearance(world: Node) -> void:
     world.start_run(true)
     for enemy in world.enemies:
@@ -135,7 +199,9 @@ func _initialize() -> void:
     expect(options[0]["id"] == "none", "no-link is always selectable")
     for option in options:
         expect(option["weapons"].size() == 0 or option["weapons"].size() == 2, "every recipe uses exactly two weapons")
-    expect(rules.link_options(["club", "staff"]).size() == 1, "missing powder cannot activate a recipe")
+    expect(rules.link_options(["club", "sling"]).size() == 1, "unrelated weapons cannot activate a recipe")
+    var club_staff: Array = rules.link_options(["club", "staff"])
+    expect(club_staff.size() == 2 and club_staff[1]["id"] == "rune_club", "staff can enchant the club as 符能木棒")
     var rune: Dictionary = rules.link_profile("rune_shell", ids)
     expect(rune["name"] == "魔法炮" and rune["weapons"] == ["powder", "staff"], "magic cannon consists of powder and staff only and is named 魔法炮")
     expect(rune["suppressed"].has("staff") and rune["cooldown_multiplier"] > 1.0, "magic cannon really pays staff-fire and reload costs")
@@ -148,6 +214,11 @@ func _initialize() -> void:
     expect(not rules.recipes_conflict(Catalog.LINKS["fire_cannon"], Catalog.LINKS["fire_sling"]), "fire can attach to several hosts at once")
     expect(rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["fire_cannon"]), "the same cannon cannot take magic and fire enchantments together")
     expect(not rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["fire_sling"]), "magic on the cannon can coexist with fire on the sling")
+    expect(not rules.recipes_conflict(Catalog.LINKS["thunder_shell"], Catalog.LINKS["thunder_sling"]), "totem can attach to powder and sling together")
+    expect(rules.recipes_conflict(Catalog.LINKS["thunder_shell"], Catalog.LINKS["chain_axe"]), "导雷火炮 and a powder chain cannot coexist")
+    expect(rules.recipes_conflict(Catalog.LINKS["thunder_shell"], Catalog.LINKS["rune_shell"]), "the same cannon cannot take thunder and magic enchantments together")
+    expect(rules.recipes_conflict(Catalog.LINKS["fire_axe"], Catalog.LINKS["thunder_axe"]), "the same axe cannot take fire and thunder enchantments together")
+    expect(not rules.recipes_conflict(Catalog.LINKS["fire_axe"], Catalog.LINKS["fire_blade"]), "fire can attach to the axe and the blade together")
     var added: Dictionary = rules.add_link_ids(["rune_shell"], "rune_sling", ids)
     expect(added["ids"].has("rune_shell") and added["ids"].has("rune_sling") and added.get("dropped", []).is_empty(), "adding a coexisting recipe keeps the first")
     var host_swap: Dictionary = rules.add_link_ids(["rune_shell", "rune_sling"], "fire_cannon", ids + ["firepot"])
@@ -308,6 +379,7 @@ func scene_checks() -> void:
     expect(world.enemies[0]["hp"] < before_hp, "rune sling applies an extra magic burst on hit")
     expect(world.inventory.size() >= fire_count and world.active_link["id"] == "rune_sling", "rune attachment preserves the owned weapons")
     check_multi_attach_and_residuals(world)
+    check_named_host_combat_effects(world)
     check_ranged_torso_clearance(world)
     world.queue_free()
     await process_frame

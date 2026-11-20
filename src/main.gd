@@ -1743,7 +1743,7 @@ func link_hint_text() -> String:
             if str(recipe.get("id", "none")) != "none":
                 names.append(str(recipe.get("name", "")))
         var current: String = str(link_hud_view().get("name", "不联动"))
-        return "已可联动：按 %s 打开背包，把武器拖到一起即可启用（当前：%s）。火种壶、魔法杖等附魔可同时给多件武器附着。锁链从火药筒炮口弹出。" % [KeyBindings.caption_for("link"), current]
+        return "已可联动：按 %s 打开背包，把武器拖到一起即可启用（当前：%s）。火种壶、魔法杖、雷鸣图腾可同时给多件武器附魔，但同一件武器只接受一种附魔。锁链从火药筒炮口弹出。" % [KeyBindings.caption_for("link"), current]
     for link_id in Catalog.LINK_ORDER:
         if link_id == "none":
             continue
@@ -2263,17 +2263,7 @@ func update_armory(delta: float) -> void:
                 var before_hp: float=float(command.enemy.hp)
                 var was_living_monster: bool = Rules.is_living_monster(command.enemy)
                 hurt_enemy(command["enemy"],command["damage"],command["weapon_id"],false,command["direction"])
-                if has_link_kind("storm_arrow") and command.weapon_id=="bonebow" and was_living_monster and float(command.enemy.hp)<before_hp:
-                    var others: Array=combat_targets().filter(func(e):return Rules.is_living_monster(e) and e.id!=command.enemy.id)
-                    var neighbor: Dictionary=Rules.choose_target(command.enemy.position,130.0,others,false)
-                    if not neighbor.is_empty():
-                        effects.beam(command.enemy.position,neighbor.position,Color("#f3d89b"))
-                        hurt_enemy(neighbor,command.damage*0.45,"totem",true,command.direction)
-                        if has_link_kind("thunder_crystal") and armory.states.has("crystal"):
-                            for mine in armory.states.crystal.mines:
-                                if Vector2(mine.position).distance_to(neighbor.position)<=120.0:
-                                    mine["charged"]=true
-                apply_weapon_link_hit(command.enemy.position, str(command.get("weapon_id", "")))
+                apply_weapon_link_hit(command.enemy.position, str(command.get("weapon_id", "")), str(command.enemy.get("id", "")), float(command.get("damage", 0.0)))
                 flash_weapon(command["weapon_id"])
             "area":
                 damage_area(command["position"],command["radius"]*stats["area_multiplier"],command["damage"],command["weapon_id"],true,Color("#e8c783"), "quake")
@@ -2347,8 +2337,10 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
             var closest: Vector2 = Geometry2D.get_closest_point_to_segment(enemy["position"], previous, point)
             if closest.distance_to(enemy["position"]) > enemy["radius"] + 13.0 or float(runtime["hit_times"].get(enemy["id"], -INF)) > elapsed:
                 continue
-            runtime["hit_times"][enemy["id"]] = elapsed + data["cooldown"] / stats["attack_speed"]
-            hurt_enemy(enemy, data["damage"] * (1.0 + (item["level"] - 1) * 0.35), key, false, (enemy["position"] - player_position).normalized())
+            var melee_damage: float = data["damage"] * (1.0 + (item["level"] - 1) * 0.35)
+            runtime["hit_times"][enemy["id"]] = elapsed + data["cooldown"] * weapon_reload_penalty(key) / stats["attack_speed"]
+            hurt_enemy(enemy, melee_damage, key, false, (enemy["position"] - player_position).normalized())
+            apply_weapon_link_hit(enemy["position"], key, str(enemy.get("id", "")), melee_damage)
             hero.recoil((point - player_position).normalized())
             audio.play("swing", -3.0 if key == "blade" else -1.0, 1.28 if key == "blade" else 0.88)
             flash_weapon(key)
@@ -2601,7 +2593,9 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
             continue
         if Geometry2D.get_closest_point_to_segment(enemy["position"], previous, point).distance_to(enemy["position"]) <= enemy["radius"] + 12.0:
             runtime["chain_hit_ids"].append(enemy["id"])
-            hurt_enemy(enemy, runtime["chain_damage"] * (0.6 if returning else 1.0), key, true, (point - previous).normalized())
+            var chain_damage: float = runtime["chain_damage"] * (0.6 if returning else 1.0)
+            hurt_enemy(enemy, chain_damage, key, true, (point - previous).normalized())
+            apply_weapon_link_hit(enemy["position"], key, str(enemy.get("id", "")), chain_damage)
             effects.burst(point, Color("#e2ceb0"), 17)
             hit_target = true
     if not returning and (hit_target or runtime["chain_distance"] >= chain_range):
@@ -2686,7 +2680,7 @@ func update_projectiles(delta: float) -> void:
                     projectile["hit_ids"].append(enemy["id"])
                     hurt_enemy(enemy, projectile["damage"], projectile["weapon_id"], projectile["from_combo"], projectile["velocity"].normalized())
                     if not projectile.get("from_combo", false):
-                        apply_weapon_link_hit(enemy["position"], str(projectile.get("weapon_id", projectile["kind"])))
+                        apply_weapon_link_hit(enemy["position"], str(projectile.get("weapon_id", projectile["kind"])), str(enemy.get("id", "")), float(projectile.get("damage", 0.0)))
                     if projectile["kind"] == "staff":
                         audio.play("magic_hit", -5.0)
                         effects.burst(enemy["position"], Color("#67effa"), 24, "ring")
@@ -2715,7 +2709,7 @@ func update_projectiles(delta: float) -> void:
 func _host_is_enchanted(weapon_id: String) -> bool:
     return Rules.host_is_rune_enchanted(active_links, weapon_id) or Rules.host_is_fire_enchanted(active_links, weapon_id)
 
-func apply_weapon_link_hit(point: Vector2, weapon_id: String) -> void:
+func apply_weapon_link_hit(point: Vector2, weapon_id: String, except_id: String = "", source_damage: float = -1.0) -> void:
     if weapon_id.is_empty():
         return
     var kinds: Array = Rules.host_enchant_kinds(active_links, weapon_id)
@@ -2723,6 +2717,8 @@ func apply_weapon_link_hit(point: Vector2, weapon_id: String) -> void:
         _spawn_attachment_fire(point, weapon_id)
     if kinds.has("rune_enchant") or kinds.has("rune"):
         _apply_rune_burst(point)
+    if kinds.has("thunder_enchant"):
+        _apply_thunder_jump(point, except_id, source_damage)
 
 func _spawn_attachment_fire(point: Vector2, host_id: String) -> void:
     for field in burning_fields:
@@ -2743,6 +2739,21 @@ func _apply_rune_burst(point: Vector2) -> void:
     var radius: float = 34.0 * float(stats.get("area_multiplier", 1.0))
     damage_area(point, radius, damage, "staff", true, Color("#6ee7f2"), "rune_blast")
     audio.play("magic_hit", -6.0)
+
+func _apply_thunder_jump(point: Vector2, except_id: String = "", source_damage: float = -1.0) -> void:
+    var others: Array = combat_targets().filter(func(enemy): return Rules.is_living_monster(enemy) and str(enemy.get("id", "")) != except_id)
+    var neighbor: Dictionary = Rules.choose_target(point, 130.0, others, false)
+    if neighbor.is_empty():
+        return
+    var totem_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "totem")
+    var damage: float = source_damage * 0.45 if source_damage > 0.0 else Catalog.WEAPONS["totem"]["damage"] * (1.0 + float(weapon_level("totem") - 1) * 0.35) * 0.45
+    damage *= float(totem_bonus.get("damage_multiplier", 1.0))
+    effects.beam(point, neighbor["position"], Color("#f3d89b"))
+    hurt_enemy(neighbor, damage, "totem", true, (neighbor["position"] - point).normalized())
+    if has_link_kind("thunder_crystal") and armory.states.has("crystal"):
+        for mine in armory.states.crystal.mines:
+            if Vector2(mine.position).distance_to(neighbor.position) <= 120.0:
+                mine["charged"] = true
 
 func explode_powder(projectile: Dictionary) -> void:
     var enchanted: bool = bool(projectile.get("enchanted", false)) and Rules.host_is_rune_enchanted(active_links, "powder")
@@ -2783,6 +2794,8 @@ func explode_powder(projectile: Dictionary) -> void:
         audio.play("magic_hit", -5.0)
     if fire_cannon:
         effects.burst(point, Color("#ffad40"), 48.0, "blast")
+    if Rules.host_is_thunder_enchanted(active_links, "powder"):
+        _apply_thunder_jump(point, "", float(projectile.get("damage", 0.0)))
 
 func update_burning_fields(delta: float) -> void:
     var remaining: Array = []

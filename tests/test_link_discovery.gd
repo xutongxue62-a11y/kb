@@ -45,22 +45,32 @@ func check_catalog_helpers() -> void:
     expect(Catalog.LINKS["rune_shell"]["name"] == "魔法炮", "rune_shell display name is 魔法炮")
     expect(Catalog.LINKS["fire_cannon"]["weapons"] == ["firepot", "powder"], "flame cannon is firepot plus powder")
     expect(Catalog.LINKS["rune_arrow"]["weapons"] == ["staff", "bonebow"], "rune arrow is staff plus bonebow")
+    expect(Catalog.LINKS["fire_axe"]["name"] == "焚石斧" and Catalog.LINKS["fire_blade"]["name"] == "燃骨刃", "missing fire recipes on axe and blade are named")
+    expect(Catalog.LINKS["rune_hammer"]["name"] == "符能重砸" and Catalog.LINKS["rune_axe"]["name"] == "符能石斧", "staff hammer and axe recipes are named")
+    expect(Catalog.LINKS["thunder_shell"]["name"] == "导雷火炮" and Catalog.LINKS["thunder_sling"]["name"] == "导雷石弹", "totem cannon and sling recipes are named")
+    expect(Catalog.LINKS["thunder_hammer"]["name"] == "引雷重砸" and Catalog.LINKS["thunder_axe"]["name"] == "引雷石斧" and Catalog.LINKS["thunder_blade"]["name"] == "引雷骨刃", "totem hammer, axe, and blade recipes are named")
     for key in Catalog.LINK_ORDER:
         var recipe: Dictionary = Catalog.LINKS[key]
         expect(recipe["weapons"].size() == 0 or recipe["weapons"].size() == 2, "every catalog recipe stays pairwise: " + key)
         expect(str(recipe.get("benefit", "")) != "" and str(recipe.get("cost", "")) != "", "every recipe publishes benefit and cost: " + key)
+        if key != "none":
+            expect(str(recipe.get("benefit", "")).length() >= 8 and str(recipe.get("cost", "")).length() >= 8, "benefit and cost stay uncut official sentences: " + key)
     var sling_recipes: Array = Catalog.recipes_for_weapon("sling")
     var sling_names: Array = []
     for recipe in sling_recipes:
         sling_names.append(recipe["id"])
-    expect(sling_names.has("fire_sling") and sling_names.has("rune_sling"), "sling lists fire and rune attachments")
+    expect(sling_names.has("fire_sling") and sling_names.has("rune_sling") and sling_names.has("thunder_sling"), "sling lists fire, rune, and thunder attachments")
     var offer: String = Catalog.offer_link_text("firepot", ["powder"])
     expect(offer.contains("可联动：") and offer.contains("烈焰火炮") and offer.contains("优点") and offer.contains("缺点"), "shop text marks a completing pair with benefit and cost")
     var waiting: String = Catalog.offer_link_text("firepot", [])
     expect(waiting.contains("可与") and (waiting.contains("木质火药筒") or waiting.contains("火药筒") or waiting.contains("弹弓")), "incomplete offers name the missing partner")
     expect(Catalog.offer_link_text("firepot", ["firepot"]).is_empty(), "upgrading an already-owned weapon is not treated as completing a pair")
     var details: String = Catalog.link_details_text("staff")
-    expect(details.contains("魔法炮") and details.contains("优点") and details.contains("缺点"), "weapon details list partners with benefit and cost")
+    expect(details.contains("魔法炮") and details.contains("符能石斧") and details.contains("优点") and details.contains("缺点"), "weapon details list partners with benefit and cost")
+    var fire_details: String = Catalog.link_details_text("firepot")
+    expect(fire_details.contains("焚石斧") and fire_details.contains("燃骨刃") and fire_details.contains("烈焰火炮"), "firepot details include the completed host list")
+    var totem_details: String = Catalog.link_details_text("totem")
+    expect(totem_details.contains("导雷火炮") and totem_details.contains("引雷石斧") and totem_details.contains("导雷骨箭"), "totem details include old and new thunder recipes")
 
 func check_discovery_flow() -> void:
     var world = make_world("starter")

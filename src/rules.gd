@@ -134,7 +134,7 @@ static func link_profile(link_id: String, owned: Array) -> Dictionary:
 # thunder) may attach to several hosts at once, but one host accepts only one
 # enchantment; a new compatible attachment replaces the old one on that host.
 static func uses_powder_shells(recipe: Dictionary) -> bool:
-    return str(recipe.get("id", "")) in ["rune_shell", "fire_cannon"]
+    return str(recipe.get("id", "")) in ["rune_shell", "fire_cannon", "thunder_shell"]
 
 static func is_chain_recipe(recipe: Dictionary) -> bool:
     return str(recipe.get("kind", "")) == "chain"
@@ -290,15 +290,14 @@ static func powder_attack_range(links: Array) -> float:
 static func host_enchant_kinds(links: Array, weapon_id: String) -> Array:
     var kinds: Array = []
     for recipe in links:
+        if enchant_host_id(recipe) != weapon_id:
+            continue
         var kind: String = str(recipe.get("kind", ""))
-        var is_host: bool = false
-        if kind in ["fire_enchant", "rune_enchant"] and str(recipe.get("reload_weapon", "")) == weapon_id:
-            is_host = true
-        elif kind == "rune" and weapon_id == "powder" and recipe.get("weapons", []).has("powder"):
-            kind = "rune"
-            is_host = true
-        if is_host and not kinds.has(kind):
-            kinds.append(kind)
+        if kind in ["", "none", "chain", "fire_drum", "thunder_crystal"]:
+            continue
+        var mapped: String = "thunder_enchant" if kind == "storm_arrow" else kind
+        if not kinds.has(mapped):
+            kinds.append(mapped)
     return kinds
 
 static func host_is_rune_enchanted(links: Array, weapon_id: String) -> bool:
@@ -307,6 +306,9 @@ static func host_is_rune_enchanted(links: Array, weapon_id: String) -> bool:
 
 static func host_is_fire_enchanted(links: Array, weapon_id: String) -> bool:
     return host_enchant_kinds(links, weapon_id).has("fire_enchant")
+
+static func host_is_thunder_enchanted(links: Array, weapon_id: String) -> bool:
+    return host_enchant_kinds(links, weapon_id).has("thunder_enchant")
 
 static func reload_multipliers(links: Array) -> Dictionary:
     var result: Dictionary = {}

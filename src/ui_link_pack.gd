@@ -151,6 +151,18 @@ func recipe_for_pair(weapon_a: String, weapon_b: String) -> Dictionary:
 			return recipe
 	return {}
 
+func _active_recipe_for_pair(weapon_a: String, weapon_b: String) -> Dictionary:
+	if weapon_a.is_empty() or weapon_b.is_empty() or weapon_a == weapon_b:
+		return {}
+	for recipe in _active_recipes():
+		var weapons: Array = recipe.get("weapons", [])
+		if weapons.has(weapon_a) and weapons.has(weapon_b):
+			return recipe
+	return {}
+
+func _pair_is_linked(weapon_a: String, weapon_b: String) -> bool:
+	return not _active_recipe_for_pair(weapon_a, weapon_b).is_empty()
+
 func valid_drop_targets(weapon_id: String) -> Array:
 	var targets: Array = []
 	if weapon_id.is_empty():
@@ -344,12 +356,14 @@ func _apply_drop(weapon_a: String, weapon_b: String) -> Dictionary:
 	var owned: Array = weapon_ids()
 	if not owned.has(weapon_a) or not owned.has(weapon_b) or weapon_a == weapon_b:
 		return {"ok": false, "error": ERROR_INCOMPATIBLE, "link_id": _current_link_id()}
-	var recipe: Dictionary = recipe_for_pair(weapon_a, weapon_b)
+	var previous_ids: Array = _current_link_ids()
+	var recipe: Dictionary = _active_recipe_for_pair(weapon_a, weapon_b)
+	if recipe.is_empty():
+		recipe = recipe_for_pair(weapon_a, weapon_b)
 	if recipe.is_empty():
 		return {"ok": false, "error": ERROR_INCOMPATIBLE, "link_id": _current_link_id()}
-	var previous_ids: Array = _current_link_ids()
 	var wanted: String = str(recipe.get("id", "none"))
-	if previous_ids.has(wanted):
+	if previous_ids.has(wanted) or not _active_recipe_for_pair(weapon_a, weapon_b).is_empty():
 		var cancelled: Dictionary = _apply_unlink(weapon_a, wanted)
 		cancelled["cancelled"] = cancelled.get("ok", false)
 		cancelled["unlinked"] = cancelled.get("ok", false)
@@ -1280,6 +1294,9 @@ func _intent_at(global_pos: Vector2, source_id: String) -> Dictionary:
 	var hit: Dictionary = _hit_card_zone(global_pos, source_id, ids)
 	if not hit.is_empty():
 		return hit
+	var result_hit: Dictionary = _hit_result_node(global_pos, source_id)
+	if not result_hit.is_empty():
+		return result_hit
 	var above_row: bool = _pointer_above_row(global_pos)
 	if above_row and not _recipes_for_weapon(source_id).is_empty():
 		return {"kind": "unlink", "link_id": _branch_to_unlink(source_id, global_pos)}
@@ -1299,6 +1316,19 @@ func _intent_at(global_pos: Vector2, source_id: String) -> Dictionary:
 		if moved or pointer_away:
 			return {"kind": "unlink", "link_id": _branch_to_unlink(source_id, global_pos)}
 	return {"kind": "cancel"}
+
+func _hit_result_node(global_pos: Vector2, source_id: String) -> Dictionary:
+	for link_id in results:
+		var node: Control = results[link_id]
+		if node == null or not is_instance_valid(node) or not node.get_global_rect().has_point(global_pos):
+			continue
+		var recipe: Dictionary = {}
+		if Catalog.LINKS.has(str(link_id)):
+			recipe = Catalog.LINKS[str(link_id)]
+		var weapons: Array = recipe.get("weapons", [])
+		if weapons.has(source_id):
+			return {"kind": "unlink", "link_id": str(link_id)}
+	return {}
 
 func _pointer_above_row(global_pos: Vector2) -> bool:
 	var ids: Array = weapon_ids()
@@ -1359,6 +1389,10 @@ func _hit_card_zone(global_pos: Vector2, source_id: String, ids: Array) -> Dicti
 		var rect: Rect2 = card.get_global_rect()
 		if not rect.has_point(global_pos):
 			continue
+		# Already-linked pairs use the whole card face to cancel; edges would
+		# otherwise swallow the restack and leave the player unable to unlink.
+		if _pair_is_linked(source_id, weapon_id):
+			return {"kind": "link", "target_id": weapon_id}
 		var local_x: float = global_pos.x - rect.position.x
 		if local_x <= EDGE_ZONE:
 			return {"kind": "reorder", "index": index, "side": "before", "target_id": weapon_id}

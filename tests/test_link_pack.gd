@@ -60,6 +60,7 @@ func run_checks() -> void:
     await check_reorder_and_persist()
     await check_drop_face_vs_edge()
     await check_restack_cancel_and_host_enchant()
+    await check_all_recipes_cancel_and_catalyst_hosts()
     print("LINK PACK RESULT: %d checks, %d failures" % [checks, failures])
     quit(1 if failures > 0 else 0)
 
@@ -97,7 +98,7 @@ func check_drop_unlink_error_and_swap() -> void:
     var ids: Array = ui.weapon_ids()
     expect(ids.has("powder") and ids.has("staff") and ids.has("axe") and ids.has("club"), "pack lists owned weapons as nodes")
     var before: String = str(world.active_link["id"])
-    var bad: Dictionary = ui.try_drop("club", "staff")
+    var bad: Dictionary = ui.try_drop("club", "sling")
     expect(not bad.get("ok", true) and str(bad.get("error", "")).contains("这两件武器不能联动"), "incompatible drop returns a clear error")
     expect(ui.error_text().contains("这两件武器不能联动"), "incompatible drop is shown in the pack")
     expect(world.active_link["id"] == before, "incompatible drop leaves the current link unchanged")
@@ -638,7 +639,7 @@ func check_drop_face_vs_edge() -> void:
     await process_frame
     await process_frame
     var before: Array = ui.weapon_ids().duplicate()
-    var face: Dictionary = ui.drop_at("club", ui.card_face_point("staff"))
+    var face: Dictionary = ui.drop_at("club", ui.card_face_point("sling"))
     expect(not face.get("ok", true) and str(face.get("kind", "")) == "link", "dropping onto a card face tries to link, even when the pair is incompatible")
     expect(ui.error_text().contains("这两件武器不能联动"), "an incompatible face drop still shows the toast")
     expect(ui.weapon_ids() == before, "an incompatible face drop does not reorder the row")
@@ -701,6 +702,95 @@ func check_restack_cancel_and_host_enchant() -> void:
     var moved: Dictionary = ui.try_drop("staff", "sling")
     expect(moved.get("ok", false) and world.has_active_link("fire_cannon") and world.has_active_link("rune_sling"), "the displaced staff can enchant another weapon")
     expect(not world.has_active_link("rune_shell"), "the cannon keeps only the new fire enchantment")
+    world.close_link_pack()
+    world.queue_free()
+    await process_frame
+
+func _grant_owned(world, weapon_id: String) -> bool:
+    for item in world.inventory:
+        if str(item.get("id", "")) == weapon_id:
+            return true
+    return world.grant_weapon(weapon_id)
+
+func check_all_recipes_cancel_and_catalyst_hosts() -> void:
+    var world = make_world("all_recipes")
+    for key in Catalog.LINK_ORDER:
+        if key == "none":
+            continue
+        var recipe: Dictionary = Catalog.LINKS[key]
+        var weapons: Array = recipe.get("weapons", [])
+        if weapons.size() != 2:
+            continue
+        var first: String = str(weapons[0])
+        var second: String = str(weapons[1])
+        world.start_run(false)
+        expect(_grant_owned(world, first) and _grant_owned(world, second), "can own both pieces for " + key)
+        expect(world.open_link_pack(), "pack opens for recipe cancel " + key)
+        var ui = pack(world)
+        await process_frame
+        var linked: Dictionary = ui.try_drop(first, second)
+        expect(linked.get("ok", false) and world.has_active_link(key), "can form " + key + " (" + str(recipe.get("name", "")) + ")")
+        var cancelled: Dictionary = ui.try_drop(second, first)
+        expect(cancelled.get("ok", false) and bool(cancelled.get("cancelled", false)) and not world.has_active_link(key), "restack in reverse order cancels " + key)
+        expect(ui.try_drop(second, first).get("ok", false) and world.has_active_link(key), "reverse drop can form " + key + " again")
+        var edge: Dictionary = ui.drop_at(first, ui.card_edge_point(second, "after"))
+        expect(str(edge.get("kind", "")) == "link" and edge.get("ok", false) and bool(edge.get("cancelled", false)) and not world.has_active_link(key), "stacking an already-linked pair onto a card edge still cancels " + key)
+        expect(ui.try_drop(first, second).get("ok", false) and world.has_active_link(key), "can relink " + key + " after an edge cancel")
+        var face: Dictionary = ui.drop_at(second, ui.card_face_point(first))
+        expect(str(face.get("kind", "")) == "link" and face.get("ok", false) and not world.has_active_link(key), "stacking onto the partner face cancels " + key)
+        expect(ui.try_drop(first, second).get("ok", false) and world.has_active_link(key), "can relink " + key + " after a face cancel")
+        var result_node = ui.result_control(key)
+        expect(result_node != null, "result node exists for " + key)
+        if result_node != null:
+            var from_result: Dictionary = ui.drop_at(first, result_node.get_global_rect().get_center())
+            expect(str(from_result.get("kind", "")) == "unlink" and from_result.get("ok", false) and not world.has_active_link(key), "dropping onto the result node cancels " + key)
+        expect(ui.try_drop(first, second).get("ok", false) and world.has_active_link(key), "can relink " + key + " after a result-node cancel")
+        var source_card = ui.cards.get(second, null)
+        expect(source_card != null, "partner card exists for drag-apart " + key)
+        if source_card != null:
+            var away: Vector2 = source_card.get_global_rect().get_center() + Vector2(0, -180)
+            var dragged: Dictionary = ui.drop_at(second, away)
+            expect(str(dragged.get("kind", "")) == "unlink" and dragged.get("ok", false) and not world.has_active_link(key), "drag-apart disconnects " + key)
+        world.close_link_pack()
+    # Named fire hosts all at once: firepot + cannon, sling, hammer, axe, blade.
+    world.start_run(false)
+    for weapon_id in ["firepot", "powder", "hammer", "axe", "blade"]:
+        expect(_grant_owned(world, weapon_id), "fire multi-attach can own " + weapon_id)
+    expect(world.open_link_pack(), "pack opens for fire multi-attach")
+    var ui = pack(world)
+    await process_frame
+    for pair in [["firepot", "powder", "fire_cannon"], ["firepot", "sling", "fire_sling"], ["firepot", "hammer", "fire_hammer"], ["firepot", "axe", "fire_axe"], ["firepot", "blade", "fire_blade"]]:
+        expect(ui.try_drop(str(pair[0]), str(pair[1])).get("ok", false) and world.has_active_link(str(pair[2])), "firepot enchants " + str(pair[1]) + " as " + str(pair[2]))
+    for link_id in ["fire_cannon", "fire_sling", "fire_hammer", "fire_axe", "fire_blade"]:
+        expect(world.has_active_link(link_id), "fire multi-attach keeps " + link_id)
+    var fire_cancel: Dictionary = ui.try_drop("firepot", "axe")
+    expect(fire_cancel.get("ok", false) and bool(fire_cancel.get("cancelled", false)) and not world.has_active_link("fire_axe"), "restacking firepot onto the axe cancels only 焚石斧")
+    expect(world.has_active_link("fire_cannon") and world.has_active_link("fire_sling") and world.has_active_link("fire_hammer") and world.has_active_link("fire_blade"), "cancelling 焚石斧 leaves the other fire attachments")
+    world.close_link_pack()
+    # Named thunder hosts all at once.
+    world.start_run(false)
+    for weapon_id in ["totem", "powder", "hammer", "axe", "blade"]:
+        expect(_grant_owned(world, weapon_id), "totem multi-attach can own " + weapon_id)
+    expect(world.open_link_pack(), "pack opens for totem multi-attach")
+    ui = pack(world)
+    await process_frame
+    for pair in [["totem", "powder", "thunder_shell"], ["totem", "sling", "thunder_sling"], ["totem", "hammer", "thunder_hammer"], ["totem", "axe", "thunder_axe"], ["totem", "blade", "thunder_blade"]]:
+        expect(ui.try_drop(str(pair[0]), str(pair[1])).get("ok", false) and world.has_active_link(str(pair[2])), "totem enchants " + str(pair[1]) + " as " + str(pair[2]))
+    var thunder_cancel: Dictionary = ui.drop_at("blade", ui.card_edge_point("totem", "before"))
+    expect(str(thunder_cancel.get("kind", "")) == "link" and thunder_cancel.get("ok", false) and not world.has_active_link("thunder_blade"), "edge restack still cancels 引雷骨刃")
+    expect(world.has_active_link("thunder_shell") and world.has_active_link("thunder_sling") and world.has_active_link("thunder_hammer") and world.has_active_link("thunder_axe"), "cancelling 引雷骨刃 leaves the other thunder attachments")
+    world.close_link_pack()
+    # Replacing a host enchant keeps the displaced / remaining catalyst links.
+    world.start_run(false)
+    for weapon_id in ["totem", "powder", "firepot"]:
+        expect(_grant_owned(world, weapon_id), "replace-enchant loadout can own " + weapon_id)
+    expect(world.open_link_pack(), "pack opens for host enchant replacement")
+    ui = pack(world)
+    await process_frame
+    expect(ui.try_drop("totem", "powder").get("ok", false) and ui.try_drop("totem", "sling").get("ok", false), "totem first enchants the cannon and the sling")
+    var replaced: Dictionary = ui.try_drop("firepot", "powder")
+    expect(replaced.get("ok", false) and world.has_active_link("fire_cannon") and not world.has_active_link("thunder_shell"), "a new fire enchant on the cannon replaces 导雷火炮")
+    expect(world.has_active_link("thunder_sling"), "replacing the cannon enchant does not tear the totem's sling link")
     world.close_link_pack()
     world.queue_free()
     await process_frame
