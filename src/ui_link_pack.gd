@@ -1,5 +1,6 @@
 extends Control
 const Catalog = preload("res://src/catalog.gd")
+const Rules = preload("res://src/rules.gd")
 const Details = preload("res://src/ui_weapon_details.gd")
 const Growth = preload("res://src/growth.gd")
 const PaperUI = preload("res://src/ui_paper.gd")
@@ -7,9 +8,9 @@ const KeyBindings = preload("res://src/key_bindings.gd")
 const GameFonts = preload("res://src/game_fonts.gd")
 
 const ERROR_INCOMPATIBLE := "这两件武器不能联动"
-const CARD_SIZE := Vector2(220, 200)
-const CLUSTER_MID := Vector2(360, 220)
-const BOARD_SIZE := Vector2(992, 504)
+const CARD_SIZE := Vector2(232, 214)
+const CLUSTER_MID := Vector2(420, 252)
+const BOARD_SIZE := Vector2(1104, 580)
 const UNLINK_DISTANCE := 86.0
 const PACK_WRAP := TextServer.AUTOWRAP_ARBITRARY
 
@@ -69,13 +70,24 @@ func node_info(weapon_id: String) -> Dictionary:
         "cost": "",
         "valid_targets": valid_drop_targets(weapon_id)
     }
-    var recipe: Dictionary = _active_recipe()
-    if not recipe.is_empty() and recipe.get("weapons", []).has(weapon_id):
+    var recipes: Array = _recipes_for_weapon(weapon_id)
+    if not recipes.is_empty():
         info["linked"] = true
-        info["link_id"] = str(recipe.get("id", "none"))
-        info["link_name"] = str(recipe.get("name", ""))
-        info["benefit"] = Catalog.benefit_text(recipe)
-        info["cost"] = Catalog.cost_text(recipe)
+        var names: PackedStringArray = PackedStringArray()
+        var ids: PackedStringArray = PackedStringArray()
+        var benefits: PackedStringArray = PackedStringArray()
+        var costs: PackedStringArray = PackedStringArray()
+        for recipe in recipes:
+            ids.append(str(recipe.get("id", "none")))
+            names.append(str(recipe.get("name", "")))
+            benefits.append(Catalog.benefit_text(recipe))
+            costs.append(Catalog.cost_text(recipe))
+        info["link_id"] = ids[0]
+        info["link_ids"] = Array(ids)
+        info["link_name"] = "、".join(names)
+        info["benefit"] = "；".join(benefits)
+        info["cost"] = "；".join(costs)
+        info["hint"] = "已联动：%s" % "、".join(names)
     else:
         info["hint"] = compatible_hint(weapon_id)
     return info
@@ -166,8 +178,8 @@ func try_drop(weapon_a: String, weapon_b: String) -> Dictionary:
     refresh()
     return result
 
-func try_unlink(weapon_id: String) -> Dictionary:
-    var result: Dictionary = _apply_unlink(weapon_id)
+func try_unlink(weapon_id: String, link_id: String = "") -> Dictionary:
+    var result: Dictionary = _apply_unlink(weapon_id, link_id)
     if result.get("ok", false):
         last_error = ""
         last_toast = str(result.get("toast", "已断开联动"))
@@ -189,42 +201,46 @@ func refresh() -> void:
     cards.clear()
     clusters.clear()
     var ids: Array = weapon_ids()
-    var recipe: Dictionary = _active_recipe()
     var linked: Array = []
-    if not recipe.is_empty():
-        for weapon_id in recipe.get("weapons", []):
-            if ids.has(str(weapon_id)):
-                linked.append(str(weapon_id))
+    var groups: Array = _cluster_groups()
+    for group in groups:
+        for recipe in group:
+            for weapon_id in recipe.get("weapons", []):
+                var key: String = str(weapon_id)
+                if ids.has(key) and not linked.has(key):
+                    linked.append(key)
     var unlinked: Array = []
     for weapon_id in ids:
         if not linked.has(weapon_id):
             unlinked.append(weapon_id)
     var cursor_y: float = 8.0
-    if linked.size() == 2:
-        var cluster: Control = _make_cluster(recipe, linked[0], linked[1])
-        cluster.position = Vector2((BOARD_SIZE.x - cluster.size.x) * 0.5, cursor_y)
+    for group in groups:
+        var cluster: Control = _make_group_cluster(group)
+        cluster.position = Vector2(maxf(4.0, (BOARD_SIZE.x - cluster.size.x) * 0.5), cursor_y)
         board.add_child(cluster)
-        clusters[str(recipe.get("id", ""))] = cluster
-        cursor_y += cluster.size.y + 28.0
-    var columns: int = mini(4, maxi(1, unlinked.size()))
-    var gap: float = 18.0
+        var group_id: String = str(group[0].get("id", "link")) if not group.is_empty() else "link"
+        clusters[group_id] = cluster
+        cursor_y += cluster.size.y + 22.0
+    var columns: int = mini(3, maxi(1, unlinked.size()))
+    var gap: float = 22.0
     var row_width: float = columns * CARD_SIZE.x + maxf(0, columns - 1) * gap
     var start_x: float = maxf(8.0, (BOARD_SIZE.x - row_width) * 0.5)
     for index in range(unlinked.size()):
         var weapon_id: String = unlinked[index]
         var card: Control = _make_card(weapon_id, false)
-        var col: int = index % 4
-        var row: int = int(index / 4)
+        var col: int = index % 3
+        var row: int = int(index / 3)
         var jitter: Vector2 = _idle_jitter(weapon_id)
-        card.position = Vector2(start_x + col * (CARD_SIZE.x + gap), cursor_y + row * (CARD_SIZE.y + 20.0)) + jitter
+        card.position = Vector2(start_x + col * (CARD_SIZE.x + gap), cursor_y + row * (CARD_SIZE.y + 18.0)) + jitter
         board.add_child(card)
         cards[weapon_id] = card
         card.set_meta("home", card.position)
     _relock_pack_copy(self)
+    _fit_pack_copy(self)
     _set_status(_status_copy())
     _apply_drag_highlights()
     if is_inside_tree():
-        call_deferred("_relock_pack_copy", self)
+        call_deferred("_finish_pack_layout")
 
 func _apply_drop(weapon_a: String, weapon_b: String) -> Dictionary:
     if host == null:
@@ -235,56 +251,102 @@ func _apply_drop(weapon_a: String, weapon_b: String) -> Dictionary:
     var recipe: Dictionary = recipe_for_pair(weapon_a, weapon_b)
     if recipe.is_empty():
         return {"ok": false, "error": ERROR_INCOMPATIBLE, "link_id": _current_link_id()}
-    var previous_id: String = _current_link_id()
-    var previous_name: String = str(_active_recipe().get("name", "不联动"))
+    var previous_ids: Array = _current_link_ids()
     var wanted: String = str(recipe.get("id", "none"))
-    if previous_id == wanted:
-        return {"ok": true, "link_id": wanted, "toast": "已在使用「%s」" % str(recipe.get("name", "")), "unchanged": true}
-    var before: String = previous_id
+    if previous_ids.has(wanted):
+        return {"ok": true, "link_id": wanted, "link_ids": previous_ids, "toast": "已在使用「%s」" % str(recipe.get("name", "")), "unchanged": true}
+    var resolution: Dictionary = Rules.add_link_ids(previous_ids, wanted, owned)
+    var before: Array = previous_ids.duplicate()
     host.select_link(wanted)
-    var applied: String = _current_link_id()
-    if applied != wanted:
-        var pending: String = str(host.get("pending_link")) if host.get("pending_link") != null else ""
-        var message: String = str(host.get("combo_message")) if pending != "" else "现在不能改联动"
+    var applied_ids: Array = _current_link_ids()
+    var pending: String = str(host.get("pending_link")) if host.get("pending_link") != null else ""
+    if pending != "" and not applied_ids.has(wanted):
+        var message: String = str(host.get("combo_message"))
         if message.is_empty():
             message = "现在不能改联动"
-        return {"ok": false, "error": message, "link_id": before, "keep_toast": true}
+        return {"ok": false, "error": message, "link_id": before.back() if not before.is_empty() else "none", "link_ids": before, "keep_toast": true}
+    if not applied_ids.has(wanted):
+        return {"ok": false, "error": "现在不能改联动", "link_id": before.back() if not before.is_empty() else "none", "link_ids": before}
+    var dropped: Array = resolution.get("dropped", [])
     var toast := ""
-    if previous_id != "none" and previous_id != wanted:
-        toast = "已将「%s」改为「%s」" % [previous_name, str(recipe.get("name", ""))]
+    if dropped.size() == 1:
+        toast = "已将「%s」改为「%s」" % [str(Catalog.LINKS[str(dropped[0])].get("name", "")), str(recipe.get("name", ""))]
+    elif not dropped.is_empty():
+        var dropped_names: PackedStringArray = PackedStringArray()
+        for link_id in dropped:
+            dropped_names.append(str(Catalog.LINKS[str(link_id)].get("name", "")))
+        toast = "已启用「%s」，并解除冲突的「%s」" % [str(recipe.get("name", "")), "、".join(dropped_names)]
     else:
         toast = "已启用「%s」" % str(recipe.get("name", ""))
-    return {"ok": true, "link_id": wanted, "toast": toast, "swapped": previous_id != "none"}
+    return {"ok": true, "link_id": wanted, "link_ids": applied_ids, "toast": toast, "swapped": not dropped.is_empty(), "added": dropped.is_empty(), "dropped": dropped}
 
-func _apply_unlink(weapon_id: String) -> Dictionary:
+func _apply_unlink(weapon_id: String, link_id: String = "") -> Dictionary:
     if host == null:
         return {"ok": false, "error": "现在不能断开"}
-    var recipe: Dictionary = _active_recipe()
-    if recipe.is_empty() or not recipe.get("weapons", []).has(weapon_id):
-        return {"ok": false, "error": "", "link_id": _current_link_id(), "noop": true}
-    var previous_name: String = str(recipe.get("name", "联动"))
-    var before: String = str(recipe.get("id", "none"))
-    host.select_link("none")
-    if _current_link_id() != "none":
+    var current_ids: Array = _current_link_ids()
+    var involved: Array = Rules.links_for_weapon(current_ids, weapon_id)
+    var remove_id: String = link_id
+    if remove_id.is_empty():
+        if involved.size() == 1:
+            remove_id = str(involved[0])
+        elif involved.is_empty():
+            return {"ok": false, "error": "", "link_id": _current_link_id(), "link_ids": current_ids, "noop": true}
+        else:
+            return {"ok": false, "error": "", "link_id": _current_link_id(), "link_ids": current_ids, "noop": true}
+    if not current_ids.has(remove_id):
+        return {"ok": false, "error": "", "link_id": _current_link_id(), "link_ids": current_ids, "noop": true}
+    var previous_name: String = str(Catalog.LINKS[remove_id].get("name", "联动"))
+    var desired: Array = Rules.remove_link_ids(current_ids, remove_id, weapon_ids())
+    if host.has_method("set_links"):
+        host.set_links(desired)
+    elif host.has_method("apply_links"):
+        host.apply_links(desired)
+    else:
+        host.select_link("none" if desired.is_empty() else str(desired.back()))
+    var applied_ids: Array = _current_link_ids()
+    if applied_ids.has(remove_id):
         var pending: String = str(host.get("pending_link")) if host.get("pending_link") != null else ""
         var message: String = str(host.get("combo_message")) if pending != "" else "现在不能断开"
         if message.is_empty():
             message = "现在不能断开"
-        return {"ok": false, "error": message, "link_id": before}
-    return {"ok": true, "link_id": "none", "toast": "已断开「%s」" % previous_name}
+        return {"ok": false, "error": message, "link_id": remove_id, "link_ids": current_ids}
+    return {"ok": true, "link_id": applied_ids.back() if not applied_ids.is_empty() else "none", "link_ids": applied_ids, "toast": "已断开「%s」" % previous_name}
+
+func _current_link_ids() -> Array:
+    if host == null:
+        return []
+    if host.has_method("active_link_ids"):
+        return host.active_link_ids()
+    var link_id: String = _current_link_id()
+    return [] if link_id == "none" else [link_id]
 
 func _current_link_id() -> String:
+    var ids: Array = []
+    if host != null and host.has_method("active_link_ids"):
+        ids = host.active_link_ids()
+        if not ids.is_empty():
+            return str(ids.back())
     if host == null:
         return "none"
     var link: Dictionary = host.active_link if typeof(host.active_link) == TYPE_DICTIONARY else {}
     var link_id: String = str(link.get("id", "none"))
     return link_id if Catalog.LINKS.has(link_id) else "none"
 
+func _active_recipes() -> Array:
+    return Rules.profiles_for_ids(_current_link_ids(), weapon_ids())
+
 func _active_recipe() -> Dictionary:
-    var link_id: String = _current_link_id()
-    if link_id == "none" or not Catalog.LINKS.has(link_id):
+    var recipes: Array = _active_recipes()
+    if recipes.is_empty():
         return {}
-    return Catalog.LINKS[link_id].duplicate(true)
+    return recipes.back().duplicate(true)
+
+func _recipes_for_weapon(weapon_id: String) -> Array:
+    var result: Array = []
+    for recipe in _active_recipes():
+        if recipe.get("weapons", []).has(weapon_id):
+            result.append(recipe)
+    return result
 
 func _owned_level(weapon_id: String) -> int:
     if host == null:
@@ -305,7 +367,7 @@ func _status_copy() -> String:
         return last_error
     if not last_toast.is_empty():
         return last_toast
-    return "把可以搭配的两件拖到一起即可联动，拖开即可断开。"
+    return "把可以搭配的两件拖到一起即可联动，已有的其他联动会保留；把其中一对拖开只断开这一组。一种附魔可以同时给多件武器附着。"
 
 func _set_status(text: String) -> void:
     if status_label != null and is_instance_valid(status_label):
@@ -323,23 +385,23 @@ func _build() -> void:
     sheet.name = "LinkPackSheet"
     sheet.opening_mode = "fold"
     sheet.reveal = 1.0
-    sheet.position = Vector2(76, 32)
-    sheet.size = Vector2(1128, 708)
-    sheet.set_meta("full_width", 1128)
+    sheet.position = Vector2(36, 26)
+    sheet.size = Vector2(1208, 752)
+    sheet.set_meta("full_width", 1208)
     add_child(sheet)
-    var title: Label = _label("武器背包", 32, Color("#17253a"), true)
-    title.position = Vector2(64, 28)
-    title.size = Vector2(780, 42)
+    var title: Label = _label("武器背包", 34, Color("#17253a"), true)
+    title.position = Vector2(48, 16)
+    title.size = Vector2(860, 42)
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
     sheet.content.add_child(title)
-    var hint: Label = _label("把可以搭配的两件武器拖到一起即可联动；把已经联动的武器拖开即可断开。不能搭配的拖在一起会提示错误。", 16, Color("#66705e"), false)
-    hint.position = Vector2(64, 72)
-    _prepare_pack_copy(hint, 880, 44)
+    var hint: Label = _label("把可以搭配的两件武器拖到一起即可联动，已有的其他联动会保留。一种附魔可以同时给多件武器附着。把其中一对拖开只断开这一组；不能搭配的拖在一起会提示错误。", 16, Color("#66705e"), false)
+    hint.position = Vector2(48, 58)
+    _prepare_pack_copy(hint, 1000, 48)
     sheet.content.add_child(hint)
     var close_btn := Button.new()
     close_btn.name = "CloseLinkPack"
     close_btn.text = "关闭"
-    close_btn.position = Vector2(960, 30)
+    close_btn.position = Vector2(1048, 18)
     close_btn.size = Vector2(110, 42)
     close_btn.focus_mode = Control.FOCUS_NONE
     _style_button(close_btn)
@@ -348,15 +410,15 @@ func _build() -> void:
     sheet.content.add_child(close_btn)
     board = Control.new()
     board.name = "LinkPackBoard"
-    board.position = Vector2(64, 128)
+    board.position = Vector2(48, 112)
     board.size = BOARD_SIZE
     board.mouse_filter = Control.MOUSE_FILTER_PASS
     board.clip_contents = false
     sheet.content.add_child(board)
     status_label = _label("", 16, Color("#66705e"), false)
     status_label.name = "LinkPackStatus"
-    status_label.position = Vector2(64, 640)
-    _prepare_pack_copy(status_label, 1000, 48)
+    status_label.position = Vector2(48, 698)
+    _prepare_pack_copy(status_label, 1080, 40)
     sheet.content.add_child(status_label)
     _relock_pack_copy(self)
 
@@ -428,7 +490,7 @@ func _make_card(weapon_id: String, in_cluster: bool) -> Panel:
     _prepare_pack_copy(stats, text_width, stats_height)
     card.add_child(stats)
     var hint_copy: String = str(info["hint"])
-    if in_cluster:
+    if in_cluster and hint_copy.is_empty():
         hint_copy = "已联动"
     var hint: Label = _label(hint_copy, 12, Color("#704127") if not in_cluster else Color("#7a4a22"), false)
     hint.name = "CardHint"
@@ -444,30 +506,178 @@ func _make_card(weapon_id: String, in_cluster: bool) -> Panel:
     cards[weapon_id] = card
     return card
 
+func _cluster_groups() -> Array:
+    var recipes: Array = _active_recipes()
+    var groups: Array = []
+    for recipe in recipes:
+        var hit: Array = []
+        for index in range(groups.size()):
+            var shares: bool = false
+            for other in groups[index]:
+                for weapon_id in other.get("weapons", []):
+                    if recipe.get("weapons", []).has(weapon_id):
+                        shares = true
+                        break
+                if shares:
+                    break
+            if shares:
+                hit.append(index)
+        if hit.is_empty():
+            groups.append([recipe])
+            continue
+        var combined: Array = []
+        for index in hit:
+            combined.append_array(groups[index])
+        combined.append(recipe)
+        var leftover: Array = []
+        for index in range(groups.size()):
+            if not hit.has(index):
+                leftover.append(groups[index])
+        leftover.append(combined)
+        groups = leftover
+    for group in groups:
+        var ordered: Array = []
+        for recipe in recipes:
+            if _group_has_id(group, str(recipe.get("id", ""))):
+                if not _group_has_id(ordered, str(recipe.get("id", ""))):
+                    ordered.append(recipe)
+        group.clear()
+        group.append_array(ordered)
+    return groups
+
+func _group_has_id(group: Array, link_id: String) -> bool:
+    for recipe in group:
+        if str(recipe.get("id", "")) == link_id:
+            return true
+    return false
+
+func _shared_weapon(group: Array) -> String:
+    var counts: Dictionary = {}
+    for recipe in group:
+        for weapon_id in recipe.get("weapons", []):
+            var key: String = str(weapon_id)
+            counts[key] = int(counts.get(key, 0)) + 1
+    var best: String = ""
+    var best_count: int = 0
+    for key in counts:
+        if int(counts[key]) > best_count:
+            best = key
+            best_count = int(counts[key])
+    return best if best_count >= 2 else ""
+
+func _make_group_cluster(group: Array) -> Control:
+    if group.size() <= 1:
+        var recipe: Dictionary = group[0] if not group.is_empty() else {}
+        var weapons: Array = recipe.get("weapons", [])
+        var first_id: String = str(weapons[0]) if weapons.size() > 0 else ""
+        var second_id: String = str(weapons[1]) if weapons.size() > 1 else ""
+        return _make_cluster(recipe, first_id, second_id)
+    return _make_multi_cluster(group)
+
+func _tag_cluster_card(card: Control, link_id: String, shared: bool = false) -> void:
+    if card == null:
+        return
+    card.set_meta("home", card.position)
+    if not shared:
+        card.set_meta("unlink_id", link_id)
+    card.set_meta("in_cluster", true)
+
 func _make_cluster(recipe: Dictionary, first_id: String, second_id: String) -> Control:
     var cluster := Control.new()
     cluster.name = "LinkCluster_%s" % str(recipe.get("id", "link"))
     cluster.clip_contents = false
     cluster.mouse_filter = Control.MOUSE_FILTER_PASS
     var mid: Panel = make_link_details(recipe)
-    var width: float = CARD_SIZE.x * 2.0 + mid.size.x + 16.0
-    var height: float = maxf(CARD_SIZE.y, mid.size.y + 12.0)
-    cluster.size = Vector2(width, height)
     var left: Panel = _make_card(first_id, true)
+    var right: Panel = _make_card(second_id, true)
+    var height: float = maxf(left.size.y, maxf(right.size.y, mid.size.y + 12.0))
+    var width: float = CARD_SIZE.x * 2.0 + mid.size.x + 16.0
+    cluster.size = Vector2(width, height)
     left.position = Vector2.ZERO
     cluster.add_child(left)
-    left.set_meta("home", left.position)
-    mid.position = Vector2(CARD_SIZE.x + 8, 6)
+    _tag_cluster_card(left, str(recipe.get("id", "")))
+    mid.position = Vector2(CARD_SIZE.x + 8, maxf(0.0, (height - mid.size.y) * 0.5))
     cluster.add_child(mid)
-    var right: Panel = _make_card(second_id, true)
     right.position = Vector2(CARD_SIZE.x + mid.size.x + 16, 0)
     cluster.add_child(right)
-    right.set_meta("home", right.position)
+    _tag_cluster_card(right, str(recipe.get("id", "")))
     return cluster
 
+func _make_multi_cluster(group: Array) -> Control:
+    var shared: String = _shared_weapon(group)
+    var hosts: Array = []
+    var host_links: Dictionary = {}
+    for recipe in group:
+        for weapon_id in recipe.get("weapons", []):
+            var key: String = str(weapon_id)
+            if key == shared:
+                continue
+            if not hosts.has(key):
+                hosts.append(key)
+            host_links[key] = str(recipe.get("id", ""))
+    if shared.is_empty() or hosts.is_empty():
+        return _make_cluster(group[0], str(group[0]["weapons"][0]), str(group[0]["weapons"][1]))
+    var cluster := Control.new()
+    cluster.name = "LinkCluster_%s" % str(group[0].get("id", "link"))
+    cluster.clip_contents = false
+    cluster.mouse_filter = Control.MOUSE_FILTER_PASS
+    var gap: float = 18.0
+    var card_row: Array = [shared]
+    card_row.append_array(hosts)
+    var cards_width: float = card_row.size() * CARD_SIZE.x + maxf(0, card_row.size() - 1) * gap
+    var details_width: float = maxf(CLUSTER_MID.x, cards_width)
+    var mid: Panel = make_link_details_list(group, details_width)
+    var width: float = maxf(cards_width, mid.size.x)
+    var catalyst: Panel = _make_card(shared, true)
+    cluster.add_child(catalyst)
+    catalyst.position = Vector2(0, 0)
+    _tag_cluster_card(catalyst, "", true)
+    var host_cards: Array = []
+    for index in range(hosts.size()):
+        var host_id: String = hosts[index]
+        var card: Panel = _make_card(host_id, true)
+        card.position = Vector2((index + 1) * (CARD_SIZE.x + gap), 0)
+        cluster.add_child(card)
+        _tag_cluster_card(card, str(host_links.get(host_id, "")))
+        host_cards.append(card)
+    var card_height: float = catalyst.size.y
+    for card in host_cards:
+        card_height = maxf(card_height, card.size.y)
+    mid.position = Vector2(maxf(0.0, (width - mid.size.x) * 0.5), card_height + 14.0)
+    cluster.add_child(mid)
+    cluster.size = Vector2(width, mid.position.y + mid.size.y)
+    var lines := Control.new()
+    lines.name = "LinkConnections"
+    lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    lines.anchor_left = 0
+    lines.anchor_top = 0
+    lines.anchor_right = 0
+    lines.anchor_bottom = 0
+    lines.position = Vector2.ZERO
+    lines.size = cluster.size
+    cluster.add_child(lines)
+    cluster.move_child(lines, 0)
+    var from: Vector2 = catalyst.position + catalyst.size * 0.5
+    lines.draw.connect(func():
+        for card in host_cards:
+            if card == null or not is_instance_valid(card):
+                continue
+            var to: Vector2 = card.position + card.size * 0.5
+            lines.draw_line(from, to, Color("#7a4a22"), 6.0, true)
+            lines.draw_line(from, to, Color("#b4583e"), 3.0, true)
+    )
+    lines.queue_redraw()
+    return cluster
+
+
 func make_link_details(recipe: Dictionary) -> Panel:
+    return make_link_details_list([recipe], CLUSTER_MID.x)
+
+func make_link_details_list(recipes: Array, width: float = CLUSTER_MID.x) -> Panel:
     var mid := Panel.new()
     mid.name = "LinkDetails"
+    if recipes.size() == 1:
+        mid.set_meta("link_id", str(recipes[0].get("id", "")))
     mid.clip_contents = false
     mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
     var mid_box := StyleBoxFlat.new()
@@ -476,27 +686,36 @@ func make_link_details(recipe: Dictionary) -> Panel:
     mid_box.set_border_width_all(2)
     mid_box.set_corner_radius_all(3)
     mid.add_theme_stylebox_override("panel", mid_box)
-    var pad := 12.0
-    var text_width: float = CLUSTER_MID.x - pad * 2.0
-    var cursor := 8.0
-    var name_label: Label = _label(str(recipe.get("name", "")), 17, Color("#9a3b2c"), true)
-    name_label.name = "ClusterName"
-    name_label.position = Vector2(pad, cursor)
-    name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    _prepare_pack_copy(name_label, text_width, 28)
-    mid.add_child(name_label)
-    cursor += 32.0
-    cursor += _add_detail_block(mid, "优点", Catalog.benefit_text(recipe), "ClusterBenefit", pad, cursor, text_width)
-    cursor += 10.0
-    cursor += _add_detail_block(mid, "缺点", Catalog.cost_text(recipe), "ClusterCost", pad, cursor, text_width)
-    cursor += 12.0
-    mid.size = Vector2(CLUSTER_MID.x, maxf(CLUSTER_MID.y, cursor))
-    mid.custom_minimum_size = mid.size
-    if mid.is_inside_tree():
-        _relock_pack_copy(mid)
-    else:
-        mid.ready.connect(_relock_pack_copy.bind(mid), CONNECT_ONE_SHOT)
+    _fill_link_details(mid, recipes, width)
     return mid
+
+func _fill_link_details(mid: Panel, recipes: Array, width: float) -> void:
+    var pad := 14.0
+    var text_width: float = maxf(80.0, width - pad * 2.0)
+    var cursor := 10.0
+    for index in range(recipes.size()):
+        var recipe: Dictionary = recipes[index]
+        var name_label: Label = _label(str(recipe.get("name", "")), 17, Color("#9a3b2c"), true)
+        name_label.name = "ClusterName" if recipes.size() == 1 else "ClusterName_%d" % index
+        name_label.position = Vector2(pad, cursor)
+        name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        var name_height: float = maxf(26.0, _wrapped_size(str(recipe.get("name", "")), 17, text_width).y + 6.0)
+        _prepare_pack_copy(name_label, text_width, name_height)
+        mid.add_child(name_label)
+        cursor += name_height + 4.0
+        var benefit_name: String = "ClusterBenefit" if recipes.size() == 1 else "ClusterBenefit_%d" % index
+        var cost_name: String = "ClusterCost" if recipes.size() == 1 else "ClusterCost_%d" % index
+        cursor += _add_detail_block(mid, "优点", Catalog.benefit_text(recipe), benefit_name, pad, cursor, text_width)
+        cursor += 8.0
+        cursor += _add_detail_block(mid, "缺点", Catalog.cost_text(recipe), cost_name, pad, cursor, text_width)
+        cursor += 12.0
+    mid.size = Vector2(width, maxf(CLUSTER_MID.y if recipes.size() == 1 else 120.0, cursor + 4.0))
+    mid.custom_minimum_size = mid.size
+    _fit_pack_copy(mid)
+    if mid.is_inside_tree():
+        _finish_details_layout(mid)
+    else:
+        mid.ready.connect(_finish_details_layout.bind(mid), CONNECT_ONE_SHOT)
 
 func _add_detail_block(mid: Panel, title_copy: String, body_copy: String, body_name: String, pad: float, cursor: float, text_width: float) -> float:
     var title: Label = _label(title_copy, 14, Color("#9a3b2c"), true)
@@ -538,6 +757,54 @@ func _relock_pack_copy(node: Node = null) -> void:
             root.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
     for child in root.get_children():
         _relock_pack_copy(child)
+
+func _label_font(label: Label, fallback_size: int = 13) -> Dictionary:
+    var font: Font = label.get_theme_font("font") if label != null else body_font
+    if font == null:
+        font = body_font
+    var font_size: int = label.get_theme_font_size("font_size") if label != null else fallback_size
+    if font_size <= 0:
+        font_size = fallback_size
+    return {"font": font, "size": font_size}
+
+func _fit_pack_copy(node: Node = null) -> void:
+    var root: Node = self if node == null else node
+    if not is_instance_valid(root):
+        return
+    if root is Label and root.has_meta("pack_copy_size"):
+        var wanted: Vector2 = root.get_meta("pack_copy_size")
+        var info: Dictionary = _label_font(root)
+        var font: Font = info["font"]
+        var measured: Vector2 = wanted
+        if font != null:
+            measured = font.get_multiline_string_size(root.text, HORIZONTAL_ALIGNMENT_LEFT, maxf(1.0, wanted.x), int(info["size"]), -1, TextServer.BREAK_MANDATORY | TextServer.BREAK_GRAPHEME_BOUND)
+        var height: float = maxf(wanted.y, measured.y + 8.0)
+        var size := Vector2(wanted.x, height)
+        root.custom_minimum_size = Vector2(size.x, 0)
+        root.size = size
+        root.set_meta("pack_copy_size", size)
+        root.clip_text = false
+        root.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+    for child in root.get_children():
+        _fit_pack_copy(child)
+    if root is Control and (root.name.begins_with("LinkDetails") or root.name.begins_with("WeaponCard_")):
+        var bottom: float = 8.0
+        for child in root.get_children():
+            if child is Control:
+                bottom = maxf(bottom, child.position.y + child.size.y)
+        if bottom + 10.0 > root.size.y:
+            root.size = Vector2(root.size.x, bottom + 10.0)
+            root.custom_minimum_size = root.size
+
+func _finish_details_layout(mid: Control) -> void:
+    if mid == null or not is_instance_valid(mid):
+        return
+    _relock_pack_copy(mid)
+    _fit_pack_copy(mid)
+
+func _finish_pack_layout() -> void:
+    _relock_pack_copy(self)
+    _fit_pack_copy(self)
 
 func _wrapped_size(text: String, font_size: int, width: float) -> Vector2:
     var font: Font = body_font
@@ -615,7 +882,16 @@ func _finish_drag(global_pos: Vector2) -> void:
         return
     if source_card != null and is_instance_valid(source_card) and bool(source_card.get_meta("in_cluster", false)):
         if source_card.position.distance_to(drag_home) >= UNLINK_DISTANCE or not _still_over_cluster(source_card):
-            try_unlink(source_id)
+            var unlink_id: String = str(source_card.get_meta("unlink_id", ""))
+            var involved: Array = _recipes_for_weapon(source_id)
+            if unlink_id.is_empty() and involved.size() == 1:
+                unlink_id = str(involved[0].get("id", ""))
+            if involved.size() > 1 and unlink_id.is_empty():
+                refresh()
+                last_toast = "请把要断开的那一件拖开"
+                _set_status(last_toast)
+                return
+            try_unlink(source_id, unlink_id)
             return
     refresh()
 

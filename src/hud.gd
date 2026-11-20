@@ -845,14 +845,26 @@ func update_state(hp: float, elapsed: float, kills: int, xp: float, xp_needed: i
             slot["name"].text = Catalog.WEAPONS[item["id"]]["name"]
             slot["name"].modulate = Color.WHITE
             var tag: String = ""
-            if link["kind"] == "rune" and item["id"] == "staff":
-                tag = " · 注能"
-            elif str(link.get("kind", "")) in ["fire_enchant", "rune_enchant"] and item["id"] == str(link.get("reload_weapon", "")):
-                tag = " · 附着"
-            elif str(link.get("kind", "")) in ["fire_enchant", "rune_enchant", "rune"] and link.get("suppressed", []).has(item["id"]):
-                tag = " · 附着"
-            elif link["kind"] == "chain" and item["id"] == link["weapons"][1]:
+            var recipes: Array = link.get("links", [link]) if typeof(link) == TYPE_DICTIONARY else []
+            var suppressed: Array = link.get("suppressed", []) if typeof(link) == TYPE_DICTIONARY else []
+            var tagged_attach: bool = false
+            var tagged_chain: bool = false
+            for recipe in recipes:
+                if typeof(recipe) != TYPE_DICTIONARY:
+                    continue
+                var kind: String = str(recipe.get("kind", ""))
+                if kind in ["rune", "rune_enchant", "fire_enchant"] and recipe.get("suppressed", []).has(item["id"]):
+                    tagged_attach = true
+                if kind in ["fire_enchant", "rune_enchant"] and item["id"] == str(recipe.get("reload_weapon", "")):
+                    tagged_attach = true
+                if kind == "rune" and item["id"] == "staff":
+                    tagged_attach = true
+                if kind == "chain" and recipe.get("weapons", []).size() > 1 and item["id"] == recipe["weapons"][1]:
+                    tagged_chain = true
+            if tagged_chain:
                 tag = " · 弹射"
+            elif tagged_attach or suppressed.has(item["id"]):
+                tag = " · 附着"
             slot["level"].text = "Lv.%d" % item["level"] + (" · 觉醒" if item.level>=5 else (" · 进阶" if item.level>=3 else "")) + tag
         else:
             slot["icon"].texture = null

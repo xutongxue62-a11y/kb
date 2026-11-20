@@ -2,32 +2,51 @@ extends RefCounted
 
 const Catalog = preload("res://src/catalog.gd")
 const Growth = preload("res://src/growth.gd")
+const Rules = preload("res://src/rules.gd")
 const EnemyRoster = preload("res://src/enemy_roster.gd")
 const BASE_DAMAGE = {"hunter": 1.0, "charger": 1.25, "spitter": 1.0, "tank": 1.5, "boss": 2.0}
 
-static func estimate_power(inventory: Array, levels: Dictionary, link: Dictionary = {}) -> float:
+static func _link_list(link: Variant) -> Array:
+    var links: Array = []
+    if typeof(link) == TYPE_ARRAY:
+        for entry in link:
+            if typeof(entry) == TYPE_DICTIONARY and str(entry.get("id", "none")) != "none":
+                links.append(entry)
+    elif typeof(link) == TYPE_DICTIONARY and str(link.get("id", "none")) != "none":
+        if link.has("links") and typeof(link["links"]) == TYPE_ARRAY and not link["links"].is_empty():
+            for entry in link["links"]:
+                if typeof(entry) == TYPE_DICTIONARY and str(entry.get("id", "none")) != "none":
+                    links.append(entry)
+        else:
+            links.append(link)
+    return links
+
+static func estimate_power(inventory: Array, levels: Dictionary, link: Variant = {}) -> float:
+    var links: Array = _link_list(link)
+    var suppressed: Array = Rules.suppressed_weapon_ids(links)
+    var chain: Dictionary = Rules.chain_profile(links)
     var stats: Dictionary = Growth.stats(levels)
     var total: float = 0.0
     for item in inventory:
         var key: String = item["id"]
-        if not Catalog.WEAPONS.has(key) or link.get("suppressed", []).has(key):
+        if not Catalog.WEAPONS.has(key) or suppressed.has(key):
             continue
         var data: Dictionary = Catalog.WEAPONS[key]
         var damage: float = data["damage"] * (1.0 + (item["level"] - 1) * 0.35)
-        if key == "powder" and link.get("kind", "none") == "chain":
-            var partner: String = link["weapons"][1]
+        if key == "powder" and not chain.is_empty():
+            var partner: String = chain["weapons"][1]
             var partner_level: int = 1
             for owned in inventory:
                 if owned["id"] == partner:
                     partner_level = owned["level"]
             var chain_damage: float = Catalog.WEAPONS[partner]["damage"] * (1.0 + (partner_level - 1) * 0.35) + 1.6 * (1.0 + (item["level"] - 1) * 0.25)
-            total += chain_damage * 1.6 / maxf(data["cooldown"] * link["cooldown_multiplier"], 0.65)
+            total += chain_damage * 1.6 / maxf(data["cooldown"] * Rules.weapon_cooldown_multiplier("powder", links), 0.65)
         elif data["kind"] == "melee":
             total += damage * minf(data["orbit_speed"] / TAU, 1.0 / data["cooldown"])
         else:
             var shots: float = 3.0 if key in ["staff", "wardrum"] else (6.0 if key == "firepot" else 1.0)
-            var penalty: float = link.get("cooldown_multiplier", 1.0) if key == "powder" else 1.0
-            total += damage * shots / (data["cooldown"] * penalty) * (1.2 if key == "powder" and link.get("enchanted", false) else 1.0)
+            var penalty: float = Rules.weapon_cooldown_multiplier(key, links)
+            total += damage * shots / (data["cooldown"] * penalty) * (1.2 if key == "powder" and Rules.host_is_rune_enchanted(links, "powder") else 1.0)
     for key in ["pet", "drone"]:
         var level: int = int(levels.get(key, 0))
         if level > 0:

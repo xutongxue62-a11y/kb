@@ -49,11 +49,13 @@ func run_checks() -> void:
     root.size = Vector2i(1280, 800)
     await check_open_close_and_no_cycle()
     await check_drop_unlink_error_and_swap()
+    await check_multiple_links()
     await check_attributes_and_freeze()
     await check_copy_not_clipped()
     await check_discovery_still_works()
     await check_help_and_hints()
     await check_blocked_screens()
+    await check_save_multi_links()
     print("LINK PACK RESULT: %d checks, %d failures" % [checks, failures])
     quit(1 if failures > 0 else 0)
 
@@ -195,6 +197,31 @@ func expect_inside(inner: Control, outer: Control, context: String, pad: float =
     var child: Rect2 = Rect2(inner.position, inner.size)
     expect(box.encloses(child) or (inner.position.x >= 0.0 and inner.position.y >= 0.0 and inner.position.x + inner.size.x <= outer.size.x + 1.5 and inner.position.y + inner.size.y <= outer.size.y + 1.5), context + " stays inside its panel")
 
+func _collect_named(node: Node, wanted: String, result: Array) -> void:
+    if node.name == wanted:
+        result.append(node)
+    for child in node.get_children():
+        _collect_named(child, wanted, result)
+
+func _label_with_text(root: Node, wanted: String) -> Label:
+    if root is Label and str(root.text).contains(wanted):
+        return root
+    for child in root.get_children():
+        var found: Label = _label_with_text(child, wanted)
+        if found != null:
+            return found
+    return null
+
+func _mid_for_recipe(mids: Array, recipe: Dictionary) -> Control:
+    var name: String = str(recipe.get("name", ""))
+    var benefit: String = Catalog.benefit_text(recipe)
+    for mid in mids:
+        if mid == null or not (mid is Control):
+            continue
+        if _label_with_text(mid, name) != null and _label_with_text(mid, benefit) != null:
+            return mid
+    return null
+
 func assert_pack_copy_visible(ui, context: String) -> void:
     var copy: String = ui.displayed_text()
     for weapon_id in ui.weapon_ids():
@@ -213,29 +240,40 @@ func assert_pack_copy_visible(ui, context: String) -> void:
         if stats != null and not str(stats.text).is_empty():
             expect_label_visible(stats, str(info.get("stats", "")), context + " " + weapon_id + " stats")
             expect_inside(stats, card, context + " " + weapon_id + " stats in card", 6.0)
-    var recipe: Dictionary = ui._active_recipe()
-    if recipe.is_empty() or str(recipe.get("id", "none")) == "none":
+    var recipes: Array = ui._active_recipes() if ui.has_method("_active_recipes") else []
+    if recipes.is_empty():
+        var recipe: Dictionary = ui._active_recipe()
+        if not recipe.is_empty() and str(recipe.get("id", "none")) != "none":
+            recipes = [recipe]
+    if recipes.is_empty():
         return
-    var benefit: String = Catalog.benefit_text(recipe)
-    var cost: String = Catalog.cost_text(recipe)
-    expect(copy.contains(str(recipe.get("name", ""))) and copy.contains(benefit) and copy.contains(cost), context + " displayed_text includes official name, benefit, and cost")
-    var mid: Node = ui.find_child("LinkDetails", true, false)
-    expect(mid != null, context + " has a cluster mid panel")
-    if mid == null:
+    for recipe in recipes:
+        var benefit: String = Catalog.benefit_text(recipe)
+        var cost: String = Catalog.cost_text(recipe)
+        expect(copy.contains(str(recipe.get("name", ""))) and copy.contains(benefit) and copy.contains(cost), context + " displayed_text includes official " + str(recipe.get("id", "")) + " name, benefit, and cost")
+    var mids: Array = []
+    _collect_named(ui, "LinkDetails", mids)
+    expect(not mids.is_empty(), context + " has a cluster mid panel")
+    if mids.is_empty():
         return
-    var name_label: Label = mid.find_child("ClusterName", true, false)
-    var benefit_label: Label = mid.find_child("ClusterBenefit", true, false)
-    var cost_label: Label = mid.find_child("ClusterCost", true, false)
-    var benefit_title: Label = mid.find_child("ClusterBenefitTitle", true, false)
-    var cost_title: Label = mid.find_child("ClusterCostTitle", true, false)
-    expect(benefit_title != null and benefit_title.text.contains("优点"), context + " keeps 优点 as its own label")
-    expect(cost_title != null and cost_title.text.contains("缺点"), context + " keeps 缺点 as its own label")
-    expect_label_visible(name_label, str(recipe.get("name", "")), context + " cluster name")
-    expect_label_visible(benefit_label, benefit, context + " cluster benefit")
-    expect_label_visible(cost_label, cost, context + " cluster cost")
-    for label in [name_label, benefit_label, cost_label, benefit_title, cost_title]:
-        if label != null:
-            expect_inside(label, mid, context + " " + str(label.name) + " in mid", 4.0)
+    for recipe in recipes:
+        var mid: Control = _mid_for_recipe(mids, recipe)
+        expect(mid != null, context + " has a mid panel for " + str(recipe.get("id", "")))
+        if mid == null:
+            continue
+        var name_label: Label = _label_with_text(mid, str(recipe.get("name", "")))
+        var benefit_label: Label = _label_with_text(mid, Catalog.benefit_text(recipe))
+        var cost_label: Label = _label_with_text(mid, Catalog.cost_text(recipe))
+        var benefit_title: Label = _label_with_text(mid, "优点")
+        var cost_title: Label = _label_with_text(mid, "缺点")
+        expect(benefit_title != null and benefit_title.text.contains("优点"), context + " keeps 优点 as its own label for " + str(recipe.get("id", "")))
+        expect(cost_title != null and cost_title.text.contains("缺点"), context + " keeps 缺点 as its own label for " + str(recipe.get("id", "")))
+        expect_label_visible(name_label, str(recipe.get("name", "")), context + " cluster name " + str(recipe.get("id", "")))
+        expect_label_visible(benefit_label, Catalog.benefit_text(recipe), context + " cluster benefit " + str(recipe.get("id", "")))
+        expect_label_visible(cost_label, Catalog.cost_text(recipe), context + " cluster cost " + str(recipe.get("id", "")))
+        for label in [name_label, benefit_label, cost_label, benefit_title, cost_title]:
+            if label != null:
+                expect_inside(label, mid, context + " " + str(label.name) + " in mid", 4.0)
 
 func check_copy_not_clipped() -> void:
     var world = make_world("layout")
@@ -251,8 +289,14 @@ func check_copy_not_clipped() -> void:
     await process_frame
     assert_pack_copy_visible(ui, "after linking rune_shell")
     expect(ui.displayed_text().contains("魔法杖停止独立发射，火药筒装填间隔增加50%"), "魔法炮 cost is complete, not cut at 火")
+    var second: Dictionary = ui.try_drop("staff", "sling")
+    expect(second.get("ok", false) and world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "layout check can add 符能弹 beside 魔法炮")
+    await process_frame
+    await process_frame
+    assert_pack_copy_visible(ui, "after linking rune_shell and rune_sling")
+    expect(ui.displayed_text().contains("石弹附上符能，命中时额外爆发魔力"), "符能弹 benefit stays complete in a multi-link mid panel")
     var chain: Dictionary = ui.try_drop("powder", "axe")
-    expect(chain.get("ok", false) and world.active_link["id"] == "chain_axe", "layout check can swap to 锁链石斧")
+    expect(chain.get("ok", false) and world.has_active_link("chain_axe") and not world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "layout check replaces only the conflicting powder recipe and keeps 符能弹")
     await process_frame
     await process_frame
     assert_pack_copy_visible(ui, "after linking chain_axe")
@@ -279,6 +323,57 @@ func check_copy_not_clipped() -> void:
         mid.queue_free()
         await process_frame
     world.close_link_pack()
+    world.queue_free()
+    await process_frame
+
+func check_multiple_links() -> void:
+    var world = make_world("multi")
+    world.start_run(true)
+    expect(world.open_link_pack(), "pack opens for a multi-link trial")
+    var ui = pack(world)
+    var first: Dictionary = ui.try_drop("powder", "staff")
+    expect(first.get("ok", false) and world.has_active_link("rune_shell"), "first compatible drop still enables 魔法炮")
+    var added: Dictionary = ui.try_drop("staff", "sling")
+    expect(added.get("ok", false) and bool(added.get("added", false)), "a second compatible catalyst drop is added, not swapped")
+    expect(world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "staff can enchant both powder and sling at once")
+    expect(str(added.get("toast", "")).contains("符能弹") and not str(added.get("toast", "")).contains("改为"), "adding a coexisting recipe does not use the old replace toast")
+    expect(world.is_weapon_suppressed("staff"), "staff stays suppressed while attached to several hosts")
+    var keep: Dictionary = ui.try_unlink("sling")
+    expect(keep.get("ok", false) and world.has_active_link("rune_shell") and not world.has_active_link("rune_sling"), "unlinking one pair keeps the other active links")
+    expect(str(keep.get("toast", "")).contains("符能弹"), "unlinking names only the disconnected recipe")
+    var restored: Dictionary = ui.try_drop("staff", "sling")
+    expect(restored.get("ok", false) and world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "the unlinked pair can be attached again beside the first")
+    var blocked: Dictionary = ui.try_drop("club", "blade")
+    expect(not blocked.get("ok", true) and world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "an incompatible drop still leaves every active link unchanged")
+    var swapped: Dictionary = ui.try_drop("powder", "axe")
+    expect(swapped.get("ok", false) and bool(swapped.get("swapped", false)), "powder chain conflicts with 魔法炮 and replaces only that recipe")
+    expect(world.has_active_link("chain_axe") and not world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "锁链石斧 can run beside 符能弹 after replacing 魔法炮")
+    expect(str(swapped.get("toast", "")).contains("魔法炮") and str(swapped.get("toast", "")).contains("锁链石斧"), "conflict toast still names the replaced powder recipes")
+    world.close_link_pack()
+    world.queue_free()
+    await process_frame
+
+func check_save_multi_links() -> void:
+    var world = make_world("save_multi")
+    world.start_run(true)
+    expect(world.open_link_pack(), "pack opens before saving several links")
+    var ui = pack(world)
+    ui.try_drop("powder", "staff")
+    ui.try_drop("staff", "sling")
+    world.close_link_pack()
+    var captured: Dictionary = world.SessionState.capture(world)
+    expect(captured.get("link_id", "") in ["rune_shell", "rune_sling"], "old single link_id remains valid in a multi-link save")
+    expect(captured.get("link_ids", []).has("rune_shell") and captured.get("link_ids", []).has("rune_sling"), "saves store every active link id")
+    world.start_run(true)
+    expect(world.active_link_ids().is_empty(), "a new trial starts with no links")
+    expect(world.SessionState.apply(world, captured), "a multi-link save can be restored")
+    expect(world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "restoring a multi-link save keeps both recipes")
+    var legacy: Dictionary = captured.duplicate(true)
+    legacy.erase("link_ids")
+    legacy["link_id"] = "rune_shell"
+    world.start_run(true)
+    expect(world.SessionState.apply(world, legacy), "an old single-link save still loads")
+    expect(world.has_active_link("rune_shell") and world.active_link_ids().size() == 1, "legacy link_id becomes one active link, ready for more")
     world.queue_free()
     await process_frame
 

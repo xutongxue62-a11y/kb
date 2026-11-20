@@ -55,7 +55,11 @@ func advance(delta: float, hero: Vector2, enemies: Array, inventory: Array, stat
             state["echo_done"] = false
             state["volleys_left"] = stage
             state["hit_ids"] = []
-            state["cooldown"] = data["cooldown"]*(float(stats.get("reload_multiplier",1.0)) if key==stats.get("reload_weapon","") else 1.0)
+            var reload_map: Dictionary = stats.get("reload_multipliers", {})
+            var reload_penalty: float = float(reload_map.get(key, 1.0)) if typeof(reload_map) == TYPE_DICTIONARY else 1.0
+            if is_equal_approx(reload_penalty, 1.0) and key==stats.get("reload_weapon",""):
+                reload_penalty = float(stats.get("reload_multiplier",1.0))
+            state["cooldown"] = data["cooldown"]*reload_penalty
             events.append({"type":"flash","weapon_id":key})
             if key == "totem":
                 var previous: Vector2 = mount
@@ -169,7 +173,9 @@ func advance(delta: float, hero: Vector2, enemies: Array, inventory: Array, stat
                 events.append({"type":"motion", "position":view.position, "direction":state["direction"], "weapon_id":key})
                 state["trail_clock"] = 0.05
         state["position"] = view.position
-    if stats.get("link_kind","")=="fire_drum" and states.has("wardrum") and states.has("firepot"):
+    var link_kinds: Array = stats.get("link_kinds", [])
+    var fire_drum_active: bool = stats.get("link_kind","")=="fire_drum" or (typeof(link_kinds)==TYPE_ARRAY and link_kinds.has("fire_drum"))
+    if fire_drum_active and states.has("wardrum") and states.has("firepot"):
         for wave in states.wardrum.waves:
             for fire in states.firepot.fires:
                 if not fire.get("fanned",false) and Vector2(fire.position).distance_to(wave.position)<=wave.radius+fire.radius:

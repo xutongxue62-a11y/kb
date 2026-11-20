@@ -1,5 +1,6 @@
 extends SceneTree
 const PoseProbe=preload("res://tests/weapon_pose_probe.gd")
+const Catalog=preload("res://src/catalog.gd")
 var failures: int = 0
 var checks: int = 0
 
@@ -8,6 +9,94 @@ func expect(condition: bool, message: String) -> void:
     if not condition:
         failures += 1
         print("FAIL: " + message)
+
+func residual_kinds(world: Node) -> Array:
+    var kinds: Array = []
+    for field in world.burning_fields:
+        var kind: String = world.residual_kind_of(field)
+        if not kinds.has(kind):
+            kinds.append(kind)
+    return kinds
+
+func explode_current_shell(world: Node) -> Dictionary:
+    var shell: Dictionary = {}
+    for projectile in world.projectiles:
+        if projectile["weapon_id"] == "powder":
+            shell = projectile
+            break
+    if not shell.is_empty():
+        world.explode_powder(shell)
+    return shell
+
+func check_multi_attach_and_residuals(world: Node) -> void:
+    world.start_run(true)
+    world.select_link("rune_shell")
+    world.select_link("rune_sling")
+    expect(world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "staff can enchant the cannon and the sling together")
+    expect(world.is_weapon_suppressed("staff"), "a shared staff stays suppressed")
+    world.projectiles.clear()
+    world.burning_fields.clear()
+    world.weapon_runtime["powder"]["cooldown"] = 0.0
+    world.weapon_runtime["sling"]["cooldown"] = 0.0
+    world.weapon_runtime["staff"]["cooldown"] = 0.0
+    for enemy in world.enemies:
+        enemy["view"].queue_free()
+    world.enemies.clear()
+    world.spawn_enemy("tank", world.player_position + Vector2(140, 0))
+    world.enemies[0]["hp"] = 1000.0
+    world.enemies[0]["max_hp"] = 1000.0
+    world.update_weapons(0.05)
+    var staff_shot: bool = false
+    var magic_shell: bool = false
+    var rune_stone: bool = false
+    for projectile in world.projectiles:
+        if projectile["weapon_id"] == "staff":
+            staff_shot = true
+        if projectile["weapon_id"] == "powder" and bool(projectile.get("enchanted", false)):
+            magic_shell = true
+        if projectile["weapon_id"] == "sling" and bool(projectile.get("enchanted", false)):
+            rune_stone = true
+    expect(not staff_shot, "staff still does not fire on its own when attached to several hosts")
+    expect(magic_shell and rune_stone, "both powder and sling receive the staff enchant at once")
+    world.burning_fields.clear()
+    var magic: Dictionary = explode_current_shell(world)
+    expect(not magic.is_empty(), "magic cannon still fires a shell when staff is shared")
+    expect(residual_kinds(world).has("rune") and not residual_kinds(world).has("smoke"), "magic-enchanted cannon residual is blue rune, not plain smoke")
+    world.select_link("none")
+    world.projectiles.clear()
+    world.burning_fields.clear()
+    world.weapon_runtime["powder"]["cooldown"] = 0.0
+    world.update_weapons(0.05)
+    world.burning_fields.clear()
+    var plain: Dictionary = explode_current_shell(world)
+    expect(not plain.is_empty() and not bool(plain.get("enchanted", false)), "an unenchanted cannon shell is not marked as magic")
+    expect(residual_kinds(world).has("smoke") and not residual_kinds(world).has("rune"), "unenchanted cannon residual is simple smoke, not a blue area")
+    world.start_run(false)
+    expect(world.grant_weapon("powder") and world.grant_weapon("firepot"), "residual check can own powder and firepot")
+    world.select_link("fire_cannon")
+    world.projectiles.clear()
+    world.burning_fields.clear()
+    world.weapon_runtime["powder"]["cooldown"] = 0.0
+    for enemy in world.enemies:
+        enemy["view"].queue_free()
+    world.enemies.clear()
+    world.spawn_enemy("tank", world.player_position + Vector2(140, 0))
+    world.enemies[0]["hp"] = 1000.0
+    world.enemies[0]["max_hp"] = 1000.0
+    world.update_weapons(0.05)
+    var fire_shell: Dictionary = explode_current_shell(world)
+    expect(not fire_shell.is_empty() and not bool(fire_shell.get("enchanted", false)), "a fire-enchanted cannon shell is not treated as magic")
+    expect(residual_kinds(world).has("fire") and not residual_kinds(world).has("rune"), "fire-enchanted cannon residual is fire, not blue")
+    if world.grant_weapon("staff"):
+        world.select_link("rune_shell")
+        expect(world.has_active_link("fire_cannon") and world.has_active_link("rune_shell"), "fire and magic can enchant the same cannon together")
+        world.projectiles.clear()
+        world.burning_fields.clear()
+        world.weapon_runtime["powder"]["cooldown"] = 0.0
+        world.update_weapons(0.05)
+        var both: Dictionary = explode_current_shell(world)
+        expect(not both.is_empty() and bool(both.get("enchanted", false)), "a dual-enchanted cannon shell is still a magic shell")
+        expect(residual_kinds(world).has("fire") and residual_kinds(world).has("rune"), "dual-enchanted cannon leaves both fire and blue residuals")
 
 func check_ranged_torso_clearance(world: Node) -> void:
     world.start_run(true)
@@ -51,6 +140,14 @@ func _initialize() -> void:
     expect(chain["weapons"] == ["powder", "axe"] and chain["range"] < 395.0, "chain axe is a shorter-range two-piece recipe")
     expect(chain["kind"] == "chain" and not chain.get("enchanted", false), "owning staff cannot add a third-piece magic chain")
     expect(rules.link_profile("chain_axe", ["powder", "staff"])["id"] == "none", "ineligible recipe falls back to no link")
+    expect(rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["chain_axe"]), "magic cannon and a powder chain cannot coexist")
+    expect(not rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["rune_sling"]), "staff can attach to powder and sling together")
+    expect(not rules.recipes_conflict(Catalog.LINKS["fire_cannon"], Catalog.LINKS["fire_sling"]), "fire can attach to several hosts at once")
+    expect(not rules.recipes_conflict(Catalog.LINKS["rune_shell"], Catalog.LINKS["fire_cannon"]), "magic and fire can both enchant the cannon")
+    var added: Dictionary = rules.add_link_ids(["rune_shell"], "rune_sling", ids)
+    expect(added["ids"].has("rune_shell") and added["ids"].has("rune_sling") and added.get("dropped", []).is_empty(), "adding a coexisting recipe keeps the first")
+    var replaced: Dictionary = rules.add_link_ids(["rune_shell", "rune_sling"], "chain_axe", ids)
+    expect(replaced["ids"].has("chain_axe") and replaced["ids"].has("rune_sling") and replaced["dropped"].has("rune_shell"), "a powder chain replaces only the conflicting cannon recipe")
     for id in ["powder", "staff", "sling"]:
         expect(rules.ranged_mount(id).length() <= 76.0, "ranged mount stays near the body and inside the expanded melee orbit: " + id)
     expect(is_equal_approx(rules.orbit_position(0, 3, 0.0, false).length(), rules.MELEE_ORBIT), "melee orbit sits on the expanded readable radius")
@@ -204,6 +301,7 @@ func scene_checks() -> void:
         world.apply_weapon_link_hit(world.enemies[0]["position"], "sling")
     expect(world.enemies[0]["hp"] < before_hp, "rune sling applies an extra magic burst on hit")
     expect(world.inventory.size() >= fire_count and world.active_link["id"] == "rune_sling", "rune attachment preserves the owned weapons")
+    check_multi_attach_and_residuals(world)
     check_ranged_torso_clearance(world)
     world.queue_free()
     await process_frame

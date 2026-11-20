@@ -86,8 +86,10 @@ var player_frozen: bool = false
 var trial_preset: String = "base"
 var formation_phase: float = 0.0
 var active_link: Dictionary = {}
+var active_links: Array = []
 var available_links: Array = []
 var pending_link: String = ""
+var pending_link_ids: Array = []
 var burning_fields: Array = []
 var link_notice_open: bool = false
 var link_pack_open: bool = false
@@ -175,6 +177,8 @@ func _ready() -> void:
     rng.seed = 2180411
     library = AssetLibrary.new()
     active_link = Catalog.LINKS["none"].duplicate(true)
+    active_links = []
+    pending_link_ids = []
     actors = Node2D.new()
     actors.y_sort_enabled = true
     add_child(actors)
@@ -353,7 +357,9 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     if world_camera != null:
         world_camera.offset = Vector2.ZERO
     active_link = Catalog.LINKS["none"].duplicate(true)
+    active_links = []
     pending_link = ""
+    pending_link_ids = []
     burning_fields.clear()
     demo_link_stage = ""
     for enemy in enemies:
@@ -750,46 +756,118 @@ func _fill_offer_levels(ids: Array) -> void:
         if Catalog.WEAPONS.has(str(key)) and Growth.item_level(str(key), inventory, {}) <= 0:
             upgrade_offer_levels[str(key)] = Growth.roll_new_weapon_level(rng, wave)
 
-func rebuild_groups() -> void:
+func owned_weapon_ids() -> Array:
     var ids: Array = []
     for item in inventory:
-        ids.append(item["id"])
+        var key: String = str(item.get("id", ""))
+        if not key.is_empty() and not ids.has(key):
+            ids.append(key)
+    return ids
+
+func active_link_ids() -> Array:
+    return Rules.link_ids_of(active_links)
+
+func has_active_link(link_id: String) -> bool:
+    return Rules.has_link_id(active_links, link_id)
+
+func has_link_kind(kind: String) -> bool:
+    return Rules.has_link_kind(active_links, kind)
+
+func current_chain_link() -> Dictionary:
+    return Rules.chain_profile(active_links)
+
+func is_weapon_suppressed(weapon_id: String) -> bool:
+    return Rules.suppressed_weapon_ids(active_links).has(weapon_id)
+
+func weapon_reload_penalty(weapon_id: String) -> float:
+    return Rules.weapon_cooldown_multiplier(weapon_id, active_links)
+
+func link_hud_view() -> Dictionary:
+    return Rules.combined_link_view(active_links)
+
+func _chain_blocks_link_change(desired_ids: Array) -> bool:
+    var current: Dictionary = current_chain_link()
+    if current.is_empty():
+        return false
+    var key: String = str(current.get("weapons", ["", ""])[1]) if current.get("weapons", []).size() > 1 else ""
+    if key.is_empty() or not weapon_runtime.has(key):
+        return false
+    if str(weapon_runtime[key].get("chain_state", "rest")) == "rest":
+        return false
+    var current_id: String = str(current.get("id", ""))
+    if not desired_ids.has(current_id):
+        return true
+    return false
+
+func _queue_pending_links(desired_ids: Array) -> void:
+    pending_link_ids = desired_ids.duplicate()
+    pending_link = "none" if desired_ids.is_empty() else str(desired_ids.back())
+    combo_message = "先收回锁链武器，再切换"
+    combo_message_time = 1.2
+    var current: Dictionary = current_chain_link()
+    if current.is_empty():
+        return
+    var key: String = str(current.get("weapons", ["", ""])[1]) if current.get("weapons", []).size() > 1 else ""
+    if key.is_empty() or not weapon_runtime.has(key):
+        return
+    var runtime: Dictionary = weapon_runtime[key]
+    if runtime["chain_state"] == "out":
+        runtime["chain_state"] = "back"
+        runtime["chain_hit_ids"] = []
+        audio.play("chain_in", -1.0)
+
+func rebuild_groups() -> void:
+    var ids: Array = owned_weapon_ids()
     available_links = Rules.link_options(ids)
-    active_link = Rules.link_profile(active_link.get("id", "none"), ids)
-    groups = [] if active_link["id"] == "none" else [active_link]
-    combo_mode = active_link["id"]
+    apply_links(Rules.normalize_link_ids(active_link_ids(), ids), false)
     announce_link_ready()
 
 func select_link(link_id: String) -> void:
-    var ids: Array = []
-    for item in inventory:
-        ids.append(item["id"])
-    var profile: Dictionary = Rules.link_profile(link_id, ids)
-    if active_link.get("kind", "none") == "chain":
-        var key: String = active_link["weapons"][1]
-        var runtime: Dictionary = weapon_runtime[key]
-        if runtime["chain_state"] != "rest":
-            if runtime["chain_state"] == "out":
-                runtime["chain_state"] = "back"
-                runtime["chain_hit_ids"] = []
-                audio.play("chain_in", -1.0)
-            pending_link = profile["id"]
-            combo_message = "先收回锁链武器，再切换"
-            combo_message_time = 1.2
-            update_hud()
-            return
-    apply_link(profile)
+    var ids: Array = owned_weapon_ids()
+    var resolution: Dictionary = Rules.add_link_ids(active_link_ids(), link_id, ids)
+    if bool(resolution.get("invalid", false)):
+        return
+    var desired: Array = resolution.get("ids", [])
+    if _chain_blocks_link_change(desired):
+        _queue_pending_links(desired)
+        update_hud()
+        return
+    apply_links(desired)
 
 func apply_link(profile: Dictionary) -> void:
-    if active_link.get("kind", "none") == "chain":
-        var key: String = active_link["weapons"][1]
-        weapon_runtime[key]["blend_left"] = 0.2
-        weapon_runtime[key]["blend_start"] = weapon_views[key].position
-    active_link = profile
+    var ids: Array = owned_weapon_ids()
+    var link_id: String = str(profile.get("id", "none"))
+    var desired: Array = [] if link_id == "none" else Rules.normalize_link_ids([link_id], ids)
+    set_links(desired)
+
+func set_links(link_ids: Array) -> void:
+    var desired: Array = Rules.normalize_link_ids(link_ids, owned_weapon_ids())
+    if _chain_blocks_link_change(desired):
+        _queue_pending_links(desired)
+        update_hud()
+        return
+    apply_links(desired)
+
+func apply_links(link_ids: Array, refresh: bool = true) -> void:
+    var ids: Array = owned_weapon_ids()
+    var desired: Array = Rules.normalize_link_ids(link_ids, ids)
+    var previous_chain: Dictionary = current_chain_link()
+    var profiles: Array = Rules.profiles_for_ids(desired, ids)
+    var next_chain: Dictionary = Rules.chain_profile(profiles)
+    if not previous_chain.is_empty():
+        var key: String = str(previous_chain.get("weapons", ["", ""])[1]) if previous_chain.get("weapons", []).size() > 1 else ""
+        var same_chain: bool = not next_chain.is_empty() and str(next_chain.get("id", "")) == str(previous_chain.get("id", ""))
+        if not same_chain and not key.is_empty() and weapon_runtime.has(key) and weapon_views.has(key):
+            weapon_runtime[key]["blend_left"] = 0.2
+            weapon_runtime[key]["blend_start"] = weapon_views[key].position
+    active_links = profiles
+    active_link = Catalog.LINKS["none"].duplicate(true) if profiles.is_empty() else profiles.back().duplicate(true)
     pending_link = ""
-    groups = [] if profile["id"] == "none" else [profile]
-    combo_mode = profile["id"]
-    update_hud()
+    pending_link_ids = []
+    groups = profiles.duplicate()
+    combo_mode = "none" if profiles.is_empty() else (str(profiles[0].get("id", "none")) if profiles.size() == 1 else "multi")
+    if refresh:
+        update_hud()
 
 func switch_formation() -> void:
     if upgrade_pending or wave_closing or shop_open or player_frozen:
@@ -1153,7 +1231,7 @@ func update_hud() -> void:
     if hud == null:
         return
     hud.update_growth(buff_levels, stats, wave)
-    hud.update_state(player_hp, elapsed, kills, xp, xp_needed, inventory, collapsed, active_link, prefer_elite, trial_mode)
+    hud.update_state(player_hp, elapsed, kills, xp, xp_needed, inventory, collapsed, link_hud_view(), prefer_elite, trial_mode)
     var boss: Dictionary = {}
     for enemy in enemies:
         if enemy["kind"] == "boss" and enemy["hp"] > 0.0:
@@ -1423,7 +1501,7 @@ func simulate(delta: float, movement: Vector2) -> void:
             spawn_enemy("boss",offscreen_point(1)+Vector2(48,0),false,"enter")
             var boss: Dictionary=enemies.back()
             var formula_hp: float = float(boss.max_hp)
-            var capped_hp: float = Progression.cap_boss_hp(formula_hp, Progression.estimate_power(inventory,buff_levels,active_link))
+            var capped_hp: float = Progression.cap_boss_hp(formula_hp, Progression.estimate_power(inventory,buff_levels,active_links))
             boss.hp=capped_hp
             boss.max_hp=capped_hp
             boss.timer=1.6
@@ -1448,7 +1526,7 @@ func advance_wave(next_wave: int) -> void:
     record_character_wave(wave)
     var milestone: bool = wave / 5 > old_wave / 5
     if milestone:
-        enemy_adaptation = Progression.adaptation(wave, Progression.estimate_power(inventory, buff_levels, active_link), enemy_adaptation)
+        enemy_adaptation = Progression.adaptation(wave, Progression.estimate_power(inventory, buff_levels, active_links), enemy_adaptation)
     for enemy in enemies:
         var fraction: float = clampf(enemy["hp"] / maxf(0.001, enemy["max_hp"]), 0.0, 1.0)
         var profile: Dictionary = Progression.enemy_profile(wave, enemy["kind"], enemy_adaptation, enemy["elite"])
@@ -1467,10 +1545,11 @@ func begin_round(stage: int) -> void:
     expire_combat_fx()
     pickups.clear()
     armory.reset()
-    if not pending_link.is_empty():
-        var owned_ids: Array=[]
-        for item in inventory: owned_ids.append(item.id)
-        apply_link(Rules.link_profile(pending_link,owned_ids))
+    if not pending_link.is_empty() or not pending_link_ids.is_empty():
+        var desired: Array = pending_link_ids.duplicate()
+        if desired.is_empty() and pending_link != "none":
+            desired = [pending_link]
+        apply_links(desired)
     for runtime in weapon_runtime.values():
         runtime["hit_times"].clear()
         runtime["cooldown"] = 0.05
@@ -1663,8 +1742,8 @@ func link_hint_text() -> String:
         for recipe in available_links:
             if str(recipe.get("id", "none")) != "none":
                 names.append(str(recipe.get("name", "")))
-        var current: String = str(active_link.get("name", "不联动"))
-        return "已可联动：按 %s 打开背包，把武器拖到一起即可启用（当前：%s）。锁链从火药筒炮口弹出。" % [KeyBindings.caption_for("link"), current]
+        var current: String = str(link_hud_view().get("name", "不联动"))
+        return "已可联动：按 %s 打开背包，把武器拖到一起即可启用（当前：%s）。火种壶、魔法杖等附魔可同时给多件武器附着。锁链从火药筒炮口弹出。" % [KeyBindings.caption_for("link"), current]
     for link_id in Catalog.LINK_ORDER:
         if link_id == "none":
             continue
@@ -2164,10 +2243,16 @@ func refresh_weapon_draw_order() -> void:
 
 func update_armory(delta: float) -> void:
     var options: Dictionary=stats.duplicate()
-    options["link_kind"]=active_link.get("kind","none")
-    options["suppressed_weapons"]=active_link.get("suppressed",[])
-    options["reload_weapon"]=active_link.get("reload_weapon","")
-    options["reload_multiplier"]=active_link.get("cooldown_multiplier",1.0)
+    options["link_kind"]=active_link.get("kind","none") if active_links.size()<=1 else "multi"
+    options["link_kinds"]=[]
+    for recipe in active_links:
+        var kind: String = str(recipe.get("kind", "none"))
+        if not kind.is_empty() and not options["link_kinds"].has(kind):
+            options["link_kinds"].append(kind)
+    options["suppressed_weapons"]=Rules.suppressed_weapon_ids(active_links)
+    options["reload_weapon"]=str(active_link.get("reload_weapon",""))
+    options["reload_multiplier"]=float(active_link.get("cooldown_multiplier",1.0))
+    options["reload_multipliers"]=Rules.reload_multipliers(active_links)
     for command in armory.advance(delta,player_position,combat_targets(),inventory,options,prefer_elite,weapon_views,current_weapon_mounts()):
         match command.get("type",""):
             "motion":
@@ -2178,12 +2263,16 @@ func update_armory(delta: float) -> void:
                 var before_hp: float=float(command.enemy.hp)
                 var was_living_monster: bool = Rules.is_living_monster(command.enemy)
                 hurt_enemy(command["enemy"],command["damage"],command["weapon_id"],false,command["direction"])
-                if active_link.kind=="storm_arrow" and command.weapon_id=="bonebow" and was_living_monster and float(command.enemy.hp)<before_hp:
+                if has_link_kind("storm_arrow") and command.weapon_id=="bonebow" and was_living_monster and float(command.enemy.hp)<before_hp:
                     var others: Array=combat_targets().filter(func(e):return Rules.is_living_monster(e) and e.id!=command.enemy.id)
                     var neighbor: Dictionary=Rules.choose_target(command.enemy.position,130.0,others,false)
                     if not neighbor.is_empty():
                         effects.beam(command.enemy.position,neighbor.position,Color("#f3d89b"))
                         hurt_enemy(neighbor,command.damage*0.45,"totem",true,command.direction)
+                        if has_link_kind("thunder_crystal") and armory.states.has("crystal"):
+                            for mine in armory.states.crystal.mines:
+                                if Vector2(mine.position).distance_to(neighbor.position)<=120.0:
+                                    mine["charged"]=true
                 apply_weapon_link_hit(command.enemy.position, str(command.get("weapon_id", "")))
                 flash_weapon(command["weapon_id"])
             "area":
@@ -2196,7 +2285,7 @@ func update_armory(delta: float) -> void:
                 effects.lightning(command["start"],command["end"],command["color"])
                 audio.play("magic_hit", -2.0, 1.08)
                 flash_weapon("totem")
-                if active_link.kind=="thunder_crystal" and armory.states.has("crystal"):
+                if has_link_kind("thunder_crystal") and armory.states.has("crystal"):
                     for mine in armory.states.crystal.mines:
                         if Vector2(mine.position).distance_to(command["end"])<=120.0:
                             mine["charged"]=true
@@ -2209,7 +2298,8 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
     var targets: Array=combat_targets() if allow_attacks else []
     var melee_items: Array = []
     var ranged_items: Array = []
-    var chain_key: String = active_link["weapons"][1] if active_link.get("kind", "none") == "chain" else ""
+    var chain_recipe: Dictionary = current_chain_link()
+    var chain_key: String = str(chain_recipe["weapons"][1]) if not chain_recipe.is_empty() and chain_recipe.get("weapons", []).size() > 1 else ""
     for item in inventory:
         if Catalog.WEAPONS[item["id"]]["kind"] == "special":
             continue
@@ -2273,8 +2363,8 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
         var attack_range: float = Rules.scaled_range(data, stats)
         if key == "staff":
             attack_range = (365.0 if collapsed else 265.0) * float(stats.get("range_multiplier", 1.0))
-        if key == "powder" and active_link["weapons"].has("powder"):
-            attack_range = float(active_link["range"]) * float(stats.get("range_multiplier", 1.0))
+        if key == "powder":
+            attack_range = float(Rules.powder_attack_range(active_links)) * float(stats.get("range_multiplier", 1.0))
         var aim_limit: float = Rules.parked_aim_limit(key)
         var preview_aim: Vector2 = runtime.get("aim", (point - player_position).normalized())
         if preview_aim.length() < 0.001:
@@ -2310,11 +2400,11 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
                 direction = (aim_point - muzzle).normalized()
         else:
             runtime["aim"] = visual_aim
-        view.modulate = Color(0.86, 0.98, 0.86) if active_link["suppressed"].has(key) else Color.WHITE
-        if active_link["suppressed"].has(key) or target.is_empty() or runtime["cooldown"] > 0.0:
+        view.modulate = Color(0.86, 0.98, 0.86) if is_weapon_suppressed(key) else Color.WHITE
+        if is_weapon_suppressed(key) or target.is_empty() or runtime["cooldown"] > 0.0:
             continue
-        if key == "powder" and active_link["kind"] == "chain":
-            var linked: String = active_link["weapons"][1]
+        if key == "powder" and not chain_recipe.is_empty():
+            var linked: String = chain_key
             if weapon_runtime[linked]["chain_state"] != "rest" or not pending_link.is_empty():
                 continue
             launch_chain(linked, target["position"])
@@ -2341,18 +2431,16 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
                 for index in range(count):
                     var offset: float=(index-(count-1)*0.5)*0.13
                     var shot_aim: Vector2 = direction.rotated(offset)
-                    var enchanted_shot: bool = (key == "powder" and active_link["kind"] == "rune") or _host_is_enchanted(key)
+                    var enchanted_shot: bool = Rules.host_is_rune_enchanted(active_links, key)
                     fire_projectile(muzzle, shot_aim, key, damage*(1.0 if count==1 else (0.70 if count==2 else 0.61)), attack_range, false, enchanted_shot)
+                    if not projectiles.is_empty() and Rules.host_is_fire_enchanted(active_links, key):
+                        projectiles.back()["fire_enchanted"] = true
                 audio.play("powder" if key == "powder" else "sling", 0.0 if key == "powder" else -2.0, 0.86 if key == "powder" else 1.0)
                 flash_weapon(key)
-                if key == "powder" and active_link["kind"] == "rune":
+                if key == "powder" and Rules.host_is_rune_enchanted(active_links, "powder"):
                     effects.rune_ignition(mounts.get("staff", player_position + Rules.ranged_mount("staff")), muzzle)
                     audio.play("magic", -2.0)
-        var penalty: float = 1.0
-        if key == str(active_link.get("reload_weapon", "")):
-            penalty = float(active_link.get("cooldown_multiplier", 1.0))
-        elif key == "powder" and active_link["weapons"].has("powder"):
-            penalty = float(active_link.get("cooldown_multiplier", 1.0))
+        var penalty: float = weapon_reload_penalty(key)
         runtime["cooldown"] = data["cooldown"] * penalty / (1.0 + (item["level"] - 1) * 0.12)
         runtime["recoil"] = 0.12
         hero.recoil(direction)
@@ -2390,7 +2478,7 @@ func apply_weapon_glows(delta: float) -> void:
         var t: float = clampf(glow / 0.2, 0.0, 1.0)
         var color: Color = Catalog.WEAPONS[key]["color"]
         var lit: Color = Color(minf(1.0, color.r * 1.45 + 0.28), minf(1.0, color.g * 1.3 + 0.22), minf(1.0, color.b * 1.15 + 0.18), 1.0)
-        var suppressed: bool = active_link.get("suppressed", []).has(key)
+        var suppressed: bool = is_weapon_suppressed(key)
         var rest: Color = Color(0.86, 0.98, 0.86) if suppressed else Color.WHITE
         view.modulate = rest.lerp(lit, t)
         view.scale = view.get_meta("base_scale") * (1.0 + 0.10 * t)
@@ -2501,8 +2589,10 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
     view.rotation = (point - previous).angle() + (PI / 2.0 if key == "axe" else PI / 4.0)
     var hit_target: bool = false
     var chain_targets: Array = combat_targets()
+    var chain_recipe: Dictionary = current_chain_link()
+    var chain_range: float = float(chain_recipe.get("range", 210.0))
     var priority_targets: Array = chain_targets.filter(func(candidate):
-        var reach: float = float(active_link["range"]) + float(candidate.get("radius", 0.0)) + 12.0
+        var reach: float = chain_range + float(candidate.get("radius", 0.0)) + 12.0
         return not runtime["chain_hit_ids"].has(candidate["id"]) and chain_anchor().distance_squared_to(candidate["position"]) <= reach * reach)
     for enemy in chain_targets:
         if enemy["hp"] <= 0.0 or runtime["chain_hit_ids"].has(enemy["id"]):
@@ -2514,7 +2604,7 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
             hurt_enemy(enemy, runtime["chain_damage"] * (0.6 if returning else 1.0), key, true, (point - previous).normalized())
             effects.burst(point, Color("#e2ceb0"), 17)
             hit_target = true
-    if not returning and (hit_target or runtime["chain_distance"] >= active_link["range"]):
+    if not returning and (hit_target or runtime["chain_distance"] >= chain_range):
         runtime["chain_state"] = "back"
         runtime["chain_hit_ids"] = []
         audio.play("chain_in", -1.0)
@@ -2524,12 +2614,11 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
         runtime["chain_hit_ids"] = []
         view.position = chain_anchor()
         weapon_runtime["powder"]["cooldown"] = maxf(0.35, weapon_runtime["powder"]["cooldown"])
-        if not pending_link.is_empty():
-            var desired: String = pending_link
-            var ids: Array = []
-            for owned in inventory:
-                ids.append(owned["id"])
-            apply_link(Rules.link_profile(desired, ids))
+        if not pending_link.is_empty() or not pending_link_ids.is_empty():
+            var desired: Array = pending_link_ids.duplicate()
+            if desired.is_empty() and pending_link != "none":
+                desired = [pending_link]
+            apply_links(desired)
 
 func fire_projectile(point: Vector2, direction: Vector2, key: String, damage: float, attack_range: float, from_combo: bool = false, enchanted: bool = false, homing: float = 0.0) -> void:
     var speed: float = Catalog.WEAPONS[key]["speed"] * stats["bullet_speed"]
@@ -2624,16 +2713,15 @@ func update_projectiles(delta: float) -> void:
 
 
 func _host_is_enchanted(weapon_id: String) -> bool:
-    var kind: String = str(active_link.get("kind", "none"))
-    return kind in ["fire_enchant", "rune_enchant"] and str(active_link.get("reload_weapon", "")) == weapon_id
+    return Rules.host_is_rune_enchanted(active_links, weapon_id) or Rules.host_is_fire_enchanted(active_links, weapon_id)
 
 func apply_weapon_link_hit(point: Vector2, weapon_id: String) -> void:
-    if weapon_id.is_empty() or not _host_is_enchanted(weapon_id):
+    if weapon_id.is_empty():
         return
-    var kind: String = str(active_link.get("kind", "none"))
-    if kind == "fire_enchant":
+    var kinds: Array = Rules.host_enchant_kinds(active_links, weapon_id)
+    if kinds.has("fire_enchant"):
         _spawn_attachment_fire(point, weapon_id)
-    elif kind == "rune_enchant":
+    if kinds.has("rune_enchant") or kinds.has("rune"):
         _apply_rune_burst(point)
 
 func _spawn_attachment_fire(point: Vector2, host_id: String) -> void:
@@ -2657,22 +2745,29 @@ func _apply_rune_burst(point: Vector2) -> void:
     audio.play("magic_hit", -6.0)
 
 func explode_powder(projectile: Dictionary) -> void:
-    var enchanted: bool = projectile.get("enchanted", false)
+    var enchanted: bool = bool(projectile.get("enchanted", false)) and Rules.host_is_rune_enchanted(active_links, "powder")
+    var fire_cannon: bool = Rules.host_is_fire_enchanted(active_links, "powder") or bool(projectile.get("fire_enchanted", false))
     var point: Vector2 = projectile["position"]
-    damage_area(point, (85.0 if enchanted else 63.0) * stats["area_multiplier"], projectile["damage"] * (1.2 if enchanted else 1.0), "powder", true, Color("#ffad40") if not enchanted else Color("#6ee7f2"), "rune_blast" if enchanted else "blast")
+    var burst_kind: String = "rune_blast" if enchanted else ("blast" if fire_cannon else "blast")
+    var burst_color: Color = Color("#6ee7f2") if enchanted else Color("#ffad40")
+    damage_area(point, (85.0 if enchanted else 63.0) * stats["area_multiplier"], projectile["damage"] * (1.2 if enchanted else 1.0), "powder", true, burst_color, burst_kind)
     audio.play("blast", 0.0, 0.88)
     var stage: int=Evolution.tier(weapon_level("powder"))
-    var fire_cannon: bool = _host_is_enchanted("powder") and str(active_link.get("kind", "")) == "fire_enchant"
-    if (stage>=1 and not enchanted) or fire_cannon:
+    if (stage>=1 and not enchanted and not fire_cannon) or fire_cannon:
         var field_damage: float = projectile.damage*0.16
         var field_radius: float = 56.0*stats.area_multiplier
         var field_life: float = 1.4
+        var residual: String = "fire" if fire_cannon else "smoke"
         if fire_cannon:
             var pot_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "firepot")
             field_damage *= float(pot_bonus.get("damage_multiplier", 1.0))
             field_radius *= float(pot_bonus.get("area_multiplier", 1.0))
             field_life *= float(pot_bonus.get("life_multiplier", 1.0))
-        burning_fields.append({"position":point,"age":0.0,"life":field_life,"tick":0.18,"radius":field_radius,"damage":field_damage,"weapon_id":"powder" if not fire_cannon else "firepot","from_link":fire_cannon})
+        burning_fields.append({"position":point,"age":0.0,"life":field_life,"tick":0.18,"radius":field_radius,"damage":field_damage,"weapon_id":"powder" if not fire_cannon else "firepot","from_link":fire_cannon,"residual":residual})
+    elif not enchanted and not fire_cannon:
+        burning_fields.append({"position":point,"age":0.0,"life":0.55,"tick":1.0,"radius":42.0*stats.area_multiplier,"damage":0.0,"weapon_id":"powder","from_link":false,"residual":"smoke"})
+        effects.puff(point, Color("#cbb89a"), 28.0)
+        effects.puff(point + Vector2(8, -4), Color("#d9c6a3"), 18.0, 1)
     if stage>=2:
         for shard in range(4):
             fire_projectile(point,Vector2.from_angle(TAU*shard/4.0),"sling",projectile.damage*0.25,190.0,true)
@@ -2681,11 +2776,13 @@ func explode_powder(projectile: Dictionary) -> void:
     if enchanted:
         var staff_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "staff")
         var rune_damage: float = 0.7 * (1.0 + (weapon_level("staff") - 1) * 0.25) * float(staff_bonus.get("damage_multiplier", 1.0))
-        burning_fields.append({"position": point, "age": 0.0, "life": 1.1, "tick": 0.18, "radius": 61.0 * stats["area_multiplier"], "damage": rune_damage, "weapon_id": "staff", "from_link": true})
+        burning_fields.append({"position": point, "age": 0.0, "life": 1.1, "tick": 0.18, "radius": 61.0 * stats["area_multiplier"], "damage": rune_damage, "weapon_id": "staff", "from_link": true, "residual": "rune"})
         if burning_fields.size() > 12:
             burning_fields.pop_front()
         effects.burst(point, Color("#65e7ec"), 45.0, "ring")
         audio.play("magic_hit", -5.0)
+    if fire_cannon:
+        effects.burst(point, Color("#ffad40"), 48.0, "blast")
 
 func update_burning_fields(delta: float) -> void:
     var remaining: Array = []
@@ -2967,18 +3064,48 @@ func draw_magic_shell(point: Vector2, direction: Vector2) -> void:
     draw_circle(point, 4.7, Color("#a3fcff"))
     draw_arc(point, 8.0, 0.0, TAU, 20, Color("#edda9a"), 1.8, true)
 
+func residual_kind_of(field: Dictionary) -> String:
+    var tagged: String = str(field.get("residual", ""))
+    if not tagged.is_empty():
+        return tagged
+    var weapon_id: String = str(field.get("weapon_id", ""))
+    if weapon_id == "staff":
+        return "rune"
+    if weapon_id == "firepot" or bool(field.get("from_link", false)) and weapon_id in ["firepot", "powder"]:
+        return "fire"
+    if weapon_id == "powder":
+        return "smoke"
+    return "fire" if weapon_id == "firepot" else "smoke"
+
 func draw_link_shapes() -> void:
     for field in burning_fields:
-        var alpha: float = 1.0 - field["age"] / field["life"]
-        draw_circle(field["position"], field["radius"], Color(0.80, 0.43, 0.18, 0.10 * alpha))
-        draw_arc(field["position"], field["radius"], 0.0, TAU, 32, Color(0.18, 0.70, 0.83, 0.80 * alpha), 2.5, true)
-        for index in range(4):
-            var point: Vector2 = field["position"] + Vector2.from_angle(index * PI / 2.0 + 0.6) * field["radius"] * 0.45
-            var lift: float = sin(field["age"] * 15.0 + index) * 2.0
-            draw_colored_polygon(PackedVector2Array([point + Vector2(-4, 3), point + Vector2(0, -9 - lift), point + Vector2(4, 3)]), Color(0.28, 0.95, 1.0, 0.72 * alpha))
-    if active_link.get("kind", "none") != "chain":
+        var alpha: float = 1.0 - field["age"] / maxf(0.001, field["life"])
+        var kind: String = residual_kind_of(field)
+        var center: Vector2 = field["position"]
+        var radius: float = float(field["radius"])
+        if kind == "rune":
+            draw_circle(center, radius, Color(0.80, 0.43, 0.18, 0.10 * alpha))
+            draw_arc(center, radius, 0.0, TAU, 32, Color(0.18, 0.70, 0.83, 0.80 * alpha), 2.5, true)
+            for index in range(4):
+                var point: Vector2 = center + Vector2.from_angle(index * PI / 2.0 + 0.6) * radius * 0.45
+                var lift: float = sin(field["age"] * 15.0 + index) * 2.0
+                draw_colored_polygon(PackedVector2Array([point + Vector2(-4, 3), point + Vector2(0, -9 - lift), point + Vector2(4, 3)]), Color(0.28, 0.95, 1.0, 0.72 * alpha))
+        elif kind == "fire":
+            draw_circle(center, radius, Color(0.86, 0.32, 0.10, 0.16 * alpha))
+            draw_arc(center, radius, 0.0, TAU, 32, Color(0.95, 0.52, 0.16, 0.72 * alpha), 2.4, true)
+            for index in range(5):
+                var point: Vector2 = center + Vector2.from_angle(index * TAU / 5.0 + field["age"] * 2.0) * radius * 0.42
+                var lift: float = sin(field["age"] * 16.0 + index) * 3.0
+                draw_colored_polygon(PackedVector2Array([point + Vector2(-5, 4), point + Vector2(0, -11 - lift), point + Vector2(5, 4)]), Color(1.0, 0.62, 0.22, 0.80 * alpha))
+            Effects.CombatArt.draw(self, "fire", center, radius * 1.15, fmod(float(field["age"]) * 1.6, 1.0), Vector2.RIGHT, 0.72 * alpha)
+        else:
+            draw_circle(center, radius * 0.85, Color(0.42, 0.34, 0.26, 0.16 * alpha))
+            var puff: float = 1.0 + 0.08 * sin(field["age"] * 6.0)
+            Effects.CombatArt.draw(self, "smoke", center + Vector2(0, -6.0 * field["age"]), radius * 1.05 * puff, clampf(field["age"] / maxf(0.2, field["life"]), 0.0, 1.0), Vector2.RIGHT, 0.80 * alpha)
+    var chain_recipe: Dictionary = current_chain_link()
+    if chain_recipe.is_empty():
         return
-    var key: String = active_link["weapons"][1]
+    var key: String = str(chain_recipe["weapons"][1])
     var start: Vector2 = chain_anchor()
     var end: Vector2 = weapon_views[key].position
     var direction: Vector2 = end - start

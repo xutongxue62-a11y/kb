@@ -148,6 +148,17 @@ func _validate_optional_run_fields(state: Dictionary) -> String:
         return "存档角色无效"
     if state.has("link_id") and (typeof(state["link_id"]) != TYPE_STRING or not Catalog.LINKS.has(state["link_id"])):
         return "存档联动选项无效"
+    if state.has("link_ids"):
+        var link_ids: Variant = state["link_ids"]
+        if typeof(link_ids) != TYPE_ARRAY or link_ids.size() > 20:
+            return "存档联动列表无效"
+        var seen_ids: Array = []
+        for entry in link_ids:
+            if typeof(entry) != TYPE_STRING or not Catalog.LINKS.has(entry) or entry == "none":
+                return "存档联动列表无效"
+            if seen_ids.has(entry):
+                return "存档联动列表无效"
+            seen_ids.append(entry)
     if state.has("rng_state") and not _valid_rng_state(state["rng_state"]):
         return "存档随机状态无效"
     if state.has("shop_stock"):

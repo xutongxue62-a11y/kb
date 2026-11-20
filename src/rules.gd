@@ -129,6 +129,233 @@ static func link_profile(link_id: String, owned: Array) -> Dictionary:
             return recipe
     return Catalog.LINKS["none"].duplicate(true)
 
+# Powder can either fire shells or launch one chained melee weapon, not both,
+# and it can launch only one chain recipe at a time. Catalyst attachments
+# (fire / magic / thunder) may coexist with each other and with a non-conflicting
+# powder mode.
+static func uses_powder_shells(recipe: Dictionary) -> bool:
+    return str(recipe.get("id", "")) in ["rune_shell", "fire_cannon"]
+
+static func is_chain_recipe(recipe: Dictionary) -> bool:
+    return str(recipe.get("kind", "")) == "chain"
+
+static func recipes_conflict(first: Dictionary, second: Dictionary) -> bool:
+    var first_id: String = str(first.get("id", ""))
+    var second_id: String = str(second.get("id", ""))
+    if first_id.is_empty() or second_id.is_empty() or first_id == "none" or second_id == "none" or first_id == second_id:
+        return false
+    var first_chain: bool = is_chain_recipe(first)
+    var second_chain: bool = is_chain_recipe(second)
+    if first_chain and second_chain:
+        return true
+    if (first_chain and uses_powder_shells(second)) or (second_chain and uses_powder_shells(first)):
+        return true
+    return false
+
+static func normalize_link_ids(link_ids: Array, owned: Array) -> Array:
+    var result: Array = []
+    for entry in link_ids:
+        var link_id: String = str(entry)
+        if link_id == "none" or not Catalog.LINKS.has(link_id) or result.has(link_id):
+            continue
+        var profile: Dictionary = link_profile(link_id, owned)
+        if str(profile.get("id", "none")) == "none":
+            continue
+        result.append(link_id)
+    return result
+
+static func profiles_for_ids(link_ids: Array, owned: Array = []) -> Array:
+    var result: Array = []
+    for link_id in link_ids:
+        var key: String = str(link_id)
+        if key == "none" or not Catalog.LINKS.has(key):
+            continue
+        var profile: Dictionary = Catalog.LINKS[key].duplicate(true) if owned.is_empty() else link_profile(key, owned)
+        if str(profile.get("id", "none")) == "none":
+            continue
+        result.append(profile)
+    return result
+
+static func add_link_ids(current_ids: Array, new_id: String, owned: Array) -> Dictionary:
+    var wanted: String = str(new_id)
+    var current: Array = normalize_link_ids(current_ids, owned)
+    if wanted == "none":
+        return {"ids": [], "added": "", "dropped": current.duplicate(), "unchanged": current.is_empty()}
+    var profile: Dictionary = link_profile(wanted, owned)
+    if str(profile.get("id", "none")) == "none":
+        return {"ids": current, "added": "", "dropped": [], "unchanged": true, "invalid": true}
+    if current.has(wanted):
+        return {"ids": current, "added": "", "dropped": [], "unchanged": true}
+    var kept: Array = []
+    var dropped: Array = []
+    for link_id in current:
+        if recipes_conflict(Catalog.LINKS[link_id], profile):
+            dropped.append(link_id)
+        else:
+            kept.append(link_id)
+    kept.append(wanted)
+    return {"ids": kept, "added": wanted, "dropped": dropped, "unchanged": false}
+
+static func remove_link_ids(current_ids: Array, remove_id: String, owned: Array) -> Array:
+    var result: Array = []
+    var skip: String = str(remove_id)
+    for link_id in normalize_link_ids(current_ids, owned):
+        if link_id != skip:
+            result.append(link_id)
+    return result
+
+static func links_for_weapon(link_ids: Array, weapon_id: String) -> Array:
+    var result: Array = []
+    if weapon_id.is_empty():
+        return result
+    for link_id in link_ids:
+        var key: String = str(link_id)
+        if key == "none" or not Catalog.LINKS.has(key):
+            continue
+        if Catalog.LINKS[key].get("weapons", []).has(weapon_id):
+            result.append(key)
+    return result
+
+static func suppressed_weapon_ids(links: Array) -> Array:
+    var result: Array = []
+    for recipe in links:
+        for weapon_id in recipe.get("suppressed", []):
+            var key: String = str(weapon_id)
+            if not key.is_empty() and not result.has(key):
+                result.append(key)
+    return result
+
+static func chain_profile(links: Array) -> Dictionary:
+    for recipe in links:
+        if is_chain_recipe(recipe):
+            return recipe
+    return {}
+
+static func has_link_kind(links: Array, kind: String) -> bool:
+    for recipe in links:
+        if str(recipe.get("kind", "")) == kind:
+            return true
+    return false
+
+static func has_link_id(links: Array, link_id: String) -> bool:
+    for recipe in links:
+        if str(recipe.get("id", "")) == link_id:
+            return true
+    return false
+
+static func weapon_cooldown_multiplier(weapon_id: String, links: Array) -> float:
+    var penalty: float = 1.0
+    for recipe in links:
+        var applies: bool = str(recipe.get("reload_weapon", "")) == weapon_id
+        if not applies and weapon_id == "powder" and recipe.get("weapons", []).has("powder"):
+            applies = true
+        if applies:
+            penalty = maxf(penalty, float(recipe.get("cooldown_multiplier", 1.0)))
+    return penalty
+
+static func powder_attack_range(links: Array) -> float:
+    var chain: Dictionary = chain_profile(links)
+    if not chain.is_empty():
+        return float(chain.get("range", 210.0))
+    var reach: float = -1.0
+    for recipe in links:
+        if recipe.get("weapons", []).has("powder"):
+            reach = maxf(reach, float(recipe.get("range", 395.0)))
+    return 395.0 if reach < 0.0 else reach
+
+static func host_enchant_kinds(links: Array, weapon_id: String) -> Array:
+    var kinds: Array = []
+    for recipe in links:
+        var kind: String = str(recipe.get("kind", ""))
+        var is_host: bool = false
+        if kind in ["fire_enchant", "rune_enchant"] and str(recipe.get("reload_weapon", "")) == weapon_id:
+            is_host = true
+        elif kind == "rune" and weapon_id == "powder" and recipe.get("weapons", []).has("powder"):
+            kind = "rune"
+            is_host = true
+        if is_host and not kinds.has(kind):
+            kinds.append(kind)
+    return kinds
+
+static func host_is_rune_enchanted(links: Array, weapon_id: String) -> bool:
+    var kinds: Array = host_enchant_kinds(links, weapon_id)
+    return kinds.has("rune") or kinds.has("rune_enchant")
+
+static func host_is_fire_enchanted(links: Array, weapon_id: String) -> bool:
+    return host_enchant_kinds(links, weapon_id).has("fire_enchant")
+
+static func reload_multipliers(links: Array) -> Dictionary:
+    var result: Dictionary = {}
+    for recipe in links:
+        var key: String = str(recipe.get("reload_weapon", ""))
+        if key.is_empty() and recipe.get("weapons", []).has("powder"):
+            key = "powder"
+        if key.is_empty():
+            continue
+        result[key] = maxf(float(result.get(key, 1.0)), float(recipe.get("cooldown_multiplier", 1.0)))
+    return result
+
+static func link_ids_of(links: Array) -> Array:
+    var result: Array = []
+    for recipe in links:
+        var link_id: String = str(recipe.get("id", ""))
+        if not link_id.is_empty() and link_id != "none" and not result.has(link_id):
+            result.append(link_id)
+    return result
+
+static func combined_link_view(links: Array) -> Dictionary:
+    var profiles: Array = []
+    for recipe in links:
+        if str(recipe.get("id", "none")) != "none":
+            profiles.append(recipe)
+    if profiles.is_empty():
+        var empty: Dictionary = Catalog.LINKS["none"].duplicate(true)
+        empty["links"] = []
+        empty["link_ids"] = []
+        return empty
+    if profiles.size() == 1:
+        var single: Dictionary = profiles[0].duplicate(true)
+        single["links"] = [profiles[0].duplicate(true)]
+        single["link_ids"] = [str(profiles[0].get("id", ""))]
+        single["suppressed"] = suppressed_weapon_ids(profiles)
+        return single
+    var names: PackedStringArray = PackedStringArray()
+    var summaries: PackedStringArray = PackedStringArray()
+    var benefits: PackedStringArray = PackedStringArray()
+    var costs: PackedStringArray = PackedStringArray()
+    var weapons: Array = []
+    for recipe in profiles:
+        names.append(str(recipe.get("name", "")))
+        var summary: String = str(recipe.get("summary", "")).replace("\n", " · ")
+        if not summary.is_empty():
+            summaries.append(summary)
+        var benefit: String = Catalog.benefit_text(recipe)
+        if not benefit.is_empty():
+            benefits.append(benefit)
+        var cost: String = Catalog.cost_text(recipe)
+        if not cost.is_empty():
+            costs.append(cost)
+        for weapon_id in recipe.get("weapons", []):
+            if not weapons.has(weapon_id):
+                weapons.append(weapon_id)
+    var view: Dictionary = profiles.back().duplicate(true)
+    view["id"] = str(profiles.back().get("id", "none"))
+    view["name"] = "、".join(names)
+    view["kind"] = "multi"
+    view["summary"] = "、".join(summaries)
+    view["benefit"] = "；".join(benefits)
+    view["cost"] = "；".join(costs)
+    view["weapons"] = weapons
+    view["suppressed"] = suppressed_weapon_ids(profiles)
+    view["cooldown_multiplier"] = weapon_cooldown_multiplier("powder", profiles)
+    view["range"] = powder_attack_range(profiles)
+    view["enchanted"] = host_is_rune_enchanted(profiles, "powder")
+    view["links"] = []
+    for recipe in profiles:
+        view["links"].append(recipe.duplicate(true))
+    view["link_ids"] = link_ids_of(profiles)
+    return view
+
 static func ranged_mount(weapon_id: String) -> Vector2:
     match weapon_id:
         "powder": return Vector2(70, 12)

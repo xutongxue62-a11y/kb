@@ -47,7 +47,11 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
     Rules.apply_parked_hold(view, key, hero, hold_aim, idle_presentation)
     if state["cooldown"] <= 0.0 and not target.is_empty() and not (key == "wardrum" and state["phase"] == "playing"):
         state["cooldown"] = data["cooldown"] / (1.0 + (level - 1) * 0.08)
-        if key==stats.get("reload_weapon",""): state.cooldown*=float(stats.get("reload_multiplier",1.0))
+        var reload_map: Dictionary = stats.get("reload_multipliers", {})
+        var reload_penalty: float = float(reload_map.get(key, 1.0)) if typeof(reload_map) == TYPE_DICTIONARY else 1.0
+        if is_equal_approx(reload_penalty, 1.0) and key==stats.get("reload_weapon",""):
+            reload_penalty = float(stats.get("reload_multiplier",1.0))
+        state.cooldown*=reload_penalty
         state["age"] = 0.0
         state["has_fired"] = true
         events.append({"type": "flash", "weapon_id": key})
@@ -60,10 +64,16 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                     if mastery.has("pierce_limit"):
                         pierce_limit = maxi(pierce_limit, int(mastery["pierce_limit"]))
                     shot["pierce_limit"]=pierce_limit
-                    var link_kind: String = str(stats.get("link_kind", "none"))
-                    if str(stats.get("reload_weapon", "")) == "bonebow" and link_kind in ["fire_enchant", "rune_enchant"]:
-                        shot["enchanted"] = true
-                        shot["link_kind"] = link_kind
+                    var kinds: Array = stats.get("link_kinds", [])
+                    if typeof(kinds) != TYPE_ARRAY or kinds.is_empty():
+                        kinds = [str(stats.get("link_kind", "none"))]
+                    var bonebow_hosted: bool = str(stats.get("reload_weapon", "")) == "bonebow" or (typeof(reload_map) == TYPE_DICTIONARY and float(reload_map.get("bonebow", 1.0)) > 1.0)
+                    var fire_shot: bool = bonebow_hosted and kinds.has("fire_enchant")
+                    var rune_shot: bool = bonebow_hosted and kinds.has("rune_enchant")
+                    if fire_shot or rune_shot:
+                        shot["enchanted"] = rune_shot
+                        shot["fire_enchanted"] = fire_shot
+                        shot["link_kind"] = "rune_enchant" if rune_shot else "fire_enchant"
                     state.arrows.append(shot)
             "firepot":
                 var flight: float = clampf(mount.distance_to(target["position"]) / data["speed"], 0.32, 0.65)
@@ -93,7 +103,9 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                 view.rotation = -sin(minf(state["age"] / 0.35, 1.0) * PI) * 0.35
         "wardrum":
             advance_drum(state, dt, hero, targets, damage, area, events)
-            if stats.get("link_kind","")=="fire_drum": state["fan_fire"]=true
+            var drum_kinds: Array = stats.get("link_kinds", [])
+            if stats.get("link_kind","")=="fire_drum" or (typeof(drum_kinds)==TYPE_ARRAY and drum_kinds.has("fire_drum")):
+                state["fan_fire"]=true
             view.position.y -= maxf(0.0, sin(state["age"] / 0.24 * TAU)) * 3.5 if state["phase"] == "playing" else 0.0
         "crystal":
             advance_projectiles(state["shards"], dt, targets, events, key)
@@ -212,8 +224,8 @@ static func draw(canvas: Node2D, key: String, state: Dictionary) -> void:
                 var side: Vector2 = direction.orthogonal()
                 var shaft: Color = Color("#e5c794")
                 var tip: Color = Color("#f1dfb9")
-                if arrow.get("enchanted", false):
-                    shaft = Color("#f3a15a") if str(arrow.get("link_kind", "")) == "fire_enchant" else Color("#6ee7f2")
+                if arrow.get("enchanted", false) or arrow.get("fire_enchanted", false):
+                    shaft = Color("#6ee7f2") if bool(arrow.get("enchanted", false)) else Color("#f3a15a")
                     tip = shaft.lightened(0.18)
                     canvas.draw_line(point - direction * 31.0, point + direction * 11.0, Color(shaft, 0.42), 11.0, true)
                 canvas.draw_line(point - direction * 29.0, point + direction * 9.0, INK, 7.0, true)

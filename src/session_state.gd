@@ -46,7 +46,8 @@ static func capture(world: Node, finished: bool = false) -> Dictionary:
         "xp":world.xp, "xp_needed":world.xp_needed, "player_level":world.player_level, "kills":world.kills,
         "inventory":world.inventory.duplicate(true), "buff_levels":world.buff_levels.duplicate(true), "starting_weapon":world.starting_weapon,
         "character_id":world.character_id,
-        "collapsed":world.collapsed, "prefer_elite":world.prefer_elite, "link_id":world.active_link["id"],
+        "collapsed":world.collapsed, "prefer_elite":world.prefer_elite, "link_id":world.active_link["id"] if world.active_link_ids().is_empty() else str(world.active_link_ids()[0]),
+        "link_ids":world.active_link_ids(),
         "enemy_adaptation":world.enemy_adaptation, "enemy_serial":world.enemy_serial, "enemies":enemies, "pickups":drops,
         "boss_round":world.boss_round, "boss_defeated":world.boss_defeated, "boss_clear_left":world.boss_clear_left, "shop_open":world.shop_open,
         "shop_stock":world.shop_stock.duplicate(true), "rng_state":str(world.rng.state)
@@ -92,7 +93,17 @@ static func apply(world: Node, state: Dictionary) -> bool:
     world.kills = maxi(0,int(state.get("kills",0)))
     world.collapsed = bool(state.get("collapsed",false))
     world.prefer_elite = bool(state.get("prefer_elite",false))
-    world.select_link(str(state.get("link_id","none")))
+    var restored_links: Array = []
+    if state.has("link_ids"):
+        var raw_links: Variant = state.get("link_ids", [])
+        if typeof(raw_links) == TYPE_ARRAY:
+            restored_links = raw_links
+    elif str(state.get("link_id", "none")) != "none":
+        restored_links = [str(state.get("link_id", "none"))]
+    if restored_links.is_empty():
+        world.apply_links([])
+    else:
+        world.apply_links(restored_links)
     for data in state.get("enemies",[]):
         var kind: String = str(data.get("kind",""))
         if not Catalog.DINOS.has(kind) and not BiomeEncounters.MOBS.has(kind):
