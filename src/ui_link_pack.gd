@@ -11,6 +11,9 @@ const ERROR_INCOMPATIBLE := "这两件武器不能联动"
 const CARD_SIZE := Vector2(232, 214)
 const CLUSTER_MID := Vector2(420, 252)
 const BOARD_SIZE := Vector2(1104, 580)
+const BOARD_MARGIN := 8.0
+const CARD_GAP := 16.0
+const MIN_DETAILS_WIDTH := 340.0
 const UNLINK_DISTANCE := 86.0
 const PACK_WRAP := TextServer.AUTOWRAP_ARBITRARY
 
@@ -29,6 +32,7 @@ var dragging_id: String = ""
 var drag_offset: Vector2 = Vector2.ZERO
 var drag_home: Vector2 = Vector2.ZERO
 var body_font: Font
+var _reflowing: bool = false
 
 func setup(ui, world) -> void:
     hud = ui
@@ -213,34 +217,256 @@ func refresh() -> void:
     for weapon_id in ids:
         if not linked.has(weapon_id):
             unlinked.append(weapon_id)
-    var cursor_y: float = 8.0
     for group in groups:
         var cluster: Control = _make_group_cluster(group)
-        cluster.position = Vector2(maxf(4.0, (BOARD_SIZE.x - cluster.size.x) * 0.5), cursor_y)
+        cluster.position = Vector2.ZERO
         board.add_child(cluster)
         var group_id: String = str(group[0].get("id", "link")) if not group.is_empty() else "link"
         clusters[group_id] = cluster
-        cursor_y += cluster.size.y + 22.0
-    var columns: int = mini(3, maxi(1, unlinked.size()))
-    var gap: float = 22.0
-    var row_width: float = columns * CARD_SIZE.x + maxf(0, columns - 1) * gap
-    var start_x: float = maxf(8.0, (BOARD_SIZE.x - row_width) * 0.5)
-    for index in range(unlinked.size()):
-        var weapon_id: String = unlinked[index]
+    for weapon_id in unlinked:
         var card: Control = _make_card(weapon_id, false)
-        var col: int = index % 3
-        var row: int = int(index / 3)
-        var jitter: Vector2 = _idle_jitter(weapon_id)
-        card.position = Vector2(start_x + col * (CARD_SIZE.x + gap), cursor_y + row * (CARD_SIZE.y + 18.0)) + jitter
+        card.position = Vector2.ZERO
         board.add_child(card)
         cards[weapon_id] = card
         card.set_meta("home", card.position)
+    _layout_pack_board()
     _relock_pack_copy(self)
     _fit_pack_copy(self)
+    _layout_pack_board()
     _set_status(_status_copy())
     _apply_drag_highlights()
     if is_inside_tree():
         call_deferred("_finish_pack_layout")
+
+func connection_pairs() -> Array:
+    var pairs: Array = []
+    for key in clusters:
+        var cluster: Control = clusters[key]
+        if cluster == null or not is_instance_valid(cluster):
+            continue
+        var links: Array = cluster.get_meta("connections", [])
+        for entry in links:
+            if typeof(entry) != TYPE_ARRAY or entry.size() < 2:
+                continue
+            var a: String = str(entry[0])
+            var b: String = str(entry[1])
+            if a.is_empty() or b.is_empty() or a == b:
+                continue
+            var pair: Array = [a, b] if a < b else [b, a]
+            if not pairs.has(pair):
+                pairs.append(pair)
+    return pairs
+
+func _max_card_columns() -> int:
+    return maxi(1, int((BOARD_SIZE.x - BOARD_MARGIN * 2.0 + CARD_GAP) / (CARD_SIZE.x + CARD_GAP)))
+
+func _cluster_list() -> Array:
+    var result: Array = []
+    var groups: Array = _cluster_groups()
+    for group in groups:
+        var group_id: String = str(group[0].get("id", "link")) if not group.is_empty() else "link"
+        var cluster: Control = clusters.get(group_id, null)
+        if cluster != null and is_instance_valid(cluster):
+            result.append(cluster)
+    return result
+
+func _unlinked_ids() -> Array:
+    var result: Array = []
+    for weapon_id in weapon_ids():
+        var card: Control = cards.get(weapon_id, null)
+        if card != null and is_instance_valid(card) and not bool(card.get_meta("in_cluster", false)):
+            result.append(weapon_id)
+    return result
+
+func _cluster_parts(cluster: Control) -> Dictionary:
+    var parts: Dictionary = {"cards": [], "mid": null, "lines": null}
+    if cluster == null:
+        return parts
+    for child in cluster.get_children():
+        if child.name.begins_with("WeaponCard_"):
+            parts["cards"].append(child)
+        elif child.name == "LinkDetails":
+            parts["mid"] = child
+        elif child.name == "LinkConnections":
+            parts["lines"] = child
+    return parts
+
+func _set_details_width(mid: Panel, recipes: Array, width: float) -> void:
+    if mid == null or recipes.is_empty():
+        return
+    var wanted: float = maxf(MIN_DETAILS_WIDTH, width)
+    mid.custom_minimum_size = Vector2.ZERO
+    mid.size = Vector2(wanted, mid.size.y)
+    for child in mid.get_children():
+        mid.remove_child(child)
+        child.queue_free()
+    _fill_link_details(mid, recipes, wanted)
+
+func _place_board_card(card: Control, pos: Vector2, bounds: Rect2, jitter: bool) -> void:
+    var placed: Vector2 = pos
+    if jitter:
+        var trial: Vector2 = pos + _idle_jitter(str(card.get_meta("weapon_id", "")))
+        var box := Rect2(trial, card.size)
+        var room := Rect2(bounds.position, bounds.size)
+        if room.encloses(box) or (trial.x >= room.position.x and trial.y >= room.position.y and trial.x + card.size.x <= room.end.x + 0.5 and trial.y + card.size.y <= room.end.y + 0.5):
+            placed = trial
+        elif pos.x >= room.position.x and pos.y >= room.position.y and pos.x + card.size.x <= room.end.x and pos.y + card.size.y <= room.end.y:
+            placed.x = clampf(trial.x, room.position.x, maxf(room.position.x, room.end.x - card.size.x))
+            placed.y = clampf(trial.y, room.position.y, maxf(room.position.y, room.end.y - card.size.y))
+    card.position = placed
+    card.set_meta("home", card.position)
+
+func _layout_pack_board() -> void:
+    if board == null or _reflowing:
+        return
+    _reflowing = true
+    var bounds := Rect2(Vector2(BOARD_MARGIN, BOARD_MARGIN), BOARD_SIZE - Vector2(BOARD_MARGIN * 2.0, BOARD_MARGIN * 2.0))
+    var leftover: Array = _unlinked_ids()
+    var cluster_nodes: Array = _cluster_list()
+    if cluster_nodes.is_empty():
+        var columns: int = mini(3, maxi(1, leftover.size()))
+        var gap: float = 22.0
+        var row_width: float = columns * CARD_SIZE.x + maxf(0, columns - 1) * gap
+        var start_x: float = maxf(BOARD_MARGIN, (BOARD_SIZE.x - row_width) * 0.5)
+        for index in range(leftover.size()):
+            var card: Control = cards[leftover[index]]
+            var col: int = index % columns
+            var row: int = int(index / columns)
+            var pos := Vector2(start_x + col * (CARD_SIZE.x + gap), BOARD_MARGIN + row * (CARD_SIZE.y + 18.0))
+            _place_board_card(card, pos, bounds, true)
+        _reflowing = false
+        return
+    var cursor_y: float = BOARD_MARGIN
+    for cluster in cluster_nodes:
+        var recipes: Array = cluster.get_meta("recipes", [])
+        var parts: Dictionary = _cluster_parts(cluster)
+        var mid: Panel = parts["mid"]
+        if mid != null and not recipes.is_empty():
+            var mid_width: float = _wanted_mid_width(cluster, leftover.size())
+            if absf(mid.size.x - mid_width) > 1.0:
+                _set_details_width(mid, recipes, mid_width)
+        _sync_cluster_geometry(cluster)
+        var bands: Array = _cluster_bands(cluster)
+        var used_right: float = cluster.size.x
+        var band_bottoms: Array = []
+        for band in bands:
+            var used: float = float(band.get("used_width", cluster.size.x))
+            var remain: float = BOARD_SIZE.x - BOARD_MARGIN * 2.0 - used - CARD_GAP
+            var fit: int = 0
+            if remain >= CARD_SIZE.x:
+                fit = mini(leftover.size(), int((remain + CARD_GAP) / (CARD_SIZE.x + CARD_GAP)))
+            band["fit"] = fit
+            var row_w: float = used + (float(fit) * (CARD_SIZE.x + CARD_GAP) if fit > 0 else 0.0)
+            used_right = maxf(used_right, row_w)
+            band_bottoms.append(float(band.get("y", 0.0)) + float(band.get("height", 0.0)))
+        var origin_x: float = maxf(BOARD_MARGIN, (BOARD_SIZE.x - used_right) * 0.5)
+        cluster.position = Vector2(origin_x, cursor_y)
+        var row_bottom: float = cluster.position.y + cluster.size.y
+        for band in bands:
+            var fit: int = int(band.get("fit", 0))
+            var used: float = float(band.get("used_width", 0.0))
+            var band_y: float = cursor_y + float(band.get("y", 0.0))
+            for index in range(fit):
+                if leftover.is_empty():
+                    break
+                var weapon_id: String = leftover.pop_front()
+                var card: Control = cards[weapon_id]
+                var pos := Vector2(origin_x + used + CARD_GAP + float(index) * (CARD_SIZE.x + CARD_GAP), band_y)
+                _place_board_card(card, pos, bounds, false)
+                row_bottom = maxf(row_bottom, pos.y + card.size.y)
+        cursor_y = row_bottom + CARD_GAP
+    if not leftover.is_empty():
+        var columns: int = mini(_max_card_columns(), leftover.size())
+        var row_width: float = columns * CARD_SIZE.x + maxf(0, columns - 1) * CARD_GAP
+        var start_x: float = maxf(BOARD_MARGIN, (BOARD_SIZE.x - row_width) * 0.5)
+        for index in range(leftover.size()):
+            var card: Control = cards[leftover[index]]
+            var col: int = index % columns
+            var row: int = int(index / columns)
+            var pos := Vector2(start_x + col * (CARD_SIZE.x + CARD_GAP), cursor_y + row * (card.size.y + CARD_GAP))
+            _place_board_card(card, pos, bounds, true)
+        leftover.clear()
+    for cluster in cluster_nodes:
+        _tag_cluster_homes(cluster)
+    _reflowing = false
+
+func _wanted_mid_width(cluster: Control, leftover_count: int) -> float:
+    var recipes: Array = cluster.get_meta("recipes", [])
+    var kind: String = str(cluster.get_meta("cluster_kind", "pair"))
+    var base: float = CLUSTER_MID.x
+    if recipes.size() >= 2:
+        base = maxf(CLUSTER_MID.x, 280.0 * float(mini(recipes.size(), 2)))
+    if kind == "pair":
+        var side_room: float = BOARD_SIZE.x - BOARD_MARGIN * 2.0 - (CARD_SIZE.x * 2.0 + 16.0) - (CARD_SIZE.x + CARD_GAP if leftover_count > 0 else 0.0)
+        if leftover_count > 0 and _cluster_list().size() >= 2:
+            return clampf(side_room, MIN_DETAILS_WIDTH, CLUSTER_MID.x)
+        return CLUSTER_MID.x
+    var card_count: int = maxi(1, _cluster_parts(cluster)["cards"].size())
+    var card_row_w: float = float(card_count) * CARD_SIZE.x + float(card_count - 1) * CARD_GAP
+    var leftover_on_cards: int = 0
+    var card_remain: float = BOARD_SIZE.x - BOARD_MARGIN * 2.0 - card_row_w - CARD_GAP
+    if card_remain >= CARD_SIZE.x:
+        leftover_on_cards = mini(leftover_count, int((card_remain + CARD_GAP) / (CARD_SIZE.x + CARD_GAP)))
+    var remain_after: int = maxi(0, leftover_count - leftover_on_cards)
+    var beside: int = mini(remain_after, _max_card_columns() - 1)
+    while beside > 0:
+        var mid_w: float = BOARD_SIZE.x - BOARD_MARGIN * 2.0 - float(beside) * (CARD_SIZE.x + CARD_GAP)
+        if mid_w >= MIN_DETAILS_WIDTH:
+            return mid_w
+        beside -= 1
+    return minf(base, maxf(MIN_DETAILS_WIDTH, card_row_w))
+
+func _cluster_bands(cluster: Control) -> Array:
+    var parts: Dictionary = _cluster_parts(cluster)
+    var mid: Control = parts["mid"]
+    var kind: String = str(cluster.get_meta("cluster_kind", "pair"))
+    if kind != "hub" or mid == null:
+        return [{"y": 0.0, "height": cluster.size.y, "used_width": cluster.size.x}]
+    var card_height: float = 0.0
+    var card_width: float = 0.0
+    for card in parts["cards"]:
+        card_height = maxf(card_height, card.position.y + card.size.y)
+        card_width = maxf(card_width, card.position.x + card.size.x)
+    var bands: Array = [{"y": 0.0, "height": maxf(CARD_SIZE.y, card_height), "used_width": card_width}]
+    bands.append({"y": mid.position.y, "height": mid.size.y, "used_width": mid.size.x})
+    return bands
+
+func _tag_cluster_homes(cluster: Control) -> void:
+    for child in cluster.get_children():
+        if child is Control and child.has_meta("weapon_id"):
+            child.set_meta("home", child.position)
+
+func _spoke_points(from_card: Control, to_card: Control) -> PackedVector2Array:
+    var a: Rect2 = from_card.get_rect()
+    var b: Rect2 = to_card.get_rect()
+    var ac: Vector2 = a.position + a.size * 0.5
+    var bc: Vector2 = b.position + b.size * 0.5
+    var points := PackedVector2Array()
+    var mid_gap: float = minf(absf(bc.x - ac.x) - (a.size.x + b.size.x) * 0.5, absf(bc.y - ac.y) - (a.size.y + b.size.y) * 0.5)
+    var adjacent_h: bool = absf(bc.y - ac.y) <= maxf(a.size.y, b.size.y) * 0.55 and mid_gap >= -8.0 and absf(bc.x - ac.x) > absf(bc.y - ac.y)
+    if adjacent_h:
+        if ac.x < bc.x:
+            points.append(Vector2(a.position.x + a.size.x, ac.y))
+            points.append(Vector2(b.position.x, bc.y))
+        else:
+            points.append(Vector2(a.position.x, ac.y))
+            points.append(Vector2(b.position.x + b.size.x, bc.y))
+        return points
+    var adjacent_v: bool = absf(bc.x - ac.x) <= maxf(a.size.x, b.size.x) * 0.55
+    if adjacent_v:
+        if ac.y < bc.y:
+            points.append(Vector2(ac.x, a.position.y + a.size.y))
+            points.append(Vector2(bc.x, b.position.y))
+        else:
+            points.append(Vector2(ac.x, a.position.y))
+            points.append(Vector2(bc.x, b.position.y + b.size.y))
+        return points
+    var rail_y: float = maxf(a.position.y + a.size.y, b.position.y + b.size.y) + 6.0
+    points.append(Vector2(ac.x, a.position.y + a.size.y))
+    points.append(Vector2(ac.x, rail_y))
+    points.append(Vector2(bc.x, rail_y))
+    points.append(Vector2(bc.x, b.position.y if bc.y > ac.y else b.position.y + b.size.y))
+    return points
 
 func _apply_drop(weapon_a: String, weapon_b: String) -> Dictionary:
     if host == null:
@@ -587,21 +813,94 @@ func _make_cluster(recipe: Dictionary, first_id: String, second_id: String) -> C
     cluster.name = "LinkCluster_%s" % str(recipe.get("id", "link"))
     cluster.clip_contents = false
     cluster.mouse_filter = Control.MOUSE_FILTER_PASS
+    cluster.set_meta("cluster_kind", "pair")
+    cluster.set_meta("recipes", [recipe])
+    cluster.set_meta("connections", [])
     var mid: Panel = make_link_details(recipe)
     var left: Panel = _make_card(first_id, true)
     var right: Panel = _make_card(second_id, true)
-    var height: float = maxf(left.size.y, maxf(right.size.y, mid.size.y + 12.0))
-    var width: float = CARD_SIZE.x * 2.0 + mid.size.x + 16.0
-    cluster.size = Vector2(width, height)
-    left.position = Vector2.ZERO
     cluster.add_child(left)
     _tag_cluster_card(left, str(recipe.get("id", "")))
-    mid.position = Vector2(CARD_SIZE.x + 8, maxf(0.0, (height - mid.size.y) * 0.5))
     cluster.add_child(mid)
-    right.position = Vector2(CARD_SIZE.x + mid.size.x + 16, 0)
     cluster.add_child(right)
     _tag_cluster_card(right, str(recipe.get("id", "")))
+    _sync_cluster_geometry(cluster)
     return cluster
+
+func _hub_card_order(shared: String, hosts: Array) -> Array:
+    var row: Array = []
+    var left_count: int = int(hosts.size() / 2)
+    for index in range(left_count):
+        row.append(hosts[index])
+    row.append(shared)
+    for index in range(left_count, hosts.size()):
+        row.append(hosts[index])
+    return row
+
+func _sync_cluster_geometry(cluster: Control) -> void:
+    if cluster == null or not is_instance_valid(cluster):
+        return
+    var kind: String = str(cluster.get_meta("cluster_kind", "pair"))
+    var parts: Dictionary = _cluster_parts(cluster)
+    var mid: Control = parts["mid"]
+    var card_nodes: Array = parts["cards"]
+    if kind == "pair" and card_nodes.size() >= 2 and mid != null:
+        var left: Control = card_nodes[0]
+        var right: Control = card_nodes[1]
+        if left.position.x > right.position.x:
+            var swap: Control = left
+            left = right
+            right = swap
+        var height: float = maxf(left.size.y, maxf(right.size.y, mid.size.y + 12.0))
+        var width: float = left.size.x + 8.0 + mid.size.x + 8.0 + right.size.x
+        left.position = Vector2.ZERO
+        mid.position = Vector2(left.size.x + 8.0, maxf(0.0, (height - mid.size.y) * 0.5))
+        right.position = Vector2(left.size.x + mid.size.x + 16.0, 0.0)
+        cluster.size = Vector2(width, height)
+        _tag_cluster_homes(cluster)
+        return
+    var shared: String = str(cluster.get_meta("catalyst_id", ""))
+    var hosts: Array = cluster.get_meta("host_ids", [])
+    var gap: float = CARD_GAP
+    var row: Array = _hub_card_order(shared, hosts)
+    var by_id: Dictionary = {}
+    for card in card_nodes:
+        by_id[str(card.get_meta("weapon_id", ""))] = card
+    var x: float = 0.0
+    var card_height: float = 0.0
+    var catalyst: Control = by_id.get(shared, null)
+    var max_row: int = _max_card_columns()
+    var index: int = 0
+    var row_y: float = 0.0
+    var row_width: float = 0.0
+    var width: float = 0.0
+    for weapon_id in row:
+        var card: Control = by_id.get(weapon_id, null)
+        if card == null:
+            continue
+        if index > 0 and index % max_row == 0:
+            row_y += card_height + gap
+            x = 0.0
+            card_height = 0.0
+        card.position = Vector2(x, row_y)
+        x += card.size.x + gap
+        row_width = maxf(row_width, x - gap)
+        card_height = maxf(card_height, card.size.y)
+        width = maxf(width, row_width)
+        index += 1
+    var cards_bottom: float = row_y + card_height
+    if mid != null:
+        mid.position = Vector2(0.0, cards_bottom + 12.0)
+        width = maxf(width, mid.size.x)
+        cluster.size = Vector2(width, mid.position.y + mid.size.y)
+    else:
+        cluster.size = Vector2(width, cards_bottom)
+    var lines: Control = parts["lines"]
+    if lines != null:
+        lines.position = Vector2.ZERO
+        lines.size = cluster.size
+        lines.queue_redraw()
+    _tag_cluster_homes(cluster)
 
 func _make_multi_cluster(group: Array) -> Control:
     var shared: String = _shared_weapon(group)
@@ -621,31 +920,27 @@ func _make_multi_cluster(group: Array) -> Control:
     cluster.name = "LinkCluster_%s" % str(group[0].get("id", "link"))
     cluster.clip_contents = false
     cluster.mouse_filter = Control.MOUSE_FILTER_PASS
-    var gap: float = 18.0
-    var card_row: Array = [shared]
-    card_row.append_array(hosts)
-    var cards_width: float = card_row.size() * CARD_SIZE.x + maxf(0, card_row.size() - 1) * gap
-    var details_width: float = maxf(CLUSTER_MID.x, cards_width)
-    var mid: Panel = make_link_details_list(group, details_width)
-    var width: float = maxf(cards_width, mid.size.x)
+    cluster.set_meta("cluster_kind", "hub")
+    cluster.set_meta("recipes", group)
+    cluster.set_meta("catalyst_id", shared)
+    cluster.set_meta("host_ids", hosts)
+    var links: Array = []
+    for host_id in hosts:
+        links.append([shared, host_id])
+    cluster.set_meta("connections", links)
+    var mid_width: float = maxf(CLUSTER_MID.x, 280.0 * float(mini(group.size(), 2)))
+    mid_width = minf(mid_width, BOARD_SIZE.x - BOARD_MARGIN * 2.0)
+    var mid: Panel = make_link_details_list(group, mid_width)
     var catalyst: Panel = _make_card(shared, true)
     cluster.add_child(catalyst)
-    catalyst.position = Vector2(0, 0)
     _tag_cluster_card(catalyst, "", true)
     var host_cards: Array = []
-    for index in range(hosts.size()):
-        var host_id: String = hosts[index]
+    for host_id in hosts:
         var card: Panel = _make_card(host_id, true)
-        card.position = Vector2((index + 1) * (CARD_SIZE.x + gap), 0)
         cluster.add_child(card)
         _tag_cluster_card(card, str(host_links.get(host_id, "")))
         host_cards.append(card)
-    var card_height: float = catalyst.size.y
-    for card in host_cards:
-        card_height = maxf(card_height, card.size.y)
-    mid.position = Vector2(maxf(0.0, (width - mid.size.x) * 0.5), card_height + 14.0)
     cluster.add_child(mid)
-    cluster.size = Vector2(width, mid.position.y + mid.size.y)
     var lines := Control.new()
     lines.name = "LinkConnections"
     lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -654,19 +949,24 @@ func _make_multi_cluster(group: Array) -> Control:
     lines.anchor_right = 0
     lines.anchor_bottom = 0
     lines.position = Vector2.ZERO
-    lines.size = cluster.size
     cluster.add_child(lines)
     cluster.move_child(lines, 0)
-    var from: Vector2 = catalyst.position + catalyst.size * 0.5
+    var catalyst_ref: Control = catalyst
+    var host_refs: Array = host_cards
     lines.draw.connect(func():
-        for card in host_cards:
+        if catalyst_ref == null or not is_instance_valid(catalyst_ref):
+            return
+        for card in host_refs:
             if card == null or not is_instance_valid(card):
                 continue
-            var to: Vector2 = card.position + card.size * 0.5
-            lines.draw_line(from, to, Color("#7a4a22"), 6.0, true)
-            lines.draw_line(from, to, Color("#b4583e"), 3.0, true)
+            var points: PackedVector2Array = _spoke_points(catalyst_ref, card)
+            if points.size() < 2:
+                continue
+            for step in range(points.size() - 1):
+                lines.draw_line(points[step], points[step + 1], Color("#7a4a22"), 6.0, true)
+                lines.draw_line(points[step], points[step + 1], Color("#b4583e"), 3.0, true)
     )
-    lines.queue_redraw()
+    _sync_cluster_geometry(cluster)
     return cluster
 
 
@@ -686,18 +986,31 @@ func make_link_details_list(recipes: Array, width: float = CLUSTER_MID.x) -> Pan
     mid_box.set_border_width_all(2)
     mid_box.set_corner_radius_all(3)
     mid.add_theme_stylebox_override("panel", mid_box)
+    mid.set_meta("recipes", recipes)
     _fill_link_details(mid, recipes, width)
     return mid
 
 func _fill_link_details(mid: Panel, recipes: Array, width: float) -> void:
     var pad := 14.0
-    var text_width: float = maxf(80.0, width - pad * 2.0)
-    var cursor := 10.0
+    var columns: int = 1
+    if recipes.size() >= 2 and width >= 520.0:
+        columns = mini(recipes.size(), 2)
+        if recipes.size() >= 3 and width >= 780.0:
+            columns = mini(recipes.size(), 3)
+    var col_gap := 16.0
+    var col_width: float = width - pad * 2.0 if columns <= 1 else (width - pad * 2.0 - col_gap * float(columns - 1)) / float(columns)
+    var text_width: float = maxf(80.0, col_width)
+    var col_cursor: Array = []
+    for _col in range(columns):
+        col_cursor.append(10.0)
     for index in range(recipes.size()):
         var recipe: Dictionary = recipes[index]
+        var col: int = index % columns
+        var origin_x: float = pad + float(col) * (text_width + col_gap)
+        var cursor: float = float(col_cursor[col])
         var name_label: Label = _label(str(recipe.get("name", "")), 17, Color("#9a3b2c"), true)
         name_label.name = "ClusterName" if recipes.size() == 1 else "ClusterName_%d" % index
-        name_label.position = Vector2(pad, cursor)
+        name_label.position = Vector2(origin_x, cursor)
         name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         var name_height: float = maxf(26.0, _wrapped_size(str(recipe.get("name", "")), 17, text_width).y + 6.0)
         _prepare_pack_copy(name_label, text_width, name_height)
@@ -705,12 +1018,19 @@ func _fill_link_details(mid: Panel, recipes: Array, width: float) -> void:
         cursor += name_height + 4.0
         var benefit_name: String = "ClusterBenefit" if recipes.size() == 1 else "ClusterBenefit_%d" % index
         var cost_name: String = "ClusterCost" if recipes.size() == 1 else "ClusterCost_%d" % index
-        cursor += _add_detail_block(mid, "优点", Catalog.benefit_text(recipe), benefit_name, pad, cursor, text_width)
+        cursor += _add_detail_block(mid, "优点", Catalog.benefit_text(recipe), benefit_name, origin_x, cursor, text_width)
         cursor += 8.0
-        cursor += _add_detail_block(mid, "缺点", Catalog.cost_text(recipe), cost_name, pad, cursor, text_width)
+        cursor += _add_detail_block(mid, "缺点", Catalog.cost_text(recipe), cost_name, origin_x, cursor, text_width)
         cursor += 12.0
-    mid.size = Vector2(width, maxf(CLUSTER_MID.y if recipes.size() == 1 else 120.0, cursor + 4.0))
+        col_cursor[col] = cursor
+    var bottom: float = 10.0
+    for cursor in col_cursor:
+        bottom = maxf(bottom, float(cursor))
+    var min_h: float = CLUSTER_MID.y if recipes.size() == 1 and columns == 1 else 120.0
+    mid.custom_minimum_size = Vector2.ZERO
+    mid.size = Vector2(width, maxf(min_h, bottom + 4.0))
     mid.custom_minimum_size = mid.size
+    mid.set_meta("recipes", recipes)
     _fit_pack_copy(mid)
     if mid.is_inside_tree():
         _finish_details_layout(mid)
@@ -805,6 +1125,10 @@ func _finish_details_layout(mid: Control) -> void:
 func _finish_pack_layout() -> void:
     _relock_pack_copy(self)
     _fit_pack_copy(self)
+    _layout_pack_board()
+    _relock_pack_copy(self)
+    _fit_pack_copy(self)
+    _layout_pack_board()
 
 func _wrapped_size(text: String, font_size: int, width: float) -> Vector2:
     var font: Font = body_font

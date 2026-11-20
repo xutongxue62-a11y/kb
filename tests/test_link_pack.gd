@@ -197,6 +197,51 @@ func expect_inside(inner: Control, outer: Control, context: String, pad: float =
     var child: Rect2 = Rect2(inner.position, inner.size)
     expect(box.encloses(child) or (inner.position.x >= 0.0 and inner.position.y >= 0.0 and inner.position.x + inner.size.x <= outer.size.x + 1.5 and inner.position.y + inner.size.y <= outer.size.y + 1.5), context + " stays inside its panel")
 
+func expect_global_inside(inner: Control, outer: Control, context: String, pad: float = 1.0) -> void:
+    expect(inner != null and outer != null, context + " has both rects")
+    if inner == null or outer == null:
+        return
+    var outer_rect: Rect2 = outer.get_global_rect().grow(-pad)
+    var inner_rect: Rect2 = inner.get_global_rect()
+    var slack := Vector2(1.5, 1.5)
+    var fits: bool = outer_rect.encloses(inner_rect) or (inner_rect.position.x >= outer_rect.position.x - slack.x and inner_rect.position.y >= outer_rect.position.y - slack.y and inner_rect.end.x <= outer_rect.end.x + slack.x and inner_rect.end.y <= outer_rect.end.y + slack.y)
+    expect(fits, context + " stays fully visible inside the pack (card %s in %s)" % [str(inner_rect), str(outer.get_global_rect())])
+
+func _has_connection(pairs: Array, left_id: String, right_id: String) -> bool:
+    var wanted: Array = [left_id, right_id] if left_id < right_id else [right_id, left_id]
+    return pairs.has(wanted)
+
+func assert_cards_fit_pack(ui, context: String) -> void:
+    var board: Control = ui.board
+    expect(board != null, context + " has a board")
+    var parchment: Control = null
+    if ui.sheet != null:
+        parchment = ui.sheet.find_child("PaperClip", true, false)
+        if parchment == null:
+            parchment = ui.sheet
+    for weapon_id in ui.weapon_ids():
+        var card: Control = ui.cards.get(weapon_id, null)
+        expect(card != null, context + " has a fully visible card for " + weapon_id)
+        if card == null:
+            continue
+        expect(card.size.x >= 230.0 and card.size.y >= 200.0, context + " " + weapon_id + " keeps a full-size card, not a clipped strip")
+        expect_global_inside(card, board, context + " " + weapon_id + " card in board")
+        if parchment != null:
+            expect_global_inside(card, parchment, context + " " + weapon_id + " card in parchment")
+        var hint: Label = card.find_child("CardHint", true, false)
+        var stats: Label = card.find_child("CardStats", true, false)
+        if hint != null and not str(hint.text).is_empty():
+            expect_inside(hint, card, context + " " + weapon_id + " hint stays in card", 6.0)
+        if stats != null and not str(stats.text).is_empty():
+            expect_inside(stats, card, context + " " + weapon_id + " stats stay in card", 6.0)
+    var mids: Array = []
+    _collect_named(ui, "LinkDetails", mids)
+    for mid in mids:
+        if mid is Control:
+            expect_global_inside(mid, board, context + " mid panel in board")
+            if parchment != null:
+                expect_global_inside(mid, parchment, context + " mid panel in parchment")
+
 func _collect_named(node: Node, wanted: String, result: Array) -> void:
     if node.name == wanted:
         result.append(node)
@@ -246,6 +291,7 @@ func assert_pack_copy_visible(ui, context: String) -> void:
         if not recipe.is_empty() and str(recipe.get("id", "none")) != "none":
             recipes = [recipe]
     if recipes.is_empty():
+        assert_cards_fit_pack(ui, context)
         return
     for recipe in recipes:
         var benefit: String = Catalog.benefit_text(recipe)
@@ -255,6 +301,7 @@ func assert_pack_copy_visible(ui, context: String) -> void:
     _collect_named(ui, "LinkDetails", mids)
     expect(not mids.is_empty(), context + " has a cluster mid panel")
     if mids.is_empty():
+        assert_cards_fit_pack(ui, context)
         return
     for recipe in recipes:
         var mid: Control = _mid_for_recipe(mids, recipe)
@@ -274,6 +321,7 @@ func assert_pack_copy_visible(ui, context: String) -> void:
         for label in [name_label, benefit_label, cost_label, benefit_title, cost_title]:
             if label != null:
                 expect_inside(label, mid, context + " " + str(label.name) + " in mid", 4.0)
+    assert_cards_fit_pack(ui, context)
 
 func check_copy_not_clipped() -> void:
     var world = make_world("layout")
@@ -295,6 +343,12 @@ func check_copy_not_clipped() -> void:
     await process_frame
     assert_pack_copy_visible(ui, "after linking rune_shell and rune_sling")
     expect(ui.displayed_text().contains("石弹附上符能，命中时额外爆发魔力"), "符能弹 benefit stays complete in a multi-link mid panel")
+    var spokes: Array = ui.connection_pairs()
+    expect(_has_connection(spokes, "staff", "powder") and _has_connection(spokes, "staff", "sling"), "multi-host cluster draws hub-and-spoke lines from the staff to each host")
+    expect(not _has_connection(spokes, "powder", "sling"), "no connection bar is drawn between powder and sling, which are not a recipe pair")
+    for leftover_id in ["club", "axe", "blade"]:
+        var leftover: Control = ui.cards.get(leftover_id, null)
+        expect(leftover != null and leftover.size.y >= 200.0, leftover_id + " remains a full leftover card after 魔法炮 and 符能弹")
     var chain: Dictionary = ui.try_drop("powder", "axe")
     expect(chain.get("ok", false) and world.has_active_link("chain_axe") and not world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "layout check replaces only the conflicting powder recipe and keeps 符能弹")
     await process_frame
