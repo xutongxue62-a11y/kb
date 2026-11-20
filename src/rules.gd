@@ -554,11 +554,10 @@ const MAGNET_WAVE_BONUS: float = 10.0
 const MAGNET_WAVE_STEPS: int = 10
 const WARD_INTERVAL: float = 0.70
 const WARD_TARGET_COOLDOWN: float = 1.55
-const STAFF_WARD_DISTANCE: float = 54.0
-const STAFF_WARD_DURATION: float = 0.20
-const THUNDER_WARD_DISTANCE_ADVANCED: float = 28.0
-const THUNDER_WARD_DISTANCE_AWAKENED: float = 40.0
-const THUNDER_WARD_DURATION: float = 0.16
+const PARALYZE_DURATION: float = 0.55
+const PARALYZE_BOSS_DURATION: float = 0.22
+const PARALYZE_INTERVAL: float = 2.5
+const PARALYZE_TARGET_COOLDOWN: float = 12.0
 
 static func spawn_interval(wave: int) -> float:
     var stage: int = maxi(1, wave)
@@ -579,12 +578,13 @@ static func magnet_wave_bonus(wave: int) -> float:
     return MAGNET_WAVE_BONUS * float(clampi(wave - 3, 0, MAGNET_WAVE_STEPS))
 
 static func ward_profile(source: String, level: int = 1) -> Dictionary:
+    # Staff is damage-only. Thunder, from 进阶 onward, briefly roots in place
+    # with a long per-target cooldown instead of shoving the monster away.
     if source == "staff":
-        return {"distance": STAFF_WARD_DISTANCE, "duration": STAFF_WARD_DURATION, "interval": WARD_INTERVAL, "target_cooldown": WARD_TARGET_COOLDOWN}
+        return {"kind": "none", "distance": 0.0, "duration": 0.0, "interval": 0.0, "target_cooldown": 0.0}
     if source == "thunder":
         var stage: int = 2 if level >= 5 else (1 if level >= 3 else 0)
         if stage <= 0:
-            return {"distance": 0.0, "duration": 0.0, "interval": WARD_INTERVAL, "target_cooldown": WARD_TARGET_COOLDOWN}
-        var distance: float = THUNDER_WARD_DISTANCE_AWAKENED if stage >= 2 else THUNDER_WARD_DISTANCE_ADVANCED
-        return {"distance": distance, "duration": THUNDER_WARD_DURATION, "interval": WARD_INTERVAL, "target_cooldown": WARD_TARGET_COOLDOWN}
-    return {"distance": 0.0, "duration": 0.0, "interval": WARD_INTERVAL, "target_cooldown": WARD_TARGET_COOLDOWN}
+            return {"kind": "none", "distance": 0.0, "duration": 0.0, "interval": PARALYZE_INTERVAL, "target_cooldown": PARALYZE_TARGET_COOLDOWN}
+        return {"kind": "paralyze", "distance": 0.0, "duration": PARALYZE_DURATION, "interval": PARALYZE_INTERVAL, "target_cooldown": PARALYZE_TARGET_COOLDOWN}
+    return {"kind": "none", "distance": 0.0, "duration": 0.0, "interval": 0.0, "target_cooldown": 0.0}

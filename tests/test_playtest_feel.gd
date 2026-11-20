@@ -118,15 +118,19 @@ func check_pickup_radius() -> void:
 
 func check_staff_ward() -> void:
     var rules = load("res://src/rules.gd")
-    var profile: Dictionary = rules.ward_profile("staff", 1)
-    expect(is_equal_approx(float(profile["distance"]), 54.0) and is_equal_approx(float(profile["duration"]), 0.20), "staff 喝退 is a short, fixed shove")
-    expect(is_equal_approx(float(profile["interval"]), 0.70) and is_equal_approx(float(profile["target_cooldown"]), 1.55), "staff 喝退 has an interval and a per-target cooldown")
+    var catalog = load("res://src/catalog.gd")
+    var details = load("res://src/ui_weapon_details.gd")
+    var profile: Dictionary = rules.ward_profile("staff", 5)
+    expect(str(profile.get("kind", "none")) == "none" and is_equal_approx(float(profile["duration"]), 0.0), "the staff has no special CC at any level")
+    expect(not str(catalog.WEAPONS["staff"]["description"]).contains("喝退"), "staff catalog copy no longer mentions 喝退")
+    expect(not details.attack("staff", 1).contains("喝退") and not details.attack("staff", 5).contains("喝退"), "staff hover text does not describe knockback or 喝退")
     var world = prepare_world("staff_ward")
     clear_field(world)
-    if not world.grant_weapon("staff") and not load("res://src/catalog.gd").inventory_ids(world.inventory).has("staff"):
-        expect(false, "staff ward fixture can own a staff")
+    if not world.grant_weapon("staff") and not catalog.inventory_ids(world.inventory).has("staff"):
+        expect(false, "staff fixture can own a staff")
         world.queue_free()
         return
+    set_level(world, "staff", 5)
     freeze_weapons(world)
     var lane: Dictionary = clear_push_lane(world)
     world.spawn_enemy("hunter", lane["point"])
@@ -136,77 +140,87 @@ func check_staff_ward() -> void:
     enemy["speed_multiplier"] = 0.0
     var start: Vector2 = enemy["position"]
     world.hurt_enemy(enemy, 0.2, "staff", false, lane["direction"])
-    expect(bool(enemy.get("ward_moving", false)) or float(enemy.get("ward_left", 0.0)) > 0.0, "a staff hit applies 喝退 instead of a long flee")
-    world.simulate(0.22, Vector2.ZERO)
-    var travelled: float = enemy["position"].distance_to(start)
-    expect(travelled > 24.0 and travelled < 80.0, "staff 喝退 travels a short distance only, not off-screen")
-    expect(world.visible_world_rect().grow(8.0).has_point(enemy["position"]), "staff 喝退 keeps the monster on-screen")
-    var after_first: Vector2 = enemy["position"]
-    var ready_at: float = float(enemy.get("ward_ready", 0.0))
-    world.hurt_enemy(enemy, 0.2, "staff", false, Vector2.RIGHT)
-    expect(is_equal_approx(float(enemy.get("ward_ready", 0.0)), ready_at), "the same monster cannot be 喝退 again before its cooldown")
-    world.simulate(0.22, Vector2.ZERO)
-    expect(enemy["position"].distance_to(after_first) < 20.0, "a repeated staff hit during cooldown does not shove the same monster again")
-    world.spawn_enemy("hunter", world.player_position + Vector2(0, 90))
-    var other: Dictionary = world.enemies.back()
-    other["hp"] = 200.0
-    other["max_hp"] = 200.0
-    other["speed_multiplier"] = 0.0
-    var other_start: Vector2 = other["position"]
-    world.hurt_enemy(other, 0.2, "staff", false, Vector2.DOWN)
-    expect(is_equal_approx(float(other.get("ward_left", 0.0)), 0.0), "global 喝退 interval blocks a second target immediately")
-    world.elapsed = float(world.ward_ready.get("staff", 0.0)) + 0.01
-    world.hurt_enemy(other, 0.2, "staff", false, Vector2.DOWN)
-    expect(float(other.get("ward_left", 0.0)) > 0.0, "a new target can be 喝退 after the interval")
+    expect(not bool(enemy.get("paralyzed", false)) and is_equal_approx(float(enemy.get("ward_left", 0.0)), 0.0), "a staff hit does not paralyze or 喝退")
+    world.simulate(0.25, Vector2.ZERO)
+    expect(enemy["position"].distance_to(start) < 8.0, "a staff hit does not shove the monster away")
+    # Awakened 符阵 is damage-only.
+    world.spawn_enemy("hunter", world.player_position + Vector2(40, 0))
+    var near: Dictionary = world.enemies.back()
+    near["hp"] = 200.0
+    near["max_hp"] = 200.0
+    var before: float = near["hp"]
+    var before_pos: Vector2 = near["position"]
+    world.weapon_runtime["staff"]["nova_cooldown"] = 0.0
+    world.update_rune_nova(0.05, true)
+    expect(near["hp"] < before, "awakened 符阵 still deals damage")
+    expect(not bool(near.get("paralyzed", false)) and near["position"].distance_to(before_pos) < 8.0, "符阵 does not paralyze or knock back")
     world.queue_free()
 
 func check_thunder_ward() -> void:
     var rules = load("res://src/rules.gd")
-    expect(is_equal_approx(float(rules.ward_profile("thunder", 1)["distance"]), 0.0), "base totem tiers do not yet 喝退 enchanted hits")
-    expect(is_equal_approx(float(rules.ward_profile("thunder", 3)["distance"]), 28.0), "advanced thunder 喝退 is milder than staff")
-    expect(is_equal_approx(float(rules.ward_profile("thunder", 5)["distance"]), 40.0), "awakened thunder 喝退 is stronger than advanced, still shorter than staff")
-    expect(float(rules.ward_profile("thunder", 5)["distance"]) < float(rules.ward_profile("staff", 1)["distance"]), "even awakened thunder stays milder than staff 喝退")
+    var catalog = load("res://src/catalog.gd")
+    expect(str(rules.ward_profile("thunder", 1).get("kind", "none")) == "none", "base totem tiers do not yet paralyze")
+    var advanced: Dictionary = rules.ward_profile("thunder", 3)
+    var awakened: Dictionary = rules.ward_profile("thunder", 5)
+    expect(str(advanced.get("kind", "")) == "paralyze" and is_equal_approx(float(advanced["duration"]), 0.55), "advanced thunder roots in place for a brief 0.55s")
+    expect(is_equal_approx(float(advanced["target_cooldown"]), 12.0) and is_equal_approx(float(advanced["interval"]), 2.5), "thunder paralysis uses a long per-target cooldown and a global interval")
+    expect(is_equal_approx(float(advanced["distance"]), 0.0) and is_equal_approx(float(awakened["duration"]), float(advanced["duration"])), "awakened thunder does not shove farther; it stays an in-place root")
+    expect(str(catalog.WEAPONS["totem"]["description"]).contains("麻痹"), "totem catalog mentions the brief paralysis")
     var world = prepare_world("thunder_ward")
     clear_field(world)
-    var catalog = load("res://src/catalog.gd")
-    expect(world.grant_weapon("totem") or catalog.inventory_ids(world.inventory).has("totem"), "thunder ward fixture owns a totem")
-    expect(world.grant_weapon("axe") or catalog.inventory_ids(world.inventory).has("axe"), "thunder ward fixture owns an axe")
+    expect(world.grant_weapon("totem") or catalog.inventory_ids(world.inventory).has("totem"), "thunder fixture owns a totem")
+    expect(world.grant_weapon("axe") or catalog.inventory_ids(world.inventory).has("axe"), "thunder fixture owns an axe")
     world.select_link("thunder_axe")
-    expect(world.has_active_link("thunder_axe"), "axe can be thunder-enchanted for 喝退")
+    expect(world.has_active_link("thunder_axe"), "axe can be thunder-enchanted for paralysis")
     set_level(world, "totem", 3)
     freeze_weapons(world)
-    var lane: Dictionary = clear_push_lane(world)
-    world.spawn_enemy("hunter", lane["point"])
+    world.spawn_enemy("hunter", world.player_position + Vector2(80, 0))
     var enemy: Dictionary = world.enemies.back()
     enemy["hp"] = 200.0
     enemy["max_hp"] = 200.0
-    enemy["speed_multiplier"] = 0.0
+    enemy["speed_multiplier"] = 1.0
     var start: Vector2 = enemy["position"]
-    world.hurt_enemy(enemy, 0.2, "axe", false, lane["direction"])
-    world.simulate(0.18, Vector2.ZERO)
-    var advanced: float = enemy["position"].distance_to(start)
-    expect(advanced > 12.0 and advanced < 50.0, "advanced thunder 喝退 is a short shove")
+    expect(world.try_apply_ward(enemy, "thunder"), "an advanced thunder hit can paralyze")
+    expect(bool(enemy.get("paralyzed", false)) and str(enemy.get("ward_kind", "")) == "paralyze", "thunder applies in-place paralysis, not a shove")
+    world.simulate(0.30, Vector2.ZERO)
+    expect(enemy["position"].distance_to(start) < 6.0, "a paralyzed monster stays in place instead of running away")
+    expect(bool(enemy.get("paralyzed", false)) or float(enemy.get("ward_left", 0.0)) > 0.0, "the brief root is still active at 0.30s")
+    var ready_at: float = float(enemy.get("ward_ready", 0.0))
+    expect(ready_at >= world.elapsed + 8.0, "the same monster cannot be paralyzed again for a long cooldown")
+    expect(not world.try_apply_ward(enemy, "thunder"), "a second thunder hit is blocked by the per-target cooldown")
+    # After the root ends, the monster still cannot be re-paralyzed until the long cooldown.
+    enemy["ward_left"] = 0.0
+    enemy["paralyzed"] = false
+    enemy["ward_kind"] = ""
+    world.elapsed = ready_at - 1.0
+    expect(not world.try_apply_ward(enemy, "thunder"), "the per-target cooldown still blocks before it expires")
+    world.elapsed = ready_at + 0.01
+    # Global interval may also still be blocking; expire it too.
+    world.ward_ready["thunder"] = world.elapsed - 0.01
+    expect(world.try_apply_ward(enemy, "thunder"), "the same monster can be paralyzed again only after the long cooldown")
     world.queue_free()
 
-    var late = prepare_world("thunder_wake")
-    clear_field(late)
-    expect(late.grant_weapon("totem") or catalog.inventory_ids(late.inventory).has("totem"), "awakened thunder fixture owns a totem")
-    expect(late.grant_weapon("axe") or catalog.inventory_ids(late.inventory).has("axe"), "awakened thunder fixture owns an axe")
-    late.select_link("thunder_axe")
-    set_level(late, "totem", 5)
-    freeze_weapons(late)
-    var late_lane: Dictionary = clear_push_lane(late)
-    late.spawn_enemy("hunter", late_lane["point"])
-    var target: Dictionary = late.enemies.back()
-    target["hp"] = 200.0
-    target["max_hp"] = 200.0
-    target["speed_multiplier"] = 0.0
-    var late_start: Vector2 = target["position"]
-    late.hurt_enemy(target, 0.2, "axe", false, late_lane["direction"])
-    late.simulate(0.18, Vector2.ZERO)
-    var awakened: float = target["position"].distance_to(late_start)
-    expect(awakened > advanced and awakened < 70.0, "awakened thunder 喝退 travels farther than advanced, still a short distance")
-    late.queue_free()
+    # Global interval: a second monster is not instantly rooted.
+    var pack = prepare_world("thunder_interval")
+    clear_field(pack)
+    expect(pack.grant_weapon("totem") or catalog.inventory_ids(pack.inventory).has("totem"), "interval fixture owns a totem")
+    expect(pack.grant_weapon("axe") or catalog.inventory_ids(pack.inventory).has("axe"), "interval fixture owns an axe")
+    pack.select_link("thunder_axe")
+    set_level(pack, "totem", 5)
+    freeze_weapons(pack)
+    pack.spawn_enemy("hunter", pack.player_position + Vector2(70, 0))
+    var first: Dictionary = pack.enemies.back()
+    first["hp"] = 200.0
+    first["max_hp"] = 200.0
+    pack.spawn_enemy("hunter", pack.player_position + Vector2(0, 80))
+    var second: Dictionary = pack.enemies.back()
+    second["hp"] = 200.0
+    second["max_hp"] = 200.0
+    expect(pack.try_apply_ward(first, "thunder"), "the first thunder target can be paralyzed")
+    expect(not pack.try_apply_ward(second, "thunder"), "the global interval blocks immediately paralyzing another monster")
+    pack.elapsed = float(pack.ward_ready.get("thunder", 0.0)) + 0.01
+    expect(pack.try_apply_ward(second, "thunder"), "a new target can be paralyzed after the global interval")
+    pack.queue_free()
 
 func check_spawns() -> void:
     var rules = load("res://src/rules.gd")
@@ -252,8 +266,10 @@ func check_vfx_helpers() -> void:
     var advanced: Color = visuals.staff_tint(1)
     var awakened: Color = visuals.staff_tint(2)
     expect(base.b > base.r and awakened.r > base.r + 0.2 and awakened.g < base.g, "awakened staff shots shift from cyan toward purple")
-    expect(advanced.b > base.b * 0.5 and advanced.r > base.r, "advanced staff shots already pick up violet")
-    expect(visuals.staff_tint(2) != visuals.staff_tint(0), "staff combat VFX changes with evolution tier")
+    expect(visuals.staff_tint(1) == visuals.staff_tint(0), "staff and rune shots stay cyan/blue through level 4")
+    expect(visuals.staff_tint(2) != visuals.staff_tint(0), "only 觉醒 (level 5+) staff shots turn purple")
+    expect(not visuals.WEAPON_ORBIT_RINGS, "orbiting weapons no longer draw rotating wrap or aura rings")
+    expect(visuals.weapon_enchant_modulate("rune", 1) == visuals.weapon_enchant_modulate("rune", 0), "rune-enchanted views also stay blue until 觉醒")
     expect(visuals.fire_tint(2).r >= visuals.fire_tint(0).r and visuals.fire_tint(2).g < visuals.fire_tint(0).g, "later fire upgrades shift toward a hotter crimson")
     expect(visuals.thunder_tint(2).g >= visuals.thunder_tint(0).g and visuals.thunder_tint(2).b >= visuals.thunder_tint(0).b, "later thunder upgrades shift toward a brighter white-blue")
     var rune_shell := {"enchanted": true, "vfx_tier": 2}

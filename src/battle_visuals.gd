@@ -1,6 +1,8 @@
 extends RefCounted
 
 const INK: Color = Color("#272524")
+# Parked/orbiting weapons must not draw rotating wrap or aura rings.
+const WEAPON_ORBIT_RINGS := false
 const COIN_UNIT = preload("res://assets/pickups/coin_unit.svg")
 const XP_UNIT = preload("res://assets/pickups/xp_unit.svg")
 
@@ -136,24 +138,19 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
 
 
 static func staff_tint(tier: int) -> Color:
+    # Stay cyan/blue through base and 进阶 (levels 1-4). Only 觉醒 (level 5+) turns purple.
     if tier >= 2:
         return Color("#b46cf0")
-    if tier >= 1:
-        return Color("#8c86ee")
     return Color("#57dce8")
 
 static func staff_core(tier: int) -> Color:
     if tier >= 2:
         return Color("#c99bff")
-    if tier >= 1:
-        return Color("#a9a0f6")
     return Color("#63edee")
 
 static func staff_highlight(tier: int) -> Color:
     if tier >= 2:
         return Color("#f0e6ff")
-    if tier >= 1:
-        return Color("#e4e8ff")
     return Color("#ecffed")
 
 static func fire_tint(tier: int) -> Color:
@@ -226,8 +223,6 @@ static func weapon_enchant_modulate(kind: String, tier: int) -> Color:
     if kind == "rune":
         if tier >= 2:
             return Color(0.96, 0.78, 1.18)
-        if tier >= 1:
-            return Color(0.88, 0.84, 1.14)
         return Color(0.82, 0.96, 1.10)
     if kind == "thunder":
         if tier >= 2:

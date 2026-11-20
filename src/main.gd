@@ -2087,6 +2087,8 @@ func update_enemies(delta: float) -> void:
             if enemy["timer"] <= 0.0:
                 hatch_enemy(enemy)
             continue
+        if _hold_paralyzed_enemy(enemy, delta, view_rect):
+            continue
         var difference: Vector2 = player_position - enemy["position"]
         var distance: float = difference.length()
         var direction: Vector2 = difference.normalized() if distance > 0.001 else Vector2.RIGHT
@@ -2203,6 +2205,17 @@ func update_enemies(delta: float) -> void:
                 break
 
 func _ward_velocity(enemy: Dictionary, velocity: Vector2, delta: float) -> Vector2:
+    if str(enemy.get("ward_kind", "")) == "paralyze" or bool(enemy.get("paralyzed", false)):
+        var left: float = float(enemy.get("ward_left", 0.0))
+        if left <= 0.0:
+            enemy["paralyzed"] = false
+            enemy["ward_kind"] = ""
+            enemy["ward_moving"] = false
+            return velocity
+        enemy["ward_left"] = left - minf(left, maxf(delta, 0.000001))
+        enemy["ward_moving"] = false
+        enemy["knock"] = Vector2.ZERO
+        return Vector2.ZERO
     var left: float = float(enemy.get("ward_left", 0.0))
     if left <= 0.0:
         enemy["ward_moving"] = false
@@ -2224,30 +2237,60 @@ func _move_warded_enemy(enemy: Dictionary, velocity: Vector2, delta: float) -> V
 func try_apply_ward(enemy: Dictionary, source: String, origin: Vector2 = Vector2.INF) -> bool:
     if enemy.is_empty() or float(enemy.get("hp", 0.0)) <= 0.0:
         return false
-    var level: int = weapon_level("staff") if source == "staff" else weapon_level("totem")
+    var level: int = weapon_level("totem") if source == "thunder" else weapon_level("staff")
     var profile: Dictionary = Rules.ward_profile(source, level)
-    var distance: float = float(profile.get("distance", 0.0))
+    if str(profile.get("kind", "none")) != "paralyze":
+        return false
     var duration: float = float(profile.get("duration", 0.0))
-    if distance <= 0.001 or duration <= 0.001:
+    if duration <= 0.001:
         return false
     if str(enemy.get("kind", "")) == "boss":
-        distance *= 0.20
+        duration = Rules.PARALYZE_BOSS_DURATION
     if elapsed < float(enemy.get("ward_ready", -1000.0)):
         return false
     if elapsed < float(ward_ready.get(source, -1000.0)):
         return false
-    var from: Vector2 = player_position if not origin.is_finite() else origin
-    var away: Vector2 = Vector2(enemy["position"]) - from
-    var direction: Vector2 = away.normalized() if away.length_squared() > 0.0001 else Vector2.RIGHT
-    enemy["ward_ready"] = elapsed + float(profile.get("target_cooldown", Rules.WARD_TARGET_COOLDOWN))
-    ward_ready[source] = elapsed + float(profile.get("interval", Rules.WARD_INTERVAL))
+    enemy["ward_ready"] = elapsed + float(profile.get("target_cooldown", Rules.PARALYZE_TARGET_COOLDOWN))
+    ward_ready[source] = elapsed + float(profile.get("interval", Rules.PARALYZE_INTERVAL))
+    enemy["ward_kind"] = "paralyze"
     enemy["ward_left"] = duration
-    enemy["ward_dir"] = direction
-    enemy["ward_speed"] = distance / duration
+    enemy["paralyzed"] = true
+    enemy["ward_moving"] = false
+    enemy["ward_dir"] = Vector2.ZERO
+    enemy["ward_speed"] = 0.0
     enemy["knock"] = Vector2.ZERO
+    enemy["velocity"] = Vector2.ZERO
     if effects != null:
-        var tint: Color = Color("#b891ff") if source == "staff" else Color("#f3d89b")
-        effects.puff(enemy["position"], tint, 11.0)
+        effects.puff(enemy["position"], Color("#d8f7ff"), 9.0)
+    return true
+
+func _hold_paralyzed_enemy(enemy: Dictionary, delta: float, view_rect: Rect2) -> bool:
+    if str(enemy.get("ward_kind", "")) != "paralyze" and not bool(enemy.get("paralyzed", false)):
+        return false
+    var left: float = float(enemy.get("ward_left", 0.0))
+    if left <= 0.0:
+        enemy["ward_left"] = 0.0
+        enemy["paralyzed"] = false
+        enemy["ward_kind"] = ""
+        enemy["ward_moving"] = false
+        return false
+    enemy["ward_left"] = left - delta
+    if enemy["ward_left"] <= 0.0:
+        enemy["ward_left"] = 0.0
+        enemy["paralyzed"] = false
+        enemy["ward_kind"] = ""
+        enemy["ward_moving"] = false
+        return false
+    enemy["paralyzed"] = true
+    enemy["ward_moving"] = false
+    enemy["knock"] = Vector2.ZERO
+    enemy["velocity"] = Vector2.ZERO
+    var view = enemy.get("view")
+    if is_instance_valid(view):
+        view.position = enemy["position"]
+        view.health_fraction = enemy["hp"] / enemy["max_hp"]
+        if view_rect.has_point(enemy["position"]):
+            view.animate(Vector2.ZERO, delta, "walk")
     return true
 
 func charge_path(enemy: Dictionary) -> Vector2:
@@ -3015,9 +3058,7 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
         push = 0.0
     enemy["knock"] += direction * push * (0.12 if enemy["kind"] == "boss" else 1.0)
     if not neutral:
-        if weapon_id == "staff":
-            try_apply_ward(enemy, "staff", enemy["position"] - direction)
-        elif Rules.host_is_thunder_enchanted(active_links, weapon_id) or (weapon_id == "totem" and weapon_level("totem") >= 3):
+        if Rules.host_is_thunder_enchanted(active_links, weapon_id) or (weapon_id == "totem" and weapon_level("totem") >= 3):
             try_apply_ward(enemy, "thunder", enemy["position"] - direction)
     var feedback: bool = not neutral or elapsed >= float(enemy.get("lava_feedback_next",-INF)) or enemy["hp"]<=0
     if neutral: enemy["lava_feedback_sum"] = float(enemy.get("lava_feedback_sum",0.0)) + amount
@@ -3225,21 +3266,8 @@ func _draw() -> void:
             BattleVisuals.draw_fire_wrap(self, projectile["position"], aim, 22.0, elapsed, int(projectile.get("fire_tier", 0)))
         if bool(projectile.get("thunder_enchanted", false)):
             BattleVisuals.draw_thunder_wrap(self, projectile["position"], 16.0, elapsed, int(projectile.get("thunder_tier", 0)))
-    for key in weapon_views.keys():
-        var view: Sprite2D = weapon_views[key]
-        if view == null or not is_instance_valid(view) or not view.visible:
-            continue
-        var host_size: float = float(Catalog.WEAPONS.get(key, {}).get("size", 42.0))
-        if Rules.host_is_fire_enchanted(active_links, key):
-            BattleVisuals.draw_fire_wrap(self, view.position, Vector2.UP, host_size * 0.92, elapsed, Evolution.tier(weapon_level("firepot")))
-        if key == "staff" or Rules.host_is_rune_enchanted(active_links, key):
-            var tier: int = Evolution.tier(weapon_level("staff"))
-            if tier >= 1 or Rules.host_is_rune_enchanted(active_links, key):
-                BattleVisuals.draw_staff_aura(self, view.position, host_size * 0.50, elapsed, tier)
-        if key == "totem" or Rules.host_is_thunder_enchanted(active_links, key):
-            var thunder_tier: int = Evolution.tier(weapon_level("totem"))
-            if thunder_tier >= 1 or Rules.host_is_thunder_enchanted(active_links, key):
-                BattleVisuals.draw_thunder_wrap(self, view.position, host_size * 0.62, elapsed, thunder_tier)
+    # No rotating wrap/aura rings on parked or orbiting weapons.
+    # Attack-shot tints and projectile wraps stay on the projectiles themselves.
 
 func draw_magic_shell(point: Vector2, direction: Vector2) -> void:
     var normal: Vector2 = direction.orthogonal()
