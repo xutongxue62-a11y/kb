@@ -1,4 +1,5 @@
 extends RefCounted
+const BattleVisuals=preload("res://src/battle_visuals.gd")
 const CombatArt=preload("res://src/combat_art.gd")
 
 const Catalog = preload("res://src/catalog.gd")
@@ -228,6 +229,8 @@ static func draw(canvas: Node2D, key: String, state: Dictionary) -> void:
                     shaft = Color("#6ee7f2") if bool(arrow.get("enchanted", false)) else Color("#f3a15a")
                     tip = shaft.lightened(0.18)
                     canvas.draw_line(point - direction * 31.0, point + direction * 11.0, Color(shaft, 0.42), 11.0, true)
+                    if bool(arrow.get("fire_enchanted", false)):
+                        BattleVisuals.draw_fire_wrap(canvas, point, direction, 14.0, float(arrow.get("age", 0.0)))
                 canvas.draw_line(point - direction * 29.0, point + direction * 9.0, INK, 7.0, true)
                 canvas.draw_line(point - direction * 29.0, point + direction * 9.0, shaft, 3.5, true)
                 outlined_polygon(canvas, PackedVector2Array([point + direction * 19.0, point + direction * 4.0 + side * 7.0, point + direction * 6.0, point + direction * 4.0 - side * 7.0]), tip)

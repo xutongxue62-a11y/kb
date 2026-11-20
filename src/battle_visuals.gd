@@ -53,10 +53,12 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
             canvas.draw_polyline(PackedVector2Array([point + direction * 2 + normal * 0.2, point - direction * 1.5 + normal * 1.5, point - direction * 0.5 + normal * 4]), Color("#776c5b"), 1.2, true)
         "powder":
             var enchanted: bool = bool(projectile.get("enchanted", false))
+            var rune_color: Color = staff_tint(int(projectile.get("vfx_tier", 0))) if enchanted else Color("#ff8e36")
+            var rune_core: Color = staff_highlight(int(projectile.get("vfx_tier", 0))) if enchanted else Color("#fff0a1")
             var flicker: float = sin(elapsed * 33.0 + point.x * 0.13) * 3.0
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-4, -6), Vector2(-18, -7), Vector2(-14, -3), Vector2(-34 - flicker, 0), Vector2(-20, 3), Vector2(-24, 7), Vector2(-5, 6)]), INK)
-            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -4), Vector2(-17, -5), Vector2(-13, -1), Vector2(-29 - flicker, 0), Vector2(-17, 2), Vector2(-20, 5), Vector2(-5, 4)]), Color("#51e6ed") if enchanted else Color("#ff8e36"))
-            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -2), Vector2(-22 - flicker * 0.5, 0), Vector2(-6, 2.5)]), Color("#eaffd3") if enchanted else Color("#fff0a1"))
+            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -4), Vector2(-17, -5), Vector2(-13, -1), Vector2(-29 - flicker, 0), Vector2(-17, 2), Vector2(-20, 5), Vector2(-5, 4)]), rune_color)
+            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -2), Vector2(-22 - flicker * 0.5, 0), Vector2(-6, 2.5)]), rune_core)
             canvas.draw_circle(point, 10.0, INK)
             canvas.draw_circle(point, 7.6, Color("#57534c"))
             canvas.draw_arc(point, 7.7, 0.0, TAU, 24, Color("#c6a366"), 1.6, true)
@@ -64,16 +66,25 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
             if enchanted:
                 var rune := _shape(point, direction.rotated(sin(elapsed * 5.0) * 0.15), [Vector2(14, 0), Vector2(0, 11), Vector2(-14, 0), Vector2(0, -11), Vector2(14, 0)])
                 canvas.draw_polyline(rune, INK, 3.5, true)
-                canvas.draw_polyline(rune, Color("#a0ffff"), 1.5, true)
-                canvas.draw_circle(point, 2.1, Color("#bcfdff"))
+                canvas.draw_polyline(rune, rune_core, 1.5, true)
+                canvas.draw_circle(point, 2.1, rune_core)
         "staff":
+            var staff_tier: int = int(projectile.get("vfx_tier", 0))
+            var body: Color = staff_tint(staff_tier)
+            var core: Color = staff_core(staff_tier)
+            var shine: Color = staff_highlight(staff_tier)
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-4, -4.8), Vector2(-32, 0), Vector2(-4, 4.8)]), INK)
-            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -2.9), Vector2(-28, 0), Vector2(-5, 2.9)]), Color("#57dce8"))
-            canvas.draw_line(point - direction * 23, point - direction * 4, Color("#e2ffff"), 1.3, true)
+            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -2.9), Vector2(-28, 0), Vector2(-5, 2.9)]), body)
+            canvas.draw_line(point - direction * 23, point - direction * 4, shine, 1.3, true)
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(12, 0), Vector2(0, -8), Vector2(-9, 0), Vector2(0, 8)]), INK)
-            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(8.8, 0), Vector2(0, -5.6), Vector2(-6.1, 0), Vector2(0, 5.6)]), Color("#63edee"))
-            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(8.8, 0), Vector2(0, -5.6), Vector2(-1, 0)]), Color("#ecffed"))
-            canvas.draw_line(point - direction * 15 - normal * 4, point - direction * 15 + normal * 4, Color("#a7ffff"), 1.4, true)
+            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(8.8, 0), Vector2(0, -5.6), Vector2(-6.1, 0), Vector2(0, 5.6)]), core)
+            canvas.draw_colored_polygon(_shape(point, direction, [Vector2(8.8, 0), Vector2(0, -5.6), Vector2(-1, 0)]), shine)
+            canvas.draw_line(point - direction * 15 - normal * 4, point - direction * 15 + normal * 4, shine, 1.4, true)
+            if staff_tier >= 1:
+                var spark: float = 1.0 + 0.35 * sin(elapsed * 18.0 + point.x)
+                canvas.draw_circle(point + direction * 2.0, 3.2 * spark, Color(core, 0.55))
+                if staff_tier >= 2:
+                    canvas.draw_arc(point, 11.0 + spark, elapsed * 6.0, elapsed * 6.0 + 4.2, 10, Color(body, 0.7), 1.4, true)
         "hostile":
             var style: String = str(projectile.get("hostile_style",""))
             if style in ["quill", "reed"]:
@@ -120,3 +131,51 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
             canvas.draw_colored_polygon(inner, Color("#c4377e"))
             canvas.draw_circle(point + Vector2(-1.3, -1.8), 3.0, Color("#ffcade"))
     return true
+
+
+static func staff_tint(tier: int) -> Color:
+    if tier >= 2:
+        return Color("#b46cf0")
+    if tier >= 1:
+        return Color("#8c86ee")
+    return Color("#57dce8")
+
+static func staff_core(tier: int) -> Color:
+    if tier >= 2:
+        return Color("#c99bff")
+    if tier >= 1:
+        return Color("#a9a0f6")
+    return Color("#63edee")
+
+static func staff_highlight(tier: int) -> Color:
+    if tier >= 2:
+        return Color("#f0e6ff")
+    if tier >= 1:
+        return Color("#e4e8ff")
+    return Color("#ecffed")
+
+static func draw_fire_wrap(canvas, point: Vector2, direction: Vector2, size: float, elapsed: float) -> void:
+    var axis: Vector2 = direction.normalized() if direction.length_squared() > 0.01 else Vector2.UP
+    var side: Vector2 = axis.orthogonal()
+    var flicker: float = 0.65 + 0.35 * sin(elapsed * 22.0 + point.x * 0.15)
+    var radius: float = size * (0.85 + 0.18 * flicker)
+    canvas.draw_circle(point, radius * 1.18, Color(1.0, 0.45, 0.12, 0.16 * flicker))
+    for index in range(6):
+        var phase: float = elapsed * 9.0 + float(index) * 1.047
+        var outward: Vector2 = (axis * cos(phase) + side * sin(phase * 1.3)).normalized()
+        var tongue: Vector2 = point + outward * radius * (0.55 + 0.4 * absf(sin(phase * 1.7)))
+        var width: Vector2 = outward.orthogonal() * (3.2 + 1.4 * flicker)
+        canvas.draw_colored_polygon(PackedVector2Array([
+            point + width * 0.25,
+            tongue,
+            point - width * 0.25
+        ]), Color(1.0, 0.55 + 0.15 * float(index % 2), 0.18, 0.72 * flicker))
+    canvas.draw_circle(point + axis * 1.5, radius * 0.32, Color(1.0, 0.92, 0.55, 0.45 * flicker))
+
+static func draw_staff_aura(canvas, point: Vector2, size: float, elapsed: float, tier: int) -> void:
+    var tint: Color = staff_tint(tier)
+    var pulse: float = 0.75 + 0.25 * sin(elapsed * 8.0)
+    canvas.draw_circle(point, size * pulse, Color(tint, 0.16 if tier >= 2 else 0.12))
+    canvas.draw_arc(point, size * (0.9 + 0.15 * pulse), elapsed * 3.0, elapsed * 3.0 + 4.0, 12, Color(tint, 0.55), 1.5, true)
+    if tier >= 2:
+        canvas.draw_arc(point, size * 1.2, -elapsed * 2.4, -elapsed * 2.4 + 3.4, 10, Color(staff_highlight(tier), 0.5), 1.2, true)

@@ -547,3 +547,47 @@ static func loadout_layout(ids: Array, phase: float, collapsed: bool) -> Diction
     for index in range(count):
         result[str(ids[index])] = loadout_offset(index, count, phase, str(ids[index]), collapsed)
     return result
+
+
+const EXPLORER_PICKUP_BONUS: float = 30.0
+const MAGNET_WAVE_BONUS: float = 10.0
+const MAGNET_WAVE_STEPS: int = 10
+const WARD_INTERVAL: float = 0.70
+const WARD_TARGET_COOLDOWN: float = 1.55
+const STAFF_WARD_DISTANCE: float = 54.0
+const STAFF_WARD_DURATION: float = 0.20
+const THUNDER_WARD_DISTANCE_ADVANCED: float = 28.0
+const THUNDER_WARD_DISTANCE_AWAKENED: float = 40.0
+const THUNDER_WARD_DURATION: float = 0.16
+
+static func spawn_interval(wave: int) -> float:
+    var stage: int = maxi(1, wave)
+    if stage <= 3:
+        return 0.46 - float(stage - 1) * 0.07
+    return maxf(0.14, 0.32 - float(stage - 3) * 0.008)
+
+static func spawn_interval_for(wave: int, boss_round: bool, boss_defeated: bool) -> float:
+    var interval: float = spawn_interval(wave)
+    # Boss stages use the same cadence as a normal stage. After the Boss falls,
+    # the leftover window stays live and brushes a bit denser.
+    if boss_round and boss_defeated:
+        return maxf(0.12, interval * 0.85)
+    return interval
+
+static func enemy_limit_for(wave: int) -> int:
+    var stage: int = maxi(1, wave)
+    return 50 + clampi((stage - 2) * 2, 0, 50) + clampi((stage - 24) * 4, 0, 56)
+
+static func magnet_wave_bonus(wave: int) -> float:
+    return MAGNET_WAVE_BONUS * float(clampi(wave - 3, 0, MAGNET_WAVE_STEPS))
+
+static func ward_profile(source: String, level: int = 1) -> Dictionary:
+    if source == "staff":
+        return {"distance": STAFF_WARD_DISTANCE, "duration": STAFF_WARD_DURATION, "interval": WARD_INTERVAL, "target_cooldown": WARD_TARGET_COOLDOWN}
+    if source == "thunder":
+        var stage: int = 2 if level >= 5 else (1 if level >= 3 else 0)
+        if stage <= 0:
+            return {"distance": 0.0, "duration": 0.0, "interval": WARD_INTERVAL, "target_cooldown": WARD_TARGET_COOLDOWN}
+        var distance: float = THUNDER_WARD_DISTANCE_AWAKENED if stage >= 2 else THUNDER_WARD_DISTANCE_ADVANCED
+        return {"distance": distance, "duration": THUNDER_WARD_DURATION, "interval": WARD_INTERVAL, "target_cooldown": WARD_TARGET_COOLDOWN}
+    return {"distance": 0.0, "duration": 0.0, "interval": WARD_INTERVAL, "target_cooldown": WARD_TARGET_COOLDOWN}

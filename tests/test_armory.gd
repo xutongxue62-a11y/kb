@@ -35,10 +35,12 @@ func run_checks() -> void:
     for index in range(32):
         events.append_array(armory.advance(1.0/60.0,Vector2.ZERO,enemies,[{"id":"hammer","level":1}],stats,false,views))
     var areas: Array = events.filter(func(event):return event["type"]=="area")
-    expect(areas.size()==1 and areas[0]["radius"]>=70 and areas[0]["damage"]==16.0,"hammer produces one delayed area smash with actual damage")
+    expect(areas.size()==1 and areas[0]["radius"]>=70 and is_equal_approx(areas[0]["damage"], load("res://src/catalog.gd").WEAPONS["hammer"]["damage"]),"hammer produces one delayed area smash with actual damage")
     armory.reset()
     events.clear()
-    for index in range(48):
+    # One cycle returns in ~0.56s; the new 0.76s interval would already start a
+    # second throw by frame 48, so stop while the first boomerang is home.
+    for index in range(42):
         events.append_array(armory.advance(1.0/60.0,Vector2.ZERO,enemies,[{"id":"boomerang","level":1}],stats,false,views))
     var first_hits: Array = events.filter(func(event):return event["type"]=="hit" and event["enemy"]["id"]==1)
     expect(first_hits.size()==2,"boomerang damages a crossed target once outbound and once returning")

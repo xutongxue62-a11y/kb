@@ -800,7 +800,7 @@ func _draw_ropes(canvas: Control) -> void:
 	if canvas == null or not is_instance_valid(canvas):
 		return
 	for recipe in _active_recipes():
-		_draw_recipe_rope(canvas, recipe, Color("#6a3f22"), Color("#c9894a"), Color("#e8c98a"))
+		_draw_recipe_rope(canvas, recipe, Color("#4a2712"), Color("#e09a45"), Color("#f6e1a8"))
 	if dragging_id.is_empty():
 		return
 	var source: Control = cards.get(dragging_id, null)
@@ -814,51 +814,36 @@ func _draw_ropes(canvas: Control) -> void:
 		_draw_recipe_rope(canvas, preview, Color("#6a3f22", 0.45), Color("#d4a25a", 0.7), Color("#f0d9a8", 0.5), source, target)
 
 func _draw_recipe_rope(canvas: Control, recipe: Dictionary, ink: Color, rope: Color, highlight: Color, left_override: Control = null, right_override: Control = null) -> void:
-	var weapons: Array = recipe.get("weapons", [])
-	if weapons.size() < 2:
+	var ports: Array = _recipe_ports(recipe, left_override, right_override)
+	if ports.size() < 2:
 		return
-	var left: Control = left_override if left_override != null else cards.get(str(weapons[0]), null)
-	var right: Control = right_override if right_override != null else cards.get(str(weapons[1]), null)
-	if left == null or right == null or not is_instance_valid(left) or not is_instance_valid(right):
-		return
-	if left.position.x > right.position.x:
-		var swap_card: Control = left
-		left = right
-		right = swap_card
-	var start: Vector2 = _port_point(left)
-	var finish: Vector2 = _port_point(right)
-	var knot: Vector2 = _knot_point_for_cards(left, right)
+	var knot: Vector2 = _knot_point_for_ports(ports)
 	var result_node: Control = results.get(str(recipe.get("id", "")), null)
 	if result_node != null and is_instance_valid(result_node) and str(recipe.get("id", "")) != "":
-		knot.x = result_node.position.x + result_node.size.x * 0.5
-		var bottom: float = result_node.position.y + result_node.size.y
-		var stem := PackedVector2Array([
-			Vector2(knot.x, bottom),
-			Vector2(knot.x, knot.y)
-		])
-		_stroke_rope(canvas, stem, ink, rope, highlight)
-	var left_ctrl := Vector2(start.x, knot.y + 6.0)
-	var right_ctrl := Vector2(finish.x, knot.y + 6.0)
-	_stroke_rope(canvas, _curve_points(start, left_ctrl, knot), ink, rope, highlight)
-	_stroke_rope(canvas, _curve_points(finish, right_ctrl, knot), ink, rope, highlight)
+		knot = result_node.get_meta("rope_knot", _result_anchor(result_node))
+	for port in ports:
+		var ctrl := Vector2(port.x, knot.y + 10.0)
+		_stroke_rope(canvas, _curve_points(port, ctrl, knot), ink, rope, highlight)
 	_draw_knot(canvas, knot, ink, rope, highlight)
 
 func _stroke_rope(canvas: Control, points: PackedVector2Array, ink: Color, rope: Color, highlight: Color) -> void:
 	if points.size() < 2:
 		return
-	canvas.draw_polyline(points, ink, 7.0, true)
-	canvas.draw_polyline(points, rope, 4.2, true)
+	canvas.draw_polyline(points, Color(0.12, 0.07, 0.04, 0.55), 11.5, true)
+	canvas.draw_polyline(points, ink, 9.0, true)
+	canvas.draw_polyline(points, rope, 6.2, true)
 	var lifted := PackedVector2Array()
 	for point in points:
-		lifted.append(point + Vector2(-0.8, -0.9))
-	canvas.draw_polyline(lifted, highlight, 1.4, true)
+		lifted.append(point + Vector2(-1.0, -1.2))
+	canvas.draw_polyline(lifted, highlight, 2.2, true)
 
 func _draw_knot(canvas: Control, at: Vector2, ink: Color, rope: Color, highlight: Color) -> void:
-	canvas.draw_circle(at, 7.2, ink)
-	canvas.draw_circle(at, 5.4, rope)
-	canvas.draw_circle(at + Vector2(-1.2, -1.4), 2.0, highlight)
-	canvas.draw_arc(at, 6.4, 0.4, 2.2, 8, Color(ink, 0.85), 1.6, true)
-	canvas.draw_arc(at, 6.4, 3.4, 5.2, 8, Color(ink, 0.85), 1.6, true)
+	canvas.draw_circle(at, 9.2, Color(0.12, 0.07, 0.04, 0.55))
+	canvas.draw_circle(at, 8.0, ink)
+	canvas.draw_circle(at, 6.0, rope)
+	canvas.draw_circle(at + Vector2(-1.4, -1.6), 2.4, highlight)
+	canvas.draw_arc(at, 7.2, 0.4, 2.2, 8, Color(ink, 0.9), 1.8, true)
+	canvas.draw_arc(at, 7.2, 3.4, 5.2, 8, Color(ink, 0.9), 1.8, true)
 
 func _curve_points(start: Vector2, control: Vector2, finish: Vector2, steps: int = 16) -> PackedVector2Array:
 	var points := PackedVector2Array()
@@ -872,9 +857,59 @@ func _port_point(card: Control) -> Vector2:
 	return Vector2(card.position.x + card.size.x * 0.5, card.position.y + 4.0)
 
 func _knot_point_for_cards(left: Control, right: Control) -> Vector2:
-	var start: Vector2 = _port_point(left)
-	var finish: Vector2 = _port_point(right)
-	return Vector2((start.x + finish.x) * 0.5, minf(start.y, finish.y) - KNOT_LIFT)
+	return _knot_point_for_ports([_port_point(left), _port_point(right)])
+
+func _recipe_ports(recipe: Dictionary, left_override: Control = null, right_override: Control = null) -> Array:
+	var ports: Array = []
+	if left_override != null and right_override != null:
+		ports.append(_port_point(left_override))
+		ports.append(_port_point(right_override))
+		return ports
+	for weapon_id in recipe.get("weapons", []):
+		var card: Control = cards.get(str(weapon_id), null)
+		if card == null or not is_instance_valid(card):
+			continue
+		ports.append(_port_point(card))
+	return ports
+
+func _knot_point_for_ports(ports: Array) -> Vector2:
+	if ports.is_empty():
+		return Vector2.ZERO
+	if ports.size() == 1:
+		var only: Vector2 = ports[0]
+		return Vector2(only.x, only.y - KNOT_LIFT)
+	var sum_x: float = 0.0
+	var top_y: float = INF
+	for port in ports:
+		sum_x += port.x
+		top_y = minf(top_y, port.y)
+	return Vector2(sum_x / float(ports.size()), top_y - KNOT_LIFT)
+
+func _spoke_knot(catalyst: Control, host: Control) -> Vector2:
+	var start: Vector2 = _port_point(catalyst)
+	var finish: Vector2 = _port_point(host)
+	# Sit closer to the unique host so several spokes from one catalyst fan out
+	# instead of stacking at the same midpoint.
+	var at: Vector2 = start.lerp(finish, 0.68)
+	return Vector2(at.x, minf(start.y, finish.y) - KNOT_LIFT)
+
+func _result_anchor(node: Control) -> Vector2:
+	return Vector2(node.position.x + node.size.x * 0.5, node.position.y + node.size.y)
+
+func rope_knot_for(link_id: String) -> Vector2:
+	var node: Control = results.get(link_id, null)
+	if node != null and is_instance_valid(node):
+		return node.get_meta("rope_knot", _result_anchor(node))
+	for recipe in _active_recipes():
+		if str(recipe.get("id", "")) == link_id:
+			return _planned_knot_for_recipe(recipe)
+	return Vector2.ZERO
+
+func rope_ports_for(link_id: String) -> Array:
+	for recipe in _active_recipes():
+		if str(recipe.get("id", "")) == link_id:
+			return _recipe_ports(recipe)
+	return []
 
 func _layout_pack_board() -> void:
 	if board == null or _reflowing:
@@ -929,6 +964,22 @@ func _layout_pack_board() -> void:
 		_place_tooltip(tooltip_link_id)
 	_reflowing = false
 
+func _planned_knot_for_recipe(recipe: Dictionary) -> Vector2:
+	var weapons: Array = recipe.get("weapons", [])
+	var catalyst_id: String = Rules.recipe_catalyst_id(recipe)
+	if not catalyst_id.is_empty() and weapons.size() >= 2:
+		var host_id: String = ""
+		for weapon_id in weapons:
+			if str(weapon_id) != catalyst_id:
+				host_id = str(weapon_id)
+				break
+		var catalyst: Control = cards.get(catalyst_id, null)
+		var host: Control = cards.get(host_id, null)
+		if catalyst != null and host != null and is_instance_valid(catalyst) and is_instance_valid(host):
+			return _spoke_knot(catalyst, host)
+	var ports: Array = _recipe_ports(recipe)
+	return _knot_point_for_ports(ports)
+
 func _layout_result_nodes(row_y: float) -> void:
 	var placed: Array = []
 	for recipe in _active_recipes():
@@ -936,16 +987,7 @@ func _layout_result_nodes(row_y: float) -> void:
 		var node: Control = results.get(link_id, null)
 		if node == null or not is_instance_valid(node):
 			continue
-		var weapons: Array = recipe.get("weapons", [])
-		var left: Control = cards.get(str(weapons[0]), null) if weapons.size() >= 2 else null
-		var right: Control = cards.get(str(weapons[1]), null) if weapons.size() >= 2 else null
-		if left == null or right == null:
-			continue
-		if left.position.x > right.position.x:
-			var swap_card: Control = left
-			left = right
-			right = swap_card
-		var knot: Vector2 = _knot_point_for_cards(left, right)
+		var knot: Vector2 = _planned_knot_for_recipe(recipe)
 		var pos := Vector2(knot.x - node.size.x * 0.5, knot.y - RESULT_GAP - node.size.y)
 		pos.x = clampf(pos.x, BOARD_MARGIN, BOARD_SIZE.x - node.size.x - BOARD_MARGIN)
 		pos.y = clampf(pos.y, BOARD_MARGIN, maxf(BOARD_MARGIN, row_y - node.size.y - 36.0))
@@ -954,13 +996,16 @@ func _layout_result_nodes(row_y: float) -> void:
 			var hit: Rect2 = other
 			if not box.grow(8.0).intersects(hit):
 				continue
-			if box.position.x <= hit.position.x:
-				box.position.x = maxf(BOARD_MARGIN, hit.position.x - box.size.x - 10.0)
-			else:
-				box.position.x = minf(BOARD_SIZE.x - box.size.x - BOARD_MARGIN, hit.end.x + 10.0)
+			# Slide along the vertical so the node stays on its spoke instead of
+			# being shoved sideways off the rope.
+			box.position.y = maxf(BOARD_MARGIN, hit.position.y - box.size.y - 10.0)
 			if box.grow(6.0).intersects(hit):
-				box.position.y = maxf(BOARD_MARGIN, hit.position.y - box.size.y - 8.0)
+				if box.position.x <= hit.position.x:
+					box.position.x = maxf(BOARD_MARGIN, hit.position.x - box.size.x - 10.0)
+				else:
+					box.position.x = minf(BOARD_SIZE.x - box.size.x - BOARD_MARGIN, hit.end.x + 10.0)
 		node.position = box.position
+		node.set_meta("rope_knot", _result_anchor(node))
 		node.z_index = 4
 		placed.append(Rect2(node.position, node.size))
 

@@ -129,6 +129,7 @@ var player_level: int = 1
 var enemy_serial: int = 0
 var elite_budget: int = 0
 var spawn_clock: float = 0.0
+var ward_ready: Dictionary = {}
 var running: bool = false
 var paused: bool = false
 var touch_input: Vector2 = Vector2.ZERO
@@ -375,6 +376,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     weapon_runtime.clear()
     counters.clear()
     combo_cooldowns.clear()
+    ward_ready.clear()
     upgrade_choices.clear()
     upgrade_offer_levels.clear()
     replace_pending.clear()
@@ -1486,17 +1488,13 @@ func simulate(delta: float, movement: Vector2) -> void:
         _simulating = false
         return
     spawn_clock -= delta
-    # Late game keeps swelling (Juniper, 2026-11-17): past wave 26 the alive cap
-    # grows +3/wave to 126 by wave 40, and the spawn interval keeps falling to
-    # a 0.18 s floor by wave 33, so deep waves feel denser than wave 29 instead
-    # of freezing at the wave-26 density.
+    # Early and late caps both rise, and the interval falls to a 0.14 s floor.
+    # Boss stages use the same cadence as a normal stage; after the Boss falls
+    # the 30 s cleanup window stays live and brushes a bit denser, not frozen.
     var alive_cap: int = enemy_limit()
-    # Boss down starts the 30 s cleanup window, but minions keep trickling in
-    # during it (Juniper, 2026-11-19): the window is extra fighting/looting
-    # time before settlement, not a spawn freeze.
     if spawn_clock <= 0.0 and enemies.size() < alive_cap:
-        var spawn_interval: float = 0.62 - (wave - 1) * 0.10 if wave <= 3 else maxf(0.18, 0.42 - (wave - 3) * 0.008)
-        spawn_clock = maxf(1.5, 3.4 - float(maxi(0, wave / 5 - 1)) * 0.28) if boss_round else spawn_interval
+        var spawn_interval: float = Rules.spawn_interval_for(wave, boss_round, boss_defeated)
+        spawn_clock = spawn_interval
         if boss_pending:
             spawn_enemy("boss",offscreen_point(1)+Vector2(48,0),false,"enter")
             var boss: Dictionary=enemies.back()
@@ -1572,6 +1570,7 @@ func begin_round(stage: int) -> void:
     boss_defeated = false
     boss_clear_left = 0.0
     spawn_clock = 0.55
+    ward_ready.clear()
     boss_pending=boss_round
     reset_elite_budget()
     player_frozen = false
@@ -1855,7 +1854,7 @@ func leave_shop() -> void:
 
 func pickup_magnet_radius() -> float:
     # Later waves pull a bit farther so large fields of loot don't sit idle.
-    return float(stats["pickup_radius"]) + 18.0 * float(clampi(wave - 3, 0, 10))
+    return float(stats["pickup_radius"]) + Rules.magnet_wave_bonus(wave)
 
 func update_pickups(delta: float) -> void:
     var remaining: int = 0
@@ -1872,7 +1871,7 @@ func update_pickups(delta: float) -> void:
         if revealed.y > stone["position"].y:
             stone["position"] = stone["position"].move_toward(revealed, maxf(260.0 * delta, 1.0))
         if stone["position"].distance_squared_to(player_position) <= radius_squared:
-            stone["position"] = stone["position"].move_toward(player_position, 420.0 * delta)
+            stone["position"] = stone["position"].move_toward(player_position, 330.0 * delta)
         if stone["position"].distance_squared_to(player_position) < 484.0:
             var kind: String = str(stone.get("kind","xp"))
             if kind == "coin":
@@ -1890,9 +1889,10 @@ func update_pickups(delta: float) -> void:
                 xp += LootDrops.experience_value(stone) * stats["xp_multiplier"]
                 if audio != null:
                     audio.play("pickup_xp", -10.0)
-            if bursts < 12:
+            if bursts < 6:
                 var burst_color := Color("#e2b85d") if kind == "coin" else (Color("#e07a7a") if kind == "blood" else Color("#87d5ae"))
-                effects.burst(player_position + Vector2(0, 12), burst_color, 7)
+                var burst_size: float = 4.5 if kind == "coin" else 6.0
+                effects.burst(player_position + Vector2(0, 12), burst_color, burst_size)
                 bursts += 1
         else:
             pickups[remaining] = stone
@@ -1998,7 +1998,7 @@ func hatch_enemy(enemy: Dictionary, fx: bool = true) -> void:
         effects.burst(enemy["position"], Color("#d7b17a"), 10.0, "hit")
 
 func enemy_limit() -> int:
-    return 42 + clampi((wave - 5) * 2, 0, 42) + clampi((wave - 26) * 3, 0, 42)
+    return Rules.enemy_limit_for(wave)
 
 func spawn_enemy(kind: String, point: Vector2 = Vector2(INF, INF), wave_spawn: bool = false, arrival: String = "") -> void:
     map_view.set_view(player_position,wave)
@@ -2097,9 +2097,10 @@ func update_enemies(delta: float) -> void:
             enemy["timer"] -= delta
             enemy["knock"] = enemy["knock"].move_toward(Vector2.ZERO, delta * 270.0)
             enter_velocity += enemy["knock"]
+            enter_velocity = _ward_velocity(enemy, enter_velocity, delta)
             enemy["velocity"] = enter_velocity
             var enter_origin: Vector2 = enemy["position"]
-            enemy["position"] = map_view.move_body(enemy["position"], enemy["position"] + enter_velocity * delta, enemy["radius"])
+            enemy["position"] = _move_warded_enemy(enemy, enter_velocity, delta)
             var enter_view = enemy.get("view")
             if is_instance_valid(enter_view):
                 enter_view.position = enemy["position"]
@@ -2172,6 +2173,7 @@ func update_enemies(delta: float) -> void:
             velocity += separation.limit_length(48)
         if not encounter or enemy["state"] == "walk":
             velocity += enemy["knock"]
+        velocity = _ward_velocity(enemy, velocity, delta)
         var before_move: Vector2 = enemy["position"]
         enemy["velocity"] = velocity
         enemy["knock"] = enemy["knock"].move_toward(Vector2.ZERO, delta * 270.0)
@@ -2181,7 +2183,7 @@ func update_enemies(delta: float) -> void:
         if velocity.is_zero_approx() and bool(enemy.get("settled", false)):
             pass
         else:
-            enemy["position"] = map_view.move_body(enemy["position"], enemy["position"] + velocity * delta, enemy["radius"])
+            enemy["position"] = _move_warded_enemy(enemy, velocity, delta)
             enemy["settled"] = true
         enemy["view"].position = enemy["position"]
         enemy["view"].health_fraction = enemy["hp"] / enemy["max_hp"]
@@ -2200,6 +2202,54 @@ func update_enemies(delta: float) -> void:
             hurt_player((player_position - enemy["position"]).normalized(), enemy["damage"], enemy["kind"] == "boss")
             if not running:
                 break
+
+func _ward_velocity(enemy: Dictionary, velocity: Vector2, delta: float) -> Vector2:
+    var left: float = float(enemy.get("ward_left", 0.0))
+    if left <= 0.0:
+        enemy["ward_moving"] = false
+        return velocity
+    var step: float = minf(left, maxf(delta, 0.000001))
+    enemy["ward_left"] = left - step
+    enemy["ward_moving"] = true
+    var direction: Vector2 = enemy.get("ward_dir", Vector2.RIGHT)
+    if direction.length_squared() < 0.0001:
+        direction = Vector2.RIGHT
+    return direction.normalized() * float(enemy.get("ward_speed", 0.0))
+
+func _move_warded_enemy(enemy: Dictionary, velocity: Vector2, delta: float) -> Vector2:
+    var next: Vector2 = enemy["position"] + velocity * delta
+    if bool(enemy.get("ward_moving", false)):
+        next = arrive_inside(next)
+    return map_view.move_body(enemy["position"], next, enemy["radius"])
+
+func try_apply_ward(enemy: Dictionary, source: String, origin: Vector2 = Vector2.INF) -> bool:
+    if enemy.is_empty() or float(enemy.get("hp", 0.0)) <= 0.0:
+        return false
+    var level: int = weapon_level("staff") if source == "staff" else weapon_level("totem")
+    var profile: Dictionary = Rules.ward_profile(source, level)
+    var distance: float = float(profile.get("distance", 0.0))
+    var duration: float = float(profile.get("duration", 0.0))
+    if distance <= 0.001 or duration <= 0.001:
+        return false
+    if str(enemy.get("kind", "")) == "boss":
+        distance *= 0.20
+    if elapsed < float(enemy.get("ward_ready", -1000.0)):
+        return false
+    if elapsed < float(ward_ready.get(source, -1000.0)):
+        return false
+    var from: Vector2 = player_position if not origin.is_finite() else origin
+    var away: Vector2 = Vector2(enemy["position"]) - from
+    var direction: Vector2 = away.normalized() if away.length_squared() > 0.0001 else Vector2.RIGHT
+    enemy["ward_ready"] = elapsed + float(profile.get("target_cooldown", Rules.WARD_TARGET_COOLDOWN))
+    ward_ready[source] = elapsed + float(profile.get("interval", Rules.WARD_INTERVAL))
+    enemy["ward_left"] = duration
+    enemy["ward_dir"] = direction
+    enemy["ward_speed"] = distance / duration
+    enemy["knock"] = Vector2.ZERO
+    if effects != null:
+        var tint: Color = Color("#b891ff") if source == "staff" else Color("#f3d89b")
+        effects.puff(enemy["position"], tint, 11.0)
+    return true
 
 func charge_path(enemy: Dictionary) -> Vector2:
     var maximum: float = 0.55 if enemy.get("kind","") == "boss" else CHARGE_DURATION
@@ -2430,7 +2480,7 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
                 audio.play("powder" if key == "powder" else "sling", 0.0 if key == "powder" else -2.0, 0.86 if key == "powder" else 1.0)
                 flash_weapon(key)
                 if key == "powder" and Rules.host_is_rune_enchanted(active_links, "powder"):
-                    effects.rune_ignition(mounts.get("staff", player_position + Rules.ranged_mount("staff")), muzzle)
+                    effects.rune_ignition(mounts.get("staff", player_position + Rules.ranged_mount("staff")), muzzle, Evolution.tier(weapon_level("staff")))
                     audio.play("magic", -2.0)
         var penalty: float = weapon_reload_penalty(key)
         runtime["cooldown"] = data["cooldown"] * penalty / (1.0 + (item["level"] - 1) * 0.12)
@@ -2617,11 +2667,12 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
 func fire_projectile(point: Vector2, direction: Vector2, key: String, damage: float, attack_range: float, from_combo: bool = false, enchanted: bool = false, homing: float = 0.0) -> void:
     var speed: float = Catalog.WEAPONS[key]["speed"] * stats["bullet_speed"]
     var aim: Vector2 = direction.normalized() if direction.length() > 0.001 else Vector2.RIGHT
-    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"], "homing": homing})
+    var vfx_tier: int = Evolution.tier(weapon_level(key))
+    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"], "homing": homing, "vfx_tier": vfx_tier})
     if not from_combo and weapon_level(key)>=5:
         if key=="sling": projectiles.back().bounces_left+=1
         if key=="staff": projectiles.back().pierce_left+=1
-    effects.muzzle(point,aim,key,enchanted)
+    effects.muzzle(point,aim,key,enchanted,vfx_tier)
 
 func update_projectiles(delta: float) -> void:
     var remaining: Array = []
@@ -2657,7 +2708,7 @@ func update_projectiles(delta: float) -> void:
         if projectile["kind"] in ["staff", "powder","sling"]:
             projectile["trail_clock"] = float(projectile.get("trail_clock", 0.0)) - delta
             if projectile["trail_clock"] <= 0.0:
-                effects.flight_trail(previous, projectile["position"], projectile["kind"] == "staff" or projectile.get("enchanted", false),projectile["kind"])
+                effects.flight_trail(previous, projectile["position"], projectile["kind"] == "staff" or projectile.get("enchanted", false),projectile["kind"], int(projectile.get("vfx_tier", 0)))
                 projectile["trail_clock"] = 0.04
         var consumed: bool = false
         if projectile["kind"] == "hostile":
@@ -2737,7 +2788,8 @@ func _apply_rune_burst(point: Vector2) -> void:
     var staff_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "staff")
     var damage: float = 1.6 * (1.0 + (weapon_level("staff") - 1) * 0.25) * float(staff_bonus.get("damage_multiplier", 1.0))
     var radius: float = 34.0 * float(stats.get("area_multiplier", 1.0))
-    damage_area(point, radius, damage, "staff", true, Color("#6ee7f2"), "rune_blast")
+    var burst_color: Color = BattleVisuals.staff_tint(Evolution.tier(weapon_level("staff")))
+    damage_area(point, radius, damage, "staff", true, burst_color, "rune_blast")
     audio.play("magic_hit", -6.0)
 
 func _apply_thunder_jump(point: Vector2, except_id: String = "", source_damage: float = -1.0) -> void:
@@ -2760,7 +2812,7 @@ func explode_powder(projectile: Dictionary) -> void:
     var fire_cannon: bool = Rules.host_is_fire_enchanted(active_links, "powder") or bool(projectile.get("fire_enchanted", false))
     var point: Vector2 = projectile["position"]
     var burst_kind: String = "rune_blast" if enchanted else ("blast" if fire_cannon else "blast")
-    var burst_color: Color = Color("#6ee7f2") if enchanted else Color("#ffad40")
+    var burst_color: Color = BattleVisuals.staff_tint(Evolution.tier(weapon_level("staff"))) if enchanted else Color("#ffad40")
     damage_area(point, (85.0 if enchanted else 63.0) * stats["area_multiplier"], projectile["damage"] * (1.2 if enchanted else 1.0), "powder", true, burst_color, burst_kind)
     audio.play("blast", 0.0, 0.88)
     var stage: int=Evolution.tier(weapon_level("powder"))
@@ -2790,7 +2842,7 @@ func explode_powder(projectile: Dictionary) -> void:
         burning_fields.append({"position": point, "age": 0.0, "life": 1.1, "tick": 0.18, "radius": 61.0 * stats["area_multiplier"], "damage": rune_damage, "weapon_id": "staff", "from_link": true, "residual": "rune"})
         if burning_fields.size() > 12:
             burning_fields.pop_front()
-        effects.burst(point, Color("#65e7ec"), 45.0, "ring")
+        effects.burst(point, BattleVisuals.staff_tint(Evolution.tier(weapon_level("staff"))), 45.0, "ring")
         audio.play("magic_hit", -5.0)
     if fire_cannon:
         effects.burst(point, Color("#ffad40"), 48.0, "blast")
@@ -2867,13 +2919,20 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
         amount *= 1.0 + float(stats["close_damage_bonus"])
     enemy["hp"] = maxf(0.0, enemy["hp"] - amount)
     var push: float = 180.0 if weapon_id == "club" else (145.0 if weapon_id == "axe" else (85.0 if weapon_id == "blade" else 36.0))
-    if neutral: push = 0.0
+    if neutral or weapon_id == "staff":
+        push = 0.0
     enemy["knock"] += direction * push * (0.12 if enemy["kind"] == "boss" else 1.0)
+    if not neutral:
+        if weapon_id == "staff":
+            try_apply_ward(enemy, "staff", enemy["position"] - direction)
+        elif Rules.host_is_thunder_enchanted(active_links, weapon_id) or (weapon_id == "totem" and weapon_level("totem") >= 3):
+            try_apply_ward(enemy, "thunder", enemy["position"] - direction)
     var feedback: bool = not neutral or elapsed >= float(enemy.get("lava_feedback_next",-INF)) or enemy["hp"]<=0
     if neutral: enemy["lava_feedback_sum"] = float(enemy.get("lava_feedback_sum",0.0)) + amount
     if feedback:
         enemy["view"].hit()
-        effects.impact(enemy["position"], direction, weapon_id)
+        var impact_tier: int = Evolution.tier(weapon_level("staff" if weapon_id in ["staff", "drone"] else weapon_id))
+        effects.impact(enemy["position"], direction, weapon_id, impact_tier)
         if slammed:
             effects.slam_cue(enemy["position"], direction)
         if bool(settings.get("damage_numbers", true)):
@@ -3068,6 +3127,21 @@ func _draw() -> void:
             draw_arc(enemy["position"] + (player_position - enemy["position"]).normalized() * 28.0, 12.0, 0.0, TAU, 24, Color("#b82f83"), 3.0, true)
     for projectile in projectiles:
         BattleVisuals.draw_projectile(self,projectile,elapsed)
+        if bool(projectile.get("fire_enchanted", false)):
+            var vel: Vector2 = projectile.get("velocity", Vector2.RIGHT)
+            var aim: Vector2 = vel.normalized() if vel.length_squared() > 0.01 else Vector2.RIGHT
+            BattleVisuals.draw_fire_wrap(self, projectile["position"], aim, 16.0, elapsed)
+    for key in weapon_views.keys():
+        var view: Sprite2D = weapon_views[key]
+        if view == null or not is_instance_valid(view) or not view.visible:
+            continue
+        if Rules.host_is_fire_enchanted(active_links, key):
+            var data: Dictionary = Catalog.WEAPONS.get(key, {})
+            BattleVisuals.draw_fire_wrap(self, view.position, Vector2.UP, float(data.get("size", 42.0)) * 0.55, elapsed)
+        if key == "staff" or Rules.host_is_rune_enchanted(active_links, key):
+            var tier: int = Evolution.tier(weapon_level("staff"))
+            if tier >= 1:
+                BattleVisuals.draw_staff_aura(self, view.position, float(Catalog.WEAPONS.get(key, {}).get("size", 42.0)) * 0.42, elapsed, tier)
 
 func draw_magic_shell(point: Vector2, direction: Vector2) -> void:
     var normal: Vector2 = direction.orthogonal()
@@ -3097,12 +3171,14 @@ func draw_link_shapes() -> void:
         var center: Vector2 = field["position"]
         var radius: float = float(field["radius"])
         if kind == "rune":
-            draw_circle(center, radius, Color(0.80, 0.43, 0.18, 0.10 * alpha))
-            draw_arc(center, radius, 0.0, TAU, 32, Color(0.18, 0.70, 0.83, 0.80 * alpha), 2.5, true)
+            var rune_tier: int = Evolution.tier(weapon_level("staff"))
+            var rune_tint: Color = BattleVisuals.staff_tint(rune_tier)
+            draw_circle(center, radius, Color(rune_tint, 0.12 * alpha))
+            draw_arc(center, radius, 0.0, TAU, 32, Color(rune_tint, 0.80 * alpha), 2.5, true)
             for index in range(4):
                 var point: Vector2 = center + Vector2.from_angle(index * PI / 2.0 + 0.6) * radius * 0.45
                 var lift: float = sin(field["age"] * 15.0 + index) * 2.0
-                draw_colored_polygon(PackedVector2Array([point + Vector2(-4, 3), point + Vector2(0, -9 - lift), point + Vector2(4, 3)]), Color(0.28, 0.95, 1.0, 0.72 * alpha))
+                draw_colored_polygon(PackedVector2Array([point + Vector2(-4, 3), point + Vector2(0, -9 - lift), point + Vector2(4, 3)]), Color(rune_tint.lightened(0.25), 0.72 * alpha))
         elif kind == "fire":
             draw_circle(center, radius, Color(0.86, 0.32, 0.10, 0.16 * alpha))
             draw_arc(center, radius, 0.0, TAU, 32, Color(0.95, 0.52, 0.16, 0.72 * alpha), 2.4, true)

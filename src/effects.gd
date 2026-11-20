@@ -1,11 +1,13 @@
 extends Node2D
 const GameFonts=preload("res://src/game_fonts.gd")
 const CombatArt=preload("res://src/combat_art.gd")
+const BattleVisuals=preload("res://src/battle_visuals.gd")
 
 var particles: Array = []
 var number_serial: int = 0
 var bolt_serial: int = 0
 var _impact_weapon: String=""
+var _impact_tier: int=0
 var font: SystemFont = GameFonts.create_system(PackedStringArray(["Microsoft YaHei", "SimSun", "Arial"]))
 var ink: Color = Color("#2a221c")
 var paper: Color = Color("#f4ead6")
@@ -58,9 +60,10 @@ func burst(at: Vector2, color: Color, size: float = 16.0, kind: String = "hit") 
 func dodge_streak(at: Vector2, direction: Vector2) -> void:
     add_particle({"at": at + Vector2(0, 18), "direction": direction, "color": Color("#c4f4f1"), "size": 28.0, "kind": "dodge", "age": 0.0, "life": 0.15})
 
-func rune_ignition(staff: Vector2, muzzle: Vector2) -> void:
-    add_particle({"at": staff, "end": muzzle, "color": Color("#59edff"), "size": 20.0, "kind": "rune_ignition", "age": 0.0, "life": 0.28})
-    burst(muzzle, Color("#b891ff"), 24.0, "rune_hit")
+func rune_ignition(staff: Vector2, muzzle: Vector2, vfx_tier: int = 0) -> void:
+    var tint: Color = BattleVisuals.staff_tint(vfx_tier)
+    add_particle({"at": staff, "end": muzzle, "color": tint, "size": 20.0, "kind": "rune_ignition", "age": 0.0, "life": 0.28, "vfx_tier": vfx_tier})
+    burst(muzzle, BattleVisuals.staff_highlight(vfx_tier) if vfx_tier >= 1 else Color("#b891ff"), 24.0 if vfx_tier >= 1 else 20.0, "rune_hit")
 
 func weapon_aura(at: Vector2, color: Color, size: float = 28.0) -> void:
     add_particle({"at": at, "color": color, "size": size, "kind": "aura", "age": 0.0, "life": 0.14})
@@ -69,13 +72,15 @@ func weapon_aura(at: Vector2, color: Color, size: float = 28.0) -> void:
 func beam(start: Vector2, end: Vector2, color: Color) -> void:
     add_particle({"at": start, "end": end, "color": color, "size": 6.5, "kind": "beam", "age": 0.0, "life": 0.20})
 
-func muzzle(at: Vector2, direction: Vector2, key: String, enchanted: bool = false) -> void:
+func muzzle(at: Vector2, direction: Vector2, key: String, enchanted: bool = false, vfx_tier: int = 0) -> void:
     if key not in ["sling", "powder", "staff"]:
         return
     var axis: Vector2 = direction.normalized() if direction.length_squared() > 0.01 else Vector2.RIGHT
     var kind: String = {"sling": "sling_release", "powder": "powder_muzzle", "staff": "staff_muzzle"}[key]
     var color: Color = {"sling": Color("#ead3a0"), "powder": Color("#ffbc54"), "staff": Color("#70f2fa")}[key]
-    add_particle({"at": at, "direction": axis, "weapon_id": key, "enchanted": enchanted, "color": color, "size": 23.0 if key == "powder" else 14.0, "kind": kind, "age": 0.0, "life": 0.11 if key == "powder" else (0.14 if key == "sling" else 0.18)})
+    if key == "staff" or (key == "powder" and enchanted):
+        color = BattleVisuals.staff_tint(vfx_tier)
+    add_particle({"at": at, "direction": axis, "weapon_id": key, "enchanted": enchanted, "color": color, "size": 23.0 if key == "powder" else (16.0 if key == "staff" and vfx_tier >= 1 else 14.0), "kind": kind, "age": 0.0, "life": 0.11 if key == "powder" else (0.14 if key == "sling" else 0.18), "vfx_tier": vfx_tier})
     if key == "powder":
         puff(at - axis * 3, Color("#aa967c"), 10.0, 1)
 
@@ -172,8 +177,9 @@ func floating_text(at: Vector2, text: String, color: Color, size: int = 20, valu
     number_serial += 1
     add_particle({"at": at + Vector2((number_serial % 5 - 2) * 12, -36 - (number_serial % 3) * 10), "color": color, "size": size, "kind": "number", "age": 0.0, "life": 0.58, "text": text, "value": value, "critical": critical})
 
-func impact(at: Vector2, direction: Vector2, weapon_id: String) -> void:
+func impact(at: Vector2, direction: Vector2, weapon_id: String, vfx_tier: int = 0) -> void:
     _impact_weapon=weapon_id
+    _impact_tier=vfx_tier
     var facing: Vector2 = direction if direction.length_squared() > 0.01 else Vector2.RIGHT
     match weapon_id:
         "powder":
@@ -209,8 +215,11 @@ func impact(at: Vector2, direction: Vector2, weapon_id: String) -> void:
         "boomerang":
             add_particle({"at": at, "color": Color("#f3d48a"), "size": 40.0, "kind": "ribbon", "age": 0.0, "life": 0.18, "direction": facing})
         "staff", "drone":
-            add_particle({"at": at, "color": Color("#63eff8"), "size": 52.0, "kind": "rune_hit", "age": 0.0, "life": 0.22, "direction": facing})
-            comic_word(at + Vector2(facing.x * 12.0, -20.0), "闪", Color("#d7fbff"), 32, -8.0)
+            var staff_tier: int = int(_impact_tier)
+            add_particle({"at": at, "color": BattleVisuals.staff_tint(staff_tier), "size": 52.0 + (8.0 if staff_tier >= 2 else (4.0 if staff_tier >= 1 else 0.0)), "kind": "rune_hit", "age": 0.0, "life": 0.22, "direction": facing, "vfx_tier": staff_tier})
+            if staff_tier >= 1:
+                add_particle({"at": at, "color": BattleVisuals.staff_highlight(staff_tier), "size": 28.0, "kind": "aura", "age": 0.0, "life": 0.16})
+            comic_word(at + Vector2(facing.x * 12.0, -20.0), "闪", BattleVisuals.staff_highlight(staff_tier), 32, -8.0)
         "spear":
             add_particle({"at": at, "color": Color("#fff1c0"), "size": 66.0, "kind": "thrust", "age": 0.0, "life": 0.22, "direction": facing})
             add_particle({"at": at + facing * 18.0, "color": Color("#ffe7a0"), "size": 22.0, "kind": "fleck", "age": 0.0, "life": 0.14, "direction": facing})
@@ -222,6 +231,7 @@ func impact(at: Vector2, direction: Vector2, weapon_id: String) -> void:
             add_particle({"at": at, "color": Color("#fff2c4"), "size": 38.0, "kind": "impact", "age": 0.0, "life": 0.18, "direction": facing})
 
     _impact_weapon=""
+    _impact_tier=0
 
 func swing_trail(start: Vector2, end: Vector2, center: Vector2, weapon_id: String) -> void:
     if particles.size() >= 180 or start.distance_squared_to(end) < 0.01:
@@ -235,15 +245,17 @@ func weapon_motion(at: Vector2, direction: Vector2, weapon_id: String) -> void:
     var color: Color = Color("#f4d28d") if weapon_id == "boomerang" else (Color("#fff4c4") if weapon_id == "spear" else Color("#d5b793"))
     add_particle({"at": at, "direction": direction, "weapon_id": weapon_id, "color": color, "size": 22.0 if weapon_id == "spear" else 18.0, "kind": "weapon_motion", "age": 0.0, "life": 0.14})
 
-func flight_trail(start: Vector2, end: Vector2, magic: bool, key: String = "") -> void:
+func flight_trail(start: Vector2, end: Vector2, magic: bool, key: String = "", vfx_tier: int = 0) -> void:
     if particles.size() >= 180 or start.distance_squared_to(end) < 0.01:
         return
     var weapon_id: String = key if not key.is_empty() else ("staff" if magic else "powder")
     var axis: Vector2 = (end - start).normalized()
     var tail: Vector2 = end - axis * minf(start.distance_to(end), 62.0 if weapon_id in ["sling", "spear"] else 46.0)
     var color: Color = Color("#75f5ff") if magic else (Color("#ffe7b0") if weapon_id == "sling" else (Color("#fff1c0") if weapon_id == "spear" else Color("#ffb558")))
+    if magic or weapon_id == "staff":
+        color = BattleVisuals.staff_tint(vfx_tier)
     var trail_life: float = 0.13 if weapon_id == "sling" else (0.16 if weapon_id == "spear" else 0.14)
-    add_particle({"at": tail, "end": end, "weapon_id": weapon_id, "enchanted": magic and weapon_id == "powder", "color": color, "size": 13.0 if weapon_id == "sling" else (14.0 if weapon_id == "spear" else 10.0), "kind": "flight", "age": 0.0, "life": trail_life})
+    add_particle({"at": tail, "end": end, "weapon_id": weapon_id, "enchanted": magic and weapon_id == "powder", "color": color, "size": 13.0 if weapon_id == "sling" else (14.0 if weapon_id == "spear" else 10.0), "kind": "flight", "age": 0.0, "life": trail_life, "vfx_tier": vfx_tier})
 
 
 func pierce_cue(at: Vector2, direction: Vector2) -> void:

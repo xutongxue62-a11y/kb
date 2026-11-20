@@ -91,8 +91,8 @@ func check_pools_and_growth() -> void:
         expect(is_finite(endless["hp"]) and is_finite(endless["damage"]) and endless["speed_multiplier"] <= 1.35, kind + " endless growth remains finite and bounded in speed")
     expect(progression.enemy_profile(20, "armored")["dodge"] < progression.enemy_profile(20, "raptor")["dodge"], "heavy armor does not acquire the agile creature's full dodge")
     expect(is_equal_approx(progression.enemy_profile(1, "hunter")["hp"], 5.0), "existing hunter starting balance is preserved")
-    expect(is_equal_approx(progression.estimate_power([{"id": "firepot", "level": 1}], {}), 7.268181818), "firepot build power accounts for all six fire ticks instead of a single impact")
-    expect(is_equal_approx(progression.estimate_power([{"id": "wardrum", "level": 1}], {}), 6.677142857), "wardrum build power accounts for all three physical beats")
+    expect(is_equal_approx(progression.estimate_power([{"id": "firepot", "level": 1}], {}), 8.45625), "firepot build power accounts for all six fire ticks instead of a single impact")
+    expect(is_equal_approx(progression.estimate_power([{"id": "wardrum", "level": 1}], {}), 7.80952381), "wardrum build power accounts for all three physical beats")
 
 func check_delegation_and_timing() -> void:
     var world = CombatWorld.new()

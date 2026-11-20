@@ -30,7 +30,7 @@ func _initialize() -> void:
     growth.apply(levels, "accuracy")
     expect(growth.stats(levels)["hit_radius"] > 0.0 and growth.stats(levels)["homing"] > 0.0, "accuracy improves collision tolerance and flight correction without random misses")
     growth.apply(levels, "explorer")
-    expect(is_equal_approx(growth.stats(levels)["pickup_radius"], 150.0) and is_equal_approx(growth.stats(levels)["xp_multiplier"], 1.15), "explorer expands collection radius and XP yield")
+    expect(is_equal_approx(growth.stats(levels)["pickup_radius"], 130.0) and is_equal_approx(growth.stats(levels)["xp_multiplier"], 1.15), "explorer expands collection radius and XP yield")
     growth.apply(levels, "pierce")
     growth.apply(levels, "pierce")
     expect(growth.stats(levels)["pierce"] == 2 and growth.apply(levels, "pierce") and growth.stats(levels)["pierce"] == 3, "each pierce stack adds one extra target")

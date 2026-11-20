@@ -65,7 +65,7 @@ func advance_live(world, seconds: float, movement: Vector2 = Vector2.ZERO) -> vo
 func run_checks() -> void:
     check_living_boss_does_not_advance()
     check_death_keeps_combat_open()
-    check_cleanup_stops_spawns_and_allows_contact_loot()
+    check_cleanup_keeps_spawns_and_allows_contact_loot()
     check_settlement_after_window_discards_leftovers()
     check_mid_cleanup_save_restores_timer()
     check_normal_waves_unchanged()
@@ -102,7 +102,7 @@ func check_death_keeps_combat_open() -> void:
     expect(not world.hud.boss_bar.visible, "the Boss bar hides once the Boss is dead")
     world.queue_free()
 
-func check_cleanup_stops_spawns_and_allows_contact_loot() -> void:
+func check_cleanup_keeps_spawns_and_allows_contact_loot() -> void:
     var world = prepare_world("spawns")
     var boss: Dictionary = begin_live_boss(world)
     if boss.is_empty():
@@ -110,13 +110,15 @@ func check_cleanup_stops_spawns_and_allows_contact_loot() -> void:
         return
     world.spawn_enemy("hunter", world.player_position + Vector2(80, 0))
     var minion_id: int = int(world.enemies.back()["id"])
-    var before_count: int = world.enemies.size()
     world.hurt_enemy(boss, 20000.0, "powder", true, Vector2.RIGHT)
-    world.spawn_clock = 0.0
-    world.simulate(0.2, Vector2.ZERO)
+    world.simulate(0.01, Vector2.ZERO)
     expect(not world.enemies.any(func(enemy): return enemy["kind"] == "boss" and enemy["hp"] > 0.0), "the defeated Boss is gone")
     expect(world.enemies.any(func(enemy): return int(enemy["id"]) == minion_id and enemy["hp"] > 0.0), "existing minions stay during the cleanup window")
-    expect(world.enemies.size() <= before_count and not world.enemies.any(func(enemy): return enemy["kind"] == "boss" and int(enemy["id"]) != minion_id), "no new minions, elites or bosses spawn after the Boss dies")
+    var after_death: int = world.enemies.size()
+    world.spawn_clock = 0.0
+    world.simulate(0.25, Vector2.ZERO)
+    expect(world.enemies.size() > after_death, "minions keep spawning during the cleanup window")
+    expect(not world.enemies.any(func(enemy): return enemy["kind"] == "boss" and enemy["hp"] > 0.0), "cleanup spawns regular minions, not another Boss")
     var minion: Dictionary = {}
     for enemy in world.enemies:
         if int(enemy["id"]) == minion_id:
@@ -186,6 +188,11 @@ func check_mid_cleanup_save_restores_timer() -> void:
     expect(world.continue_game(), "a mid-cleanup run can be continued")
     expect(world.boss_defeated and not world.wave_closing and not world.shop_open, "continue stays in live cleanup combat")
     expect(is_equal_approx(world.boss_clear_left, remaining), "continue restores the remaining cleanup time rather than restarting or skipping it")
+    world.xp_needed = 99999
+    world.invulnerable = 999.0
+    world.chest_queue = 0
+    for runtime in world.weapon_runtime.values():
+        runtime["cooldown"] = 99.0
     advance_live(world, remaining - 0.05)
     expect(not world.wave_closing and not world.shop_open, "restored leftover time is not consumed twice")
     world.simulate(0.2, Vector2.ZERO)
