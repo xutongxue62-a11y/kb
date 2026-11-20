@@ -56,6 +56,9 @@ func run_checks() -> void:
     await check_help_and_hints()
     await check_blocked_screens()
     await check_save_multi_links()
+    await check_upgraded_appearance()
+    await check_reorder_and_persist()
+    await check_drop_face_vs_edge()
     print("LINK PACK RESULT: %d checks, %d failures" % [checks, failures])
     quit(1 if failures > 0 else 0)
 
@@ -101,8 +104,15 @@ func check_drop_unlink_error_and_swap() -> void:
     expect(good.get("ok", false) and str(good.get("link_id", "")) == "rune_shell", "compatible drop enables the catalog recipe")
     expect(world.active_link["id"] == "rune_shell", "select_link applied 魔法炮")
     var copy: String = ui.displayed_text()
-    expect(copy.contains("魔法炮") and copy.contains("优点") and copy.contains("缺点"), "linked cluster shows the recipe name with benefit and cost")
-    expect(copy.contains(Catalog.benefit_text(Catalog.LINKS["rune_shell"])) and copy.contains(Catalog.cost_text(Catalog.LINKS["rune_shell"])), "pack shows the official benefit and cost copy")
+    expect(copy.contains("魔法炮"), "linked pair hangs a result node named 魔法炮")
+    expect(ui.result_control("rune_shell") != null, "魔法炮 has a compact result node above the row")
+    expect(not copy.contains(Catalog.benefit_text(Catalog.LINKS["rune_shell"])) and not copy.contains(Catalog.cost_text(Catalog.LINKS["rune_shell"])), "official benefit and cost are not resident on the pack")
+    ui.hover_result("rune_shell")
+    await process_frame
+    var tip: String = ui.tooltip_text()
+    expect(tip.contains("优点") and tip.contains("缺点"), "hovering the result node shows benefit and cost labels")
+    expect(tip.contains(Catalog.benefit_text(Catalog.LINKS["rune_shell"])) and tip.contains(Catalog.cost_text(Catalog.LINKS["rune_shell"])), "tooltip uses the official benefit and cost copy")
+    ui.hide_result_tooltip()
     var still_bad: Dictionary = ui.try_drop("club", "rune_shell")
     expect(not still_bad.get("ok", true) and world.active_link["id"] == "rune_shell", "dropping a nonsense id does not break an existing link")
     var invalid_on_linked: Dictionary = ui.try_drop("sling", "powder")
@@ -224,7 +234,7 @@ func assert_cards_fit_pack(ui, context: String) -> void:
         expect(card != null, context + " has a fully visible card for " + weapon_id)
         if card == null:
             continue
-        expect(card.size.x >= 230.0 and card.size.y >= 200.0, context + " " + weapon_id + " keeps a full-size card, not a clipped strip")
+        expect(card.size.x >= 160.0 and card.size.y >= 180.0, context + " " + weapon_id + " keeps a full card, not a clipped strip")
         expect_global_inside(card, board, context + " " + weapon_id + " card in board")
         if parchment != null:
             expect_global_inside(card, parchment, context + " " + weapon_id + " card in parchment")
@@ -234,13 +244,34 @@ func assert_cards_fit_pack(ui, context: String) -> void:
             expect_inside(hint, card, context + " " + weapon_id + " hint stays in card", 6.0)
         if stats != null and not str(stats.text).is_empty():
             expect_inside(stats, card, context + " " + weapon_id + " stats stay in card", 6.0)
+    var row_y: float = -1.0
+    var row_h: float = -1.0
+    for weapon_id in ui.weapon_ids():
+        var card: Control = ui.cards.get(weapon_id, null)
+        if card == null:
+            continue
+        if row_y < 0.0:
+            row_y = card.position.y
+            row_h = card.size.y
+        expect(is_equal_approx(card.position.y, row_y), context + " " + weapon_id + " stays in the same bottom row")
+        expect(is_equal_approx(card.size.y, row_h) and is_equal_approx(card.size.x, ui.cards[ui.weapon_ids()[0]].size.x), context + " " + weapon_id + " keeps a uniform card size")
+        expect(card.position.y + card.size.y <= board.size.y + 1.5, context + " " + weapon_id + " sits on the bottom row")
+    if ui.has_method("result_control"):
+        for recipe in (ui._active_recipes() if ui.has_method("_active_recipes") else []):
+            var node: Control = ui.result_control(str(recipe.get("id", "")))
+            if node == null:
+                continue
+            expect_global_inside(node, board, context + " result " + str(recipe.get("id", "")) + " in board")
+            if parchment != null:
+                expect_global_inside(node, parchment, context + " result " + str(recipe.get("id", "")) + " in parchment")
     var mids: Array = []
     _collect_named(ui, "LinkDetails", mids)
+    _collect_named(ui, "LinkTooltip", mids)
     for mid in mids:
-        if mid is Control:
-            expect_global_inside(mid, board, context + " mid panel in board")
+        if mid is Control and mid.visible:
+            expect_global_inside(mid, board, context + " tooltip in board")
             if parchment != null:
-                expect_global_inside(mid, parchment, context + " mid panel in parchment")
+                expect_global_inside(mid, parchment, context + " tooltip in parchment")
 
 func _collect_named(node: Node, wanted: String, result: Array) -> void:
     if node.name == wanted:
@@ -286,7 +317,7 @@ func assert_pack_copy_visible(ui, context: String) -> void:
             expect_label_visible(stats, str(info.get("stats", "")), context + " " + weapon_id + " stats")
             expect_inside(stats, card, context + " " + weapon_id + " stats in card", 6.0)
     var recipes: Array = ui._active_recipes() if ui.has_method("_active_recipes") else []
-    if recipes.is_empty():
+    if recipes.is_empty() and ui.has_method("_active_recipe"):
         var recipe: Dictionary = ui._active_recipe()
         if not recipe.is_empty() and str(recipe.get("id", "none")) != "none":
             recipes = [recipe]
@@ -294,33 +325,33 @@ func assert_pack_copy_visible(ui, context: String) -> void:
         assert_cards_fit_pack(ui, context)
         return
     for recipe in recipes:
-        var benefit: String = Catalog.benefit_text(recipe)
-        var cost: String = Catalog.cost_text(recipe)
-        expect(copy.contains(str(recipe.get("name", ""))) and copy.contains(benefit) and copy.contains(cost), context + " displayed_text includes official " + str(recipe.get("id", "")) + " name, benefit, and cost")
-    var mids: Array = []
-    _collect_named(ui, "LinkDetails", mids)
-    expect(not mids.is_empty(), context + " has a cluster mid panel")
-    if mids.is_empty():
-        assert_cards_fit_pack(ui, context)
-        return
-    for recipe in recipes:
-        var mid: Control = _mid_for_recipe(mids, recipe)
-        expect(mid != null, context + " has a mid panel for " + str(recipe.get("id", "")))
-        if mid == null:
-            continue
-        var name_label: Label = _label_with_text(mid, str(recipe.get("name", "")))
-        var benefit_label: Label = _label_with_text(mid, Catalog.benefit_text(recipe))
-        var cost_label: Label = _label_with_text(mid, Catalog.cost_text(recipe))
-        var benefit_title: Label = _label_with_text(mid, "优点")
-        var cost_title: Label = _label_with_text(mid, "缺点")
-        expect(benefit_title != null and benefit_title.text.contains("优点"), context + " keeps 优点 as its own label for " + str(recipe.get("id", "")))
-        expect(cost_title != null and cost_title.text.contains("缺点"), context + " keeps 缺点 as its own label for " + str(recipe.get("id", "")))
-        expect_label_visible(name_label, str(recipe.get("name", "")), context + " cluster name " + str(recipe.get("id", "")))
-        expect_label_visible(benefit_label, Catalog.benefit_text(recipe), context + " cluster benefit " + str(recipe.get("id", "")))
-        expect_label_visible(cost_label, Catalog.cost_text(recipe), context + " cluster cost " + str(recipe.get("id", "")))
-        for label in [name_label, benefit_label, cost_label, benefit_title, cost_title]:
-            if label != null:
-                expect_inside(label, mid, context + " " + str(label.name) + " in mid", 4.0)
+        var link_id: String = str(recipe.get("id", ""))
+        var name: String = str(recipe.get("name", ""))
+        expect(copy.contains(name), context + " displayed_text includes the result name " + name)
+        expect(not copy.contains(Catalog.benefit_text(recipe)) and not copy.contains(Catalog.cost_text(recipe)), context + " official benefit and cost stay off the resident pack for " + link_id)
+        var node: Control = ui.result_control(link_id) if ui.has_method("result_control") else null
+        expect(node != null, context + " hangs a result node for " + link_id)
+        if node != null:
+            var name_label: Label = _label_with_text(node, name)
+            expect(name_label != null and name_label.text.contains(name), context + " result node shows " + name)
+        ui.hover_result(link_id)
+        await process_frame
+        var tip: String = ui.tooltip_text()
+        var mid: Control = ui.tooltip
+        expect(tip.contains(name) and tip.contains("优点") and tip.contains("缺点"), context + " hover tooltip for " + link_id + " shows title, 优点, and 缺点")
+        expect(tip.contains(Catalog.benefit_text(recipe)) and tip.contains(Catalog.cost_text(recipe)), context + " hover tooltip uses official " + link_id + " benefit and cost")
+        if mid != null and is_instance_valid(mid):
+            var benefit_label: Label = mid.find_child("ClusterBenefit", true, false)
+            var cost_label: Label = mid.find_child("ClusterCost", true, false)
+            var benefit_title: Label = _label_with_text(mid, "优点")
+            var cost_title: Label = _label_with_text(mid, "缺点")
+            expect_label_visible(benefit_label, Catalog.benefit_text(recipe), context + " tooltip benefit " + link_id)
+            expect_label_visible(cost_label, Catalog.cost_text(recipe), context + " tooltip cost " + link_id)
+            for label in [benefit_label, cost_label, benefit_title, cost_title]:
+                if label != null:
+                    expect_inside(label, mid, context + " " + str(label.name) + " in tooltip", 4.0)
+        ui.hide_result_tooltip()
+        await process_frame
     assert_cards_fit_pack(ui, context)
 
 func check_copy_not_clipped() -> void:
@@ -330,32 +361,41 @@ func check_copy_not_clipped() -> void:
     var ui = pack(world)
     await process_frame
     await process_frame
-    assert_pack_copy_visible(ui, "six-weapon trial unlinked")
+    await assert_pack_copy_visible(ui, "six-weapon trial unlinked")
     var rune: Dictionary = ui.try_drop("powder", "staff")
     expect(rune.get("ok", false) and world.active_link["id"] == "rune_shell", "layout check can form 魔法炮")
     await process_frame
     await process_frame
-    assert_pack_copy_visible(ui, "after linking rune_shell")
-    expect(ui.displayed_text().contains("魔法杖停止独立发射，火药筒装填间隔增加50%"), "魔法炮 cost is complete, not cut at 火")
+    await assert_pack_copy_visible(ui, "after linking rune_shell")
+    ui.hover_result("rune_shell")
+    await process_frame
+    expect(ui.tooltip_text().contains("魔法杖停止独立发射，火药筒装填间隔增加50%"), "魔法炮 cost is complete, not cut at 火")
+    ui.hide_result_tooltip()
     var second: Dictionary = ui.try_drop("staff", "sling")
     expect(second.get("ok", false) and world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "layout check can add 符能弹 beside 魔法炮")
     await process_frame
     await process_frame
-    assert_pack_copy_visible(ui, "after linking rune_shell and rune_sling")
-    expect(ui.displayed_text().contains("石弹附上符能，命中时额外爆发魔力"), "符能弹 benefit stays complete in a multi-link mid panel")
+    await assert_pack_copy_visible(ui, "after linking rune_shell and rune_sling")
+    ui.hover_result("rune_sling")
+    await process_frame
+    expect(ui.tooltip_text().contains("石弹附上符能，命中时额外爆发魔力"), "符能弹 benefit stays complete in the hover tooltip")
+    ui.hide_result_tooltip()
     var spokes: Array = ui.connection_pairs()
-    expect(_has_connection(spokes, "staff", "powder") and _has_connection(spokes, "staff", "sling"), "multi-host cluster draws hub-and-spoke lines from the staff to each host")
+    expect(_has_connection(spokes, "staff", "powder") and _has_connection(spokes, "staff", "sling"), "shared catalyst keeps a separate rope to each host")
     expect(not _has_connection(spokes, "powder", "sling"), "no connection bar is drawn between powder and sling, which are not a recipe pair")
     for leftover_id in ["club", "axe", "blade"]:
         var leftover: Control = ui.cards.get(leftover_id, null)
-        expect(leftover != null and leftover.size.y >= 200.0, leftover_id + " remains a full leftover card after 魔法炮 and 符能弹")
+        expect(leftover != null and leftover.size.y >= 180.0, leftover_id + " remains a full leftover card after 魔法炮 and 符能弹")
     var chain: Dictionary = ui.try_drop("powder", "axe")
     expect(chain.get("ok", false) and world.has_active_link("chain_axe") and not world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "layout check replaces only the conflicting powder recipe and keeps 符能弹")
     await process_frame
     await process_frame
-    assert_pack_copy_visible(ui, "after linking chain_axe")
-    expect(ui.displayed_text().contains("石斧从火药筒炮口弹出并弹射往返"), "锁链石斧 benefit is complete")
-    expect(ui.displayed_text().contains("石斧不再环绕护身，火药筒不发普通炮弹；射程缩至210"), "锁链石斧 cost is complete, not cut at 火药筒")
+    await assert_pack_copy_visible(ui, "after linking chain_axe")
+    ui.hover_result("chain_axe")
+    await process_frame
+    expect(ui.tooltip_text().contains("石斧从火药筒炮口弹出并弹射往返"), "锁链石斧 benefit is complete")
+    expect(ui.tooltip_text().contains("石斧不再环绕护身，火药筒不发普通炮弹；射程缩至210"), "锁链石斧 cost is complete, not cut at 火药筒")
+    ui.hide_result_tooltip()
     for key in Catalog.LINK_ORDER:
         if key == "none":
             continue
@@ -493,5 +533,130 @@ func check_blocked_screens() -> void:
     expect(world.open_link_pack(), "pack opens again in combat")
     world.open_round_shop()
     expect(not world.link_pack_open and world.shop_open, "opening the shop dismisses the pack first")
+    world.queue_free()
+    await process_frame
+
+func textures_match(a: Texture2D, b: Texture2D) -> bool:
+    if a == b and a != null:
+        return true
+    if a == null or b == null:
+        return false
+    var ia: Image = a.get_image()
+    var ib: Image = b.get_image()
+    if ia == null or ib == null:
+        return false
+    return ia.get_width() == ib.get_width() and ia.get_height() == ib.get_height() and ia.get_data() == ib.get_data()
+
+func set_owned_level(world, weapon_id: String, level: int) -> void:
+    for item in world.inventory:
+        if str(item.get("id", "")) == weapon_id:
+            item["level"] = level
+            return
+
+func check_upgraded_appearance() -> void:
+    var world = make_world("looks")
+    world.start_run(true)
+    set_owned_level(world, "staff", 5)
+    set_owned_level(world, "powder", 3)
+    set_owned_level(world, "club", 1)
+    expect(world.open_link_pack(), "pack opens to inspect upgraded weapon art")
+    var ui = pack(world)
+    await process_frame
+    await process_frame
+    expect(ui.appearance_level("staff") == 5 and ui.appearance_level("powder") == 3 and ui.appearance_level("club") == 1, "pack reads each weapon's current upgrade level")
+    var staff_icon: TextureRect = ui.card_icon("staff")
+    var powder_icon: TextureRect = ui.card_icon("powder")
+    var club_icon: TextureRect = ui.card_icon("club")
+    expect(staff_icon != null and powder_icon != null and club_icon != null, "each pack card has a weapon icon")
+    var staff_now: Texture2D = world.library.weapon_texture("staff", 5)
+    var staff_base: Texture2D = world.library.weapon_texture("staff", 1)
+    var powder_now: Texture2D = world.library.weapon_texture("powder", 3)
+    var powder_base: Texture2D = world.library.weapon_texture("powder", 1)
+    var club_now: Texture2D = world.library.weapon_texture("club", 1)
+    expect(textures_match(staff_icon.texture, staff_now), "staff card uses the current level-5 evolved appearance")
+    expect(not textures_match(staff_icon.texture, staff_base), "staff card does not keep the basic appearance after it has evolved")
+    expect(textures_match(powder_icon.texture, powder_now), "powder card uses the current level-3 evolved appearance")
+    expect(not textures_match(powder_icon.texture, powder_base), "powder card does not stay on the basic icon at level 3")
+    expect(textures_match(club_icon.texture, club_now), "unevolved club still uses the basic appearance")
+    if staff_icon.texture != null:
+        var sample: Image = staff_icon.texture.get_image()
+        if sample != null:
+            var corner: Color = sample.get_pixel(0, 0)
+            expect(corner.a < 0.08, "pack weapon icons keep transparent corners, without a baked black matte")
+    world.close_link_pack()
+    world.queue_free()
+    await process_frame
+
+func check_reorder_and_persist() -> void:
+    var world = make_world("order")
+    world.start_run(true)
+    expect(world.open_link_pack(), "pack opens for reorder checks")
+    var ui = pack(world)
+    var before: Array = ui.weapon_ids().duplicate()
+    expect(before.size() >= 6, "trial pack still has six weapons to rearrange")
+    var first: String = str(before[0])
+    var last: String = str(before[before.size() - 1])
+    var mid: String = str(before[2])
+    ui.try_drop("powder", "staff")
+    ui.try_drop("staff", "sling")
+    expect(world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "links are in place before reordering")
+    var moved: Dictionary = ui.try_reorder_after(first, last)
+    expect(moved.get("ok", false) and not moved.get("unchanged", true), "dragging to the far edge moves a weapon to the end")
+    var after_move: Array = ui.weapon_ids()
+    expect(str(after_move.back()) == first and after_move.find(first) == after_move.size() - 1, "the moved weapon is now last in the pack")
+    expect(world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "reordering does not break existing links")
+    var inserted: Dictionary = ui.try_reorder_before(last, mid)
+    expect(inserted.get("ok", false), "a weapon can be inserted before another card")
+    var ordered: Array = ui.weapon_ids()
+    expect(ordered.find(last) == ordered.find(mid) - 1, "insertion lands immediately before the target card")
+    expect(world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "insertion still leaves both links intact")
+    world.close_link_pack()
+    expect(world.open_link_pack(), "pack can close and reopen after a reorder")
+    ui = pack(world)
+    expect(ui.weapon_ids() == ordered, "closing and reopening the pack keeps the new order")
+    var captured: Dictionary = world.SessionState.capture(world)
+    var saved_ids: Array = []
+    for item in captured.get("inventory", []):
+        saved_ids.append(str(item.get("id", "")))
+    expect(saved_ids == ordered, "the run save stores the rearranged inventory order")
+    world.start_run(true)
+    expect(world.SessionState.apply(world, captured), "the rearranged save can be restored")
+    expect(world.open_link_pack(), "restored run can open the pack")
+    ui = pack(world)
+    expect(ui.weapon_ids() == ordered, "restoring a save keeps the rearranged weapon order")
+    expect(world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "restored links survive the order change")
+    world.close_link_pack()
+    world.queue_free()
+    await process_frame
+
+func check_drop_face_vs_edge() -> void:
+    var world = make_world("intent")
+    world.start_run(true)
+    expect(world.open_link_pack(), "pack opens for drop-intent checks")
+    var ui = pack(world)
+    await process_frame
+    await process_frame
+    var before: Array = ui.weapon_ids().duplicate()
+    var face: Dictionary = ui.drop_at("club", ui.card_face_point("staff"))
+    expect(not face.get("ok", true) and str(face.get("kind", "")) == "link", "dropping onto a card face tries to link, even when the pair is incompatible")
+    expect(ui.error_text().contains("这两件武器不能联动"), "an incompatible face drop still shows the toast")
+    expect(ui.weapon_ids() == before, "an incompatible face drop does not reorder the row")
+    var linked: Dictionary = ui.drop_at("powder", ui.card_face_point("staff"))
+    expect(linked.get("ok", false) and str(linked.get("kind", "")) == "link" and world.has_active_link("rune_shell"), "dropping onto a compatible card face forms the recipe")
+    var order_before: Array = ui.weapon_ids().duplicate()
+    var edge: Dictionary = ui.drop_at("club", ui.card_edge_point("axe", "after"))
+    expect(str(edge.get("kind", "")) == "reorder" and edge.get("ok", false), "dropping onto a card edge reorders instead of linking")
+    expect(world.has_active_link("rune_shell"), "an edge reorder leaves the existing link in place")
+    expect(ui.weapon_ids() != order_before, "the edge drop actually changes the stored order")
+    var second: Dictionary = ui.drop_at("staff", ui.card_face_point("sling"))
+    expect(second.get("ok", false) and world.has_active_link("rune_shell") and world.has_active_link("rune_sling"), "a later face drop can still add a second catalyst link")
+    var sling_card = ui.cards.get("sling", null)
+    expect(sling_card != null, "sling card is present before a drag-apart")
+    if sling_card != null:
+        var away: Vector2 = sling_card.get_global_rect().get_center() + Vector2(0, -180)
+        var unlinked: Dictionary = ui.drop_at("sling", away)
+        expect(str(unlinked.get("kind", "")) == "unlink" and unlinked.get("ok", false), "dragging a linked weapon off the rope unlinks that branch")
+        expect(world.has_active_link("rune_shell") and not world.has_active_link("rune_sling"), "drag-apart disconnects only the moved branch")
+    world.close_link_pack()
     world.queue_free()
     await process_frame
