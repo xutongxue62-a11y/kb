@@ -66,6 +66,10 @@ func run_checks() -> void:
     check_spawns()
     check_vfx_helpers()
     await check_rope_layout()
+    check_awakened_skills()
+    check_enchant_color_hooks()
+    check_boss_stage_matches_normal()
+    check_level_up_hp()
     print("PLAYTEST FEEL RESULT: %d checks, %d failures" % [checks, failures])
     quit(1 if failures else 0)
 
@@ -206,12 +210,12 @@ func check_thunder_ward() -> void:
 
 func check_spawns() -> void:
     var rules = load("res://src/rules.gd")
-    expect(is_equal_approx(rules.spawn_interval(1), 0.46), "wave 1 spawns faster than the old 0.62 cadence")
+    expect(is_equal_approx(rules.spawn_interval(1), 0.40), "wave 1 cadence is tighter for a 割草 feel")
     expect(is_equal_approx(rules.spawn_interval(3), 0.32), "wave 3 interval is 0.32")
     expect(is_equal_approx(rules.spawn_interval(10), maxf(0.14, 0.32 - 7.0 * 0.008)), "mid-game interval keeps falling")
     expect(is_equal_approx(rules.spawn_interval(40), 0.14), "late-game interval floors at 0.14")
     expect(is_equal_approx(rules.spawn_interval_for(5, true, false), rules.spawn_interval(5)), "a live Boss stage uses the same spawn interval as a normal stage")
-    expect(rules.spawn_interval_for(5, true, true) < rules.spawn_interval(5), "after the Boss dies, spawning is a bit denser, not frozen")
+    expect(is_equal_approx(rules.spawn_interval_for(5, true, true), rules.spawn_interval(5)), "after the Boss dies, the spawn interval stays the same as a normal stage")
     expect(rules.enemy_limit_for(1) == 50, "early alive cap starts at 50")
     expect(rules.enemy_limit_for(10) == 66, "wave 10 alive cap is 66")
     expect(rules.enemy_limit_for(26) == 106, "late-game alive cap keeps growing past the old wave-26 plateau")
@@ -250,6 +254,16 @@ func check_vfx_helpers() -> void:
     expect(base.b > base.r and awakened.r > base.r + 0.2 and awakened.g < base.g, "awakened staff shots shift from cyan toward purple")
     expect(advanced.b > base.b * 0.5 and advanced.r > base.r, "advanced staff shots already pick up violet")
     expect(visuals.staff_tint(2) != visuals.staff_tint(0), "staff combat VFX changes with evolution tier")
+    expect(visuals.fire_tint(2).r >= visuals.fire_tint(0).r and visuals.fire_tint(2).g < visuals.fire_tint(0).g, "later fire upgrades shift toward a hotter crimson")
+    expect(visuals.thunder_tint(2).g >= visuals.thunder_tint(0).g and visuals.thunder_tint(2).b >= visuals.thunder_tint(0).b, "later thunder upgrades shift toward a brighter white-blue")
+    var rune_shell := {"enchanted": true, "vfx_tier": 2}
+    var fire_shell := {"fire_enchanted": true, "fire_tier": 2}
+    var thunder_shell := {"thunder_enchanted": true, "thunder_tier": 2}
+    expect(visuals._shot_body_color(rune_shell, Color.WHITE) == visuals.staff_tint(2), "rune-enchanted shells use the staff purple at awakened tier")
+    expect(visuals._shot_body_color(fire_shell, Color.WHITE) == visuals.fire_tint(2), "fire-enchanted shells use the later fire tint")
+    expect(visuals._shot_body_color(thunder_shell, Color.WHITE) == visuals.thunder_tint(2), "thunder-enchanted shots use the later thunder tint")
+    expect(visuals.weapon_enchant_modulate("fire", 2) != Color.WHITE, "fire-enchanted weapon views pick up a visible fire tint")
+    expect(visuals.weapon_enchant_modulate("rune", 2) != visuals.weapon_enchant_modulate("rune", 0), "rune-enchanted views shift toward purple at later staff tiers")
 
 func check_rope_layout() -> void:
     var world = prepare_world("ropes")
@@ -294,4 +308,190 @@ func check_rope_layout() -> void:
         expect(bolt_knot.x >= minf(staff_x2, sling_x) - 8.0 and bolt_knot.x <= maxf(staff_x2, sling_x) + 8.0, "符能弹 node stays on the staff-sling spoke")
         expect(absf(bolt_knot.x - sling_x) < absf(bolt_knot.x - staff_x2) + 1.0, "符能弹 node sits closer to its host than to the shared catalyst")
     expect(absf(shell_knot.x - bolt_knot.x) > 20.0, "two catalyst spokes do not stack their result nodes on the same x")
+    world.queue_free()
+
+func check_awakened_skills() -> void:
+    var evolution = load("res://src/weapon_evolution.gd")
+    expect(not evolution.sky_lightning_unlocked(4), "天雷 stays locked before level 5")
+    expect(evolution.sky_lightning_unlocked(5), "天雷 unlocks at the awakened totem tier")
+    var sky: Dictionary = evolution.sky_lightning_profile(5)
+    expect(is_equal_approx(float(sky["cooldown"]), 9.0) and float(sky["damage_multiplier"]) > 5.0, "天雷 is a long-cooldown, high-damage strike")
+    expect(float(sky["radius"]) >= 80.0 and float(sky["height"]) >= 200.0, "天雷 falls from above with a wide blast")
+    expect(not evolution.fire_pillar_unlocked(4) and evolution.fire_pillar_unlocked(5), "炎柱 unlocks at firepot level 5")
+    expect(not evolution.rune_nova_unlocked(4) and evolution.rune_nova_unlocked(5), "符阵轰击 unlocks at staff level 5")
+    var catalog = load("res://src/catalog.gd")
+    var world = prepare_world("sky_lightning")
+    clear_field(world)
+    expect(world.grant_weapon("totem") or catalog.inventory_ids(world.inventory).has("totem"), "天雷 fixture owns a totem")
+    set_level(world, "totem", 5)
+    world.sync_idle_loadout()
+    freeze_weapons(world)
+    world.spawn_enemy("hunter", world.player_position + Vector2(90, 0))
+    var enemy: Dictionary = world.enemies.back()
+    enemy["hp"] = 400.0
+    enemy["max_hp"] = 400.0
+    var before: float = enemy["hp"]
+    world.update_armory(0.08)
+    expect(enemy["hp"] < before, "awakened totem 天雷 damages the marked cluster")
+    expect(world.armory.states.has("totem") and float(world.armory.states["totem"].get("sky_cooldown", 0.0)) >= 8.0, "天雷 then enters its long cooldown")
+    world.armory.states["totem"]["cooldown"] = 99.0
+    var mid_hp: float = enemy["hp"]
+    var mid_cd: float = float(world.armory.states["totem"].get("sky_cooldown", 0.0))
+    world.update_armory(1.0)
+    expect(is_equal_approx(enemy["hp"], mid_hp), "天雷 does not strike again during the cooldown")
+    expect(float(world.armory.states["totem"].get("sky_cooldown", 0.0)) < mid_cd and float(world.armory.states["totem"].get("sky_cooldown", 0.0)) > 6.5, "the 天雷 cooldown keeps ticking but stays long")
+    world.queue_free()
+
+    var staff_world = prepare_world("rune_nova")
+    clear_field(staff_world)
+    expect(staff_world.grant_weapon("staff") or catalog.inventory_ids(staff_world.inventory).has("staff"), "符阵 fixture owns a staff")
+    set_level(staff_world, "staff", 5)
+    staff_world.sync_idle_loadout()
+    freeze_weapons(staff_world)
+    staff_world.spawn_enemy("hunter", staff_world.player_position + Vector2(40, 0))
+    var near: Dictionary = staff_world.enemies.back()
+    near["hp"] = 200.0
+    near["max_hp"] = 200.0
+    var staff_before: float = near["hp"]
+    staff_world.update_rune_nova(0.05, true)
+    expect(near["hp"] < staff_before, "awakened staff 符阵轰击 damages nearby enemies")
+    expect(float(staff_world.weapon_runtime["staff"].get("nova_cooldown", 0.0)) >= 7.0, "符阵轰击 then waits on a long cooldown")
+    staff_world.queue_free()
+
+    var pot_world = prepare_world("fire_pillar")
+    clear_field(pot_world)
+    expect(pot_world.grant_weapon("firepot") or catalog.inventory_ids(pot_world.inventory).has("firepot"), "炎柱 fixture owns a firepot")
+    set_level(pot_world, "firepot", 5)
+    pot_world.sync_idle_loadout()
+    freeze_weapons(pot_world)
+    pot_world.spawn_enemy("hunter", pot_world.player_position + Vector2(80, 0))
+    var burned: Dictionary = pot_world.enemies.back()
+    burned["hp"] = 300.0
+    burned["max_hp"] = 300.0
+    var pot_before: float = burned["hp"]
+    pot_world.update_armory(0.08)
+    expect(burned["hp"] < pot_before, "awakened firepot 炎柱 damages the aimed cluster")
+    expect(pot_world.armory.states.has("firepot") and float(pot_world.armory.states["firepot"].get("pillar_cooldown", 0.0)) >= 7.0, "炎柱 then enters its long cooldown")
+    pot_world.queue_free()
+
+func check_enchant_color_hooks() -> void:
+    var catalog = load("res://src/catalog.gd")
+    var rune_world = prepare_world("rune_colors")
+    clear_field(rune_world)
+    for weapon_id in ["staff", "powder", "sling"]:
+        expect(rune_world.grant_weapon(weapon_id) or catalog.inventory_ids(rune_world.inventory).has(weapon_id), "rune color fixture owns " + weapon_id)
+    set_level(rune_world, "staff", 5)
+    rune_world.apply_links(["rune_shell", "rune_sling"])
+    expect(rune_world.Rules.host_is_rune_enchanted(rune_world.active_links, "powder"), "powder is rune-enchanted for color checks")
+    expect(rune_world.projectile_vfx_tier("powder", true) == 2, "rune-enchanted cannon shells use the awakened staff purple tier")
+    expect(rune_world.projectile_vfx_tier("sling", true) == 2, "rune-enchanted sling stones use the awakened staff purple tier")
+    rune_world.fire_projectile(rune_world.player_position, Vector2.RIGHT, "powder", 4.0, 200.0, false, true)
+    expect(not rune_world.projectiles.is_empty() and int(rune_world.projectiles.back().get("vfx_tier", 0)) == 2, "a fired rune shell stores the staff vfx tier")
+    rune_world.queue_free()
+
+    var fire_world = prepare_world("fire_colors")
+    clear_field(fire_world)
+    for weapon_id in ["firepot", "powder", "sling"]:
+        expect(fire_world.grant_weapon(weapon_id) or catalog.inventory_ids(fire_world.inventory).has(weapon_id), "fire color fixture owns " + weapon_id)
+    set_level(fire_world, "firepot", 5)
+    fire_world.apply_links(["fire_cannon"])
+    expect(fire_world.Rules.host_is_fire_enchanted(fire_world.active_links, "powder"), "powder is fire-enchanted for 烈焰火炮")
+    expect(fire_world.projectile_fire_tier("powder") == 2, "烈焰火炮 shells use the awakened firepot tint tier")
+    fire_world.fire_projectile(fire_world.player_position, Vector2.RIGHT, "powder", 4.0, 200.0, false, false)
+    expect(not fire_world.projectiles.is_empty() and bool(fire_world.projectiles.back().get("fire_enchanted", false)), "a fired cannon shell is tagged as fire-enchanted")
+    expect(int(fire_world.projectiles.back().get("fire_tier", 0)) == 2, "the fired cannon shell stores the later fire tint tier")
+    fire_world.queue_free()
+
+    var storm_world = prepare_world("thunder_colors")
+    clear_field(storm_world)
+    for weapon_id in ["totem", "powder", "sling"]:
+        expect(storm_world.grant_weapon(weapon_id) or catalog.inventory_ids(storm_world.inventory).has(weapon_id), "thunder color fixture owns " + weapon_id)
+    set_level(storm_world, "totem", 5)
+    storm_world.apply_links(["thunder_shell"])
+    expect(storm_world.Rules.host_is_thunder_enchanted(storm_world.active_links, "powder"), "powder is thunder-enchanted for 导雷火炮")
+    expect(storm_world.projectile_thunder_tier("powder") == 2, "thunder-enchanted shells use the awakened totem tint tier")
+    storm_world.fire_projectile(storm_world.player_position, Vector2.RIGHT, "powder", 4.0, 200.0, false, false)
+    expect(bool(storm_world.projectiles.back().get("thunder_enchanted", false)) and int(storm_world.projectiles.back().get("thunder_tier", 0)) == 2, "a fired thunder shell stores the later thunder tint")
+    storm_world.queue_free()
+
+func check_boss_stage_matches_normal() -> void:
+    var roster = load("res://src/enemy_roster.gd")
+    var rules = load("res://src/rules.gd")
+    for wave in [4, 5, 9, 10]:
+        var normal: Array = roster.spawn_pool(wave, 16.0, false, false)
+        var boss: Array = roster.spawn_pool(wave, 16.0, false, true)
+        normal.sort()
+        boss.sort()
+        expect(normal == boss, "wave %d Boss minion pool matches the normal stage" % wave)
+        expect(is_equal_approx(rules.spawn_interval_for(wave, true, false), rules.spawn_interval(wave)), "wave %d live Boss interval matches normal" % wave)
+        expect(is_equal_approx(rules.spawn_interval_for(wave, true, true), rules.spawn_interval(wave)), "wave %d post-Boss interval still matches normal" % wave)
+    expect(roster.spawn_pool(5, 16.0, false, true).has("bonecaller"), "a grove Boss stage still includes heavy bonecallers")
+    expect(roster.spawn_pool(9, 16.0, false, true).has("basaltroller"), "a volcano Boss stage still includes heavy basaltrollers")
+    expect(roster.spawn_pool(4, 16.0, false, true).has("armored"), "an early Boss stage still includes armored heavies")
+    expect(not roster.spawn_pool(5, 16.0, false, true).has("boss"), "the Boss itself is never a random regular pick")
+    var world = prepare_world("boss_match")
+    world.begin_round(5)
+    world.invulnerable = 999.0
+    world.xp_needed = 99999
+    world.simulate(0.56, Vector2.ZERO)
+    expect(world.boss_round and not world.boss_defeated, "composition check is on a live Boss stage")
+    expect(is_equal_approx(world.Rules.spawn_interval_for(world.wave, true, false), world.Rules.spawn_interval(5)), "live Boss world cadence matches a normal wave 5")
+    expect(world.enemy_limit() == world.Rules.enemy_limit_for(5), "Boss-stage on-screen cap matches the same-wave normal cap")
+    var boss := {}
+    var minion_kinds := {}
+    for enemy in world.enemies:
+        if enemy["kind"] == "boss":
+            boss = enemy
+        else:
+            minion_kinds[str(enemy["kind"])] = true
+    expect(not boss.is_empty(), "the extra threat on the stage is the Boss itself")
+    var allowed: Array = roster.spawn_pool(5, world.wave_elapsed, world.trial_mode, false)
+    for kind in minion_kinds:
+        expect(allowed.has(kind), "Boss-stage minion " + str(kind) + " also belongs on a normal wave 5")
+    if not boss.is_empty():
+        world.hurt_enemy(boss, 20000.0, "powder", true, Vector2.RIGHT)
+        world.simulate(0.01, Vector2.ZERO)
+        var after_death: int = world.enemies.size()
+        var post_interval: float = world.Rules.spawn_interval_for(world.wave, world.boss_round, world.boss_defeated)
+        expect(is_equal_approx(post_interval, world.Rules.spawn_interval(5)), "cleanup cadence stays on the normal-stage interval")
+        world.spawn_clock = 0.0
+        world.simulate(post_interval + 0.05, Vector2.ZERO)
+        expect(world.boss_defeated and not world.wave_closing, "cleanup window stays live after the Boss dies")
+        expect(world.enemies.size() > after_death, "the normal-stage pipeline keeps spawning after the Boss dies")
+        expect(not world.enemies.any(func(enemy): return enemy["kind"] == "boss" and float(enemy.get("hp", 0.0)) > 0.0), "cleanup still does not spawn another Boss")
+    world.queue_free()
+
+func check_level_up_hp() -> void:
+    var growth = load("res://src/growth.gd")
+    expect(is_equal_approx(growth.level_hp_bonus(1), 0.0), "level 1 adds no extra health pips")
+    expect(is_equal_approx(growth.level_hp_bonus(2), 1.0), "the first level-up adds one max HP")
+    expect(is_equal_approx(growth.level_hp_bonus(5), 4.0), "each further level adds another pip")
+    expect(is_equal_approx(growth.stats({}, 1)["max_hp"], 8.0), "base max HP at level 1 stays 8")
+    expect(is_equal_approx(growth.stats({}, 3)["max_hp"], 10.0), "level 3 has 10 max HP before vitality")
+    var world = prepare_world("level_hp")
+    world.refresh_stats()
+    var start_max: float = float(world.stats["max_hp"])
+    expect(world.player_level == 1, "the level-up fixture starts at level 1")
+    world.player_hp = start_max
+    world.xp = world.xp_needed
+    world.present_upgrade("xp")
+    expect(world.upgrade_pending and not world.upgrade_choices.is_empty(), "gaining enough XP presents a level-up choice")
+    var choice: String = str(world.upgrade_choices[0])
+    world.on_choice(choice)
+    expect(world.player_level == 2, "taking the upgrade raises the player level")
+    expect(is_equal_approx(float(world.stats["max_hp"]), start_max + 1.0), "leveling up adds 1 maximum HP")
+    expect(is_equal_approx(world.player_hp, start_max + 1.0), "the new health pip is filled when the player was already at full HP")
+    expect(is_equal_approx(world.hud.current_max_hp, start_max + 1.0), "the health bar maximum visibly gains the new pip")
+    expect(world.hud.health_label.text.contains("%.0f" % (start_max + 1.0)), "the health label shows the raised maximum")
+    # A later level-up while injured still adds the pip and one current HP, without a full heal.
+    world.player_hp = float(world.stats["max_hp"]) - 3.0
+    var injured: float = world.player_hp
+    var injured_max: float = float(world.stats["max_hp"])
+    world.xp = world.xp_needed
+    world.present_upgrade("xp")
+    expect(world.upgrade_pending and not world.upgrade_choices.is_empty(), "a second level-up can be presented")
+    world.on_choice(str(world.upgrade_choices[0]))
+    expect(world.player_level == 3, "the second upgrade reaches level 3")
+    expect(is_equal_approx(float(world.stats["max_hp"]), injured_max + 1.0), "the second level-up adds another max HP pip")
+    expect(is_equal_approx(world.player_hp, injured + 1.0), "an injured level-up restores only the new pip, not a full heal")
     world.queue_free()

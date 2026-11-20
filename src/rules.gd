@@ -563,16 +563,13 @@ const THUNDER_WARD_DURATION: float = 0.16
 static func spawn_interval(wave: int) -> float:
     var stage: int = maxi(1, wave)
     if stage <= 3:
-        return 0.46 - float(stage - 1) * 0.07
+        return 0.40 - float(stage - 1) * 0.04
     return maxf(0.14, 0.32 - float(stage - 3) * 0.008)
 
-static func spawn_interval_for(wave: int, boss_round: bool, boss_defeated: bool) -> float:
-    var interval: float = spawn_interval(wave)
-    # Boss stages use the same cadence as a normal stage. After the Boss falls,
-    # the leftover window stays live and brushes a bit denser.
-    if boss_round and boss_defeated:
-        return maxf(0.12, interval * 0.85)
-    return interval
+static func spawn_interval_for(wave: int, _boss_round: bool = false, _boss_defeated: bool = false) -> float:
+    # A Boss stage, including the post-death cleanup window, uses the same
+    # regular spawn cadence as a normal stage of this wave.
+    return spawn_interval(wave)
 
 static func enemy_limit_for(wave: int) -> int:
     var stage: int = maxi(1, wave)

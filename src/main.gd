@@ -130,6 +130,7 @@ var enemy_serial: int = 0
 var elite_budget: int = 0
 var spawn_clock: float = 0.0
 var ward_ready: Dictionary = {}
+var pack_result_positions: Dictionary = {}
 var running: bool = false
 var paused: bool = false
 var touch_input: Vector2 = Vector2.ZERO
@@ -377,6 +378,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     counters.clear()
     combo_cooldowns.clear()
     ward_ready.clear()
+    pack_result_positions.clear()
     upgrade_choices.clear()
     upgrade_offer_levels.clear()
     replace_pending.clear()
@@ -445,6 +447,7 @@ func sync_idle_loadout() -> void:
     update_weapons(0.0,false)
     armory.advance(0.0,player_position,[],inventory,stats,prefer_elite,weapon_views,current_weapon_mounts())
     refresh_weapon_draw_order()
+    refresh_weapon_enchant_tint()
 
 func expire_combat_fx() -> void:
     if effects != null:
@@ -652,7 +655,7 @@ func record_character_wave(reached: int = -1) -> void:
     sync_character_progress()
 
 func refresh_stats() -> Dictionary:
-    stats = Growth.stats(buff_levels)
+    stats = Growth.stats(buff_levels, player_level)
     if not trial_mode:
         Catalog.apply_character_modifiers(stats, character_id)
     return stats
@@ -1183,7 +1186,8 @@ func _finish_successful_choice() -> void:
         xp = maxf(0.0, xp - xp_needed)
         player_level += 1
         xp_needed = Growth.xp_needed_for(player_level)
-        player_hp = minf(stats["max_hp"], player_hp + 1.0)
+        refresh_stats()
+        player_hp = minf(stats["max_hp"], player_hp + Growth.LEVEL_UP_HP)
         if audio != null:
             audio.play("level_up", -6.0)
     elif upgrade_reason != "chest":
@@ -1488,9 +1492,9 @@ func simulate(delta: float, movement: Vector2) -> void:
         _simulating = false
         return
     spawn_clock -= delta
-    # Early and late caps both rise, and the interval falls to a 0.14 s floor.
-    # Boss stages use the same cadence as a normal stage; after the Boss falls
-    # the 30 s cleanup window stays live and brushes a bit denser, not frozen.
+    # A Boss stage is a normal stage plus one Boss: same cadence, cap, and
+    # regular minion pool, including after the Boss falls. The 30 s cleanup
+    # window stays live and keeps the same normal-stage pipeline.
     var alive_cap: int = enemy_limit()
     if spawn_clock <= 0.0 and enemies.size() < alive_cap:
         var spawn_interval: float = Rules.spawn_interval_for(wave, boss_round, boss_defeated)
@@ -1912,34 +1916,29 @@ func update_companions(delta: float) -> void:
         hurt_enemy(enemy, attack["damage"], attack["kind"], false, (enemy["position"] - attack["position"]).normalized())
 
 func reset_elite_budget() -> void:
-    if boss_round:
-        elite_budget = 1 if rng.randf() < 0.35 else 0
+    # Boss stages use the same elite budget as a normal stage of this wave.
+    var roll: float = rng.randf()
+    if roll < 0.28:
+        elite_budget = 0
+    elif roll < 0.63:
+        elite_budget = 1
+    elif roll < 0.90:
+        elite_budget = 2
     else:
-        var roll: float = rng.randf()
-        if roll < 0.28:
-            elite_budget = 0
-        elif roll < 0.63:
-            elite_budget = 1
-        elif roll < 0.90:
-            elite_budget = 2
-        else:
-            elite_budget = 3
+        elite_budget = 3
 
 func recover_elite_budget() -> void:
     var existing: int = 0
     for enemy in enemies:
         if enemy.get("kind", "") != "boss" and bool(enemy.get("elite", false)) and float(enemy.get("hp", 0.0)) > 0.0:
             existing += 1
-    if boss_round:
-        elite_budget = 0
-    else:
-        elite_budget = maxi(0, 2 - existing)
+    elite_budget = maxi(0, 2 - existing)
 
 func take_wave_elite() -> bool:
     if elite_budget <= 0:
         return false
-    var interval: float = 4.5 if boss_round else maxf(0.40, 0.62 - float(wave - 1) * 0.10)
-    var remaining_time: float = 12.0 if boss_round else maxf(interval, WAVE_SECONDS - wave_elapsed)
+    var interval: float = maxf(0.40, 0.62 - float(wave - 1) * 0.10)
+    var remaining_time: float = maxf(interval, WAVE_SECONDS - wave_elapsed)
     var expected_left: int = maxi(1, int(ceil(remaining_time / interval)))
     if rng.randf() <= float(elite_budget) / float(expected_left):
         elite_budget -= 1
@@ -2303,6 +2302,9 @@ func update_armory(delta: float) -> void:
     options["reload_weapon"]=str(active_link.get("reload_weapon",""))
     options["reload_multiplier"]=float(active_link.get("cooldown_multiplier",1.0))
     options["reload_multipliers"]=Rules.reload_multipliers(active_links)
+    options["staff_tier"]=Evolution.tier(weapon_level("staff"))
+    options["firepot_tier"]=Evolution.tier(weapon_level("firepot"))
+    options["totem_tier"]=Evolution.tier(weapon_level("totem"))
     for command in armory.advance(delta,player_position,combat_targets(),inventory,options,prefer_elite,weapon_views,current_weapon_mounts()):
         match command.get("type",""):
             "motion":
@@ -2331,9 +2333,55 @@ func update_armory(delta: float) -> void:
                             mine["charged"]=true
             "fan_fire":
                 effects.burst(command.position,Color("#f5c66a"),command.radius,"ring")
+            "sky_lightning":
+                var bolt_color: Color = command.get("color", BattleVisuals.thunder_tint(2))
+                effects.sky_lightning(command["start"], command["end"], bolt_color)
+                damage_area(command["position"], float(command["radius"]) * stats["area_multiplier"], float(command["damage"]), "totem", true, bolt_color, "quake")
+                audio.play("magic_hit", 0.0, 0.72)
+                flash_weapon("totem")
+            "fire_pillar":
+                var pillar_tier: int = int(command.get("tier", 2))
+                var pillar_color: Color = BattleVisuals.fire_tint(pillar_tier)
+                effects.burst(command["position"], pillar_color, float(command["radius"]), "ring")
+                damage_area(command["position"], float(command["radius"]) * stats["area_multiplier"], float(command["damage"]), "firepot", true, pillar_color, "quake")
+                burning_fields.append({"position": command["position"], "age": 0.0, "life": 1.15, "tick": 0.18, "radius": float(command["radius"]) * stats["area_multiplier"], "damage": float(command["damage"]) * 0.28, "weapon_id": "firepot", "from_link": false, "residual": "fire"})
+                audio.play("powder", -1.0, 0.82)
+                flash_weapon("firepot")
+    refresh_weapon_enchant_tint()
+
+func update_rune_nova(delta: float, allow_attacks: bool) -> void:
+    if not weapon_runtime.has("staff"):
+        return
+    var runtime: Dictionary = weapon_runtime["staff"]
+    var haste: float = maxf(0.0, float(stats.get("attack_speed", 1.0)))
+    runtime["nova_cooldown"] = maxf(0.0, float(runtime.get("nova_cooldown", 0.0)) - delta * haste)
+    if not allow_attacks or is_weapon_suppressed("staff"):
+        return
+    var level: int = weapon_level("staff")
+    var profile: Dictionary = Evolution.rune_nova_profile(level)
+    if not bool(profile.get("unlocked", false)) or runtime["nova_cooldown"] > 0.0:
+        return
+    var radius: float = float(profile["radius"]) * float(stats.get("area_multiplier", 1.0))
+    var any := false
+    for enemy in combat_targets():
+        if float(enemy.get("hp", 0.0)) <= 0.0:
+            continue
+        if player_position.distance_to(enemy["position"]) <= radius + float(enemy.get("radius", 0.0)):
+            any = true
+            break
+    if not any:
+        return
+    var damage: float = Catalog.WEAPONS["staff"]["damage"] * (1.0 + float(level - 1) * 0.35) * float(profile["damage_multiplier"])
+    var tint: Color = BattleVisuals.staff_tint(Evolution.tier(level))
+    damage_area(player_position, radius, damage, "staff", true, tint, "ring")
+    effects.burst(player_position, tint, radius * 0.85, "ring")
+    audio.play("magic", -1.0, 0.85)
+    flash_weapon("staff")
+    runtime["nova_cooldown"] = float(profile["cooldown"])
 
 func update_weapons(delta: float,allow_attacks: bool=true) -> void:
     advance_formation(delta)
+    update_rune_nova(delta, allow_attacks)
     var mounts: Dictionary = current_weapon_mounts()
     var targets: Array=combat_targets() if allow_attacks else []
     var melee_items: Array = []
@@ -2489,6 +2537,7 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
     if chain_key != "" and weapon_runtime.has(chain_key) and str(weapon_runtime[chain_key].get("chain_state", "rest")) == "rest":
         attach_chain_weapon(chain_key)
     refresh_weapon_draw_order()
+    refresh_weapon_enchant_tint()
 
 
 func flash_weapon(key: String) -> void:
@@ -2507,6 +2556,7 @@ func flash_weapon(key: String) -> void:
 
 func apply_weapon_glows(delta: float) -> void:
     refresh_weapon_draw_order()
+    refresh_weapon_enchant_tint()
     for key in weapon_views.keys():
         var view: Sprite2D = weapon_views[key]
         if not is_instance_valid(view):
@@ -2664,15 +2714,57 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
                 desired = [pending_link]
             apply_links(desired)
 
+func projectile_vfx_tier(key: String, enchanted: bool = false) -> int:
+    if enchanted or Rules.host_is_rune_enchanted(active_links, key):
+        return Evolution.tier(weapon_level("staff"))
+    return Evolution.tier(weapon_level(key))
+
+func projectile_fire_tier(key: String) -> int:
+    if Rules.host_is_fire_enchanted(active_links, key):
+        return Evolution.tier(weapon_level("firepot"))
+    return 0
+
+func projectile_thunder_tier(key: String) -> int:
+    if Rules.host_is_thunder_enchanted(active_links, key):
+        return Evolution.tier(weapon_level("totem"))
+    return 0
+
+func refresh_weapon_enchant_tint() -> void:
+    for key in weapon_views.keys():
+        var view: Sprite2D = weapon_views[key]
+        if view == null or not is_instance_valid(view):
+            continue
+        if is_weapon_suppressed(key):
+            view.modulate = Color(0.86, 0.98, 0.86)
+            continue
+        if Rules.host_is_fire_enchanted(active_links, key):
+            view.modulate = BattleVisuals.weapon_enchant_modulate("fire", Evolution.tier(weapon_level("firepot")))
+        elif key == "staff" or Rules.host_is_rune_enchanted(active_links, key):
+            var rune_tier: int = Evolution.tier(weapon_level("staff"))
+            if key == "staff" and rune_tier <= 0 and not Rules.host_is_rune_enchanted(active_links, key):
+                view.modulate = Color.WHITE
+            else:
+                view.modulate = BattleVisuals.weapon_enchant_modulate("rune", rune_tier) if rune_tier >= 1 or Rules.host_is_rune_enchanted(active_links, key) else Color.WHITE
+        elif key == "totem" or Rules.host_is_thunder_enchanted(active_links, key):
+            var thunder_tier: int = Evolution.tier(weapon_level("totem"))
+            if Rules.host_is_thunder_enchanted(active_links, key) or (key == "totem" and thunder_tier >= 1):
+                view.modulate = BattleVisuals.weapon_enchant_modulate("thunder", thunder_tier)
+            else:
+                view.modulate = Color.WHITE
+        else:
+            view.modulate = Color.WHITE
+
 func fire_projectile(point: Vector2, direction: Vector2, key: String, damage: float, attack_range: float, from_combo: bool = false, enchanted: bool = false, homing: float = 0.0) -> void:
     var speed: float = Catalog.WEAPONS[key]["speed"] * stats["bullet_speed"]
     var aim: Vector2 = direction.normalized() if direction.length() > 0.001 else Vector2.RIGHT
-    var vfx_tier: int = Evolution.tier(weapon_level(key))
-    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"], "homing": homing, "vfx_tier": vfx_tier})
+    var vfx_tier: int = projectile_vfx_tier(key, enchanted)
+    var fire_tier: int = projectile_fire_tier(key)
+    var thunder_tier: int = projectile_thunder_tier(key)
+    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"], "homing": homing, "vfx_tier": vfx_tier, "fire_tier": fire_tier, "thunder_tier": thunder_tier, "fire_enchanted": fire_tier > 0 or Rules.host_is_fire_enchanted(active_links, key), "thunder_enchanted": thunder_tier > 0 or Rules.host_is_thunder_enchanted(active_links, key)})
     if not from_combo and weapon_level(key)>=5:
         if key=="sling": projectiles.back().bounces_left+=1
         if key=="staff": projectiles.back().pierce_left+=1
-    effects.muzzle(point,aim,key,enchanted,vfx_tier)
+    effects.muzzle(point,aim,key,enchanted,vfx_tier,fire_tier,thunder_tier)
 
 func update_projectiles(delta: float) -> void:
     var remaining: Array = []
@@ -3130,18 +3222,24 @@ func _draw() -> void:
         if bool(projectile.get("fire_enchanted", false)):
             var vel: Vector2 = projectile.get("velocity", Vector2.RIGHT)
             var aim: Vector2 = vel.normalized() if vel.length_squared() > 0.01 else Vector2.RIGHT
-            BattleVisuals.draw_fire_wrap(self, projectile["position"], aim, 16.0, elapsed)
+            BattleVisuals.draw_fire_wrap(self, projectile["position"], aim, 22.0, elapsed, int(projectile.get("fire_tier", 0)))
+        if bool(projectile.get("thunder_enchanted", false)):
+            BattleVisuals.draw_thunder_wrap(self, projectile["position"], 16.0, elapsed, int(projectile.get("thunder_tier", 0)))
     for key in weapon_views.keys():
         var view: Sprite2D = weapon_views[key]
         if view == null or not is_instance_valid(view) or not view.visible:
             continue
+        var host_size: float = float(Catalog.WEAPONS.get(key, {}).get("size", 42.0))
         if Rules.host_is_fire_enchanted(active_links, key):
-            var data: Dictionary = Catalog.WEAPONS.get(key, {})
-            BattleVisuals.draw_fire_wrap(self, view.position, Vector2.UP, float(data.get("size", 42.0)) * 0.55, elapsed)
+            BattleVisuals.draw_fire_wrap(self, view.position, Vector2.UP, host_size * 0.92, elapsed, Evolution.tier(weapon_level("firepot")))
         if key == "staff" or Rules.host_is_rune_enchanted(active_links, key):
             var tier: int = Evolution.tier(weapon_level("staff"))
-            if tier >= 1:
-                BattleVisuals.draw_staff_aura(self, view.position, float(Catalog.WEAPONS.get(key, {}).get("size", 42.0)) * 0.42, elapsed, tier)
+            if tier >= 1 or Rules.host_is_rune_enchanted(active_links, key):
+                BattleVisuals.draw_staff_aura(self, view.position, host_size * 0.50, elapsed, tier)
+        if key == "totem" or Rules.host_is_thunder_enchanted(active_links, key):
+            var thunder_tier: int = Evolution.tier(weapon_level("totem"))
+            if thunder_tier >= 1 or Rules.host_is_thunder_enchanted(active_links, key):
+                BattleVisuals.draw_thunder_wrap(self, view.position, host_size * 0.62, elapsed, thunder_tier)
 
 func draw_magic_shell(point: Vector2, direction: Vector2) -> void:
     var normal: Vector2 = direction.orthogonal()

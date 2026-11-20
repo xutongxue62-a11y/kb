@@ -72,6 +72,10 @@ func _initialize() -> void:
             saw_club = true
             break
     expect(saw_club, "the last legal weapon upgrade remains selectable")
+    expect(is_equal_approx(growth.level_hp_bonus(1), 0.0) and is_equal_approx(growth.stats({}, 1)["max_hp"], 8.0), "level 1 health stays at the base 8")
+    expect(is_equal_approx(growth.stats({}, 2)["max_hp"], 9.0) and is_equal_approx(growth.stats({}, 5)["max_hp"], 12.0), "each player level adds 1 max HP")
+    growth.apply(levels, "vitality")
+    expect(is_equal_approx(growth.stats(levels, 4)["max_hp"], 13.0), "level HP stacks with vitality: 8 + 2 + 3")
     finish()
 
 func finish() -> void:

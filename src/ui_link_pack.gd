@@ -41,6 +41,8 @@ var insert_marker: Control
 var tooltip: Control
 var tooltip_link_id: String = ""
 var dragging_id: String = ""
+var dragging_result_id: String = ""
+var result_positions: Dictionary = {}
 var drag_offset: Vector2 = Vector2.ZERO
 var drag_home: Vector2 = Vector2.ZERO
 var body_font: Font
@@ -694,7 +696,7 @@ func _make_result_node(recipe: Dictionary) -> Panel:
 	node.size = RESULT_SIZE
 	node.custom_minimum_size = RESULT_SIZE
 	node.mouse_filter = Control.MOUSE_FILTER_STOP
-	node.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	node.mouse_default_cursor_shape = Control.CURSOR_MOVE
 	node.set_meta("link_id", link_id)
 	node.set_meta("recipe", recipe)
 	var box := StyleBoxFlat.new()
@@ -732,6 +734,7 @@ func _make_result_node(recipe: Dictionary) -> Panel:
 		if tooltip_link_id == link_id:
 			hide_result_tooltip()
 	)
+	node.gui_input.connect(_on_result_input.bind(link_id, node))
 	return node
 
 func _make_ropes() -> Control:
@@ -980,34 +983,182 @@ func _planned_knot_for_recipe(recipe: Dictionary) -> Vector2:
 	var ports: Array = _recipe_ports(recipe)
 	return _knot_point_for_ports(ports)
 
+func _position_store() -> Dictionary:
+	if host != null and "pack_result_positions" in host:
+		return host.pack_result_positions
+	return result_positions
+
+func _stored_result_position(link_id: String) -> Vector2:
+	var store: Dictionary = _position_store()
+	if not store.has(link_id):
+		return Vector2.INF
+	var raw = store[link_id]
+	if raw is Vector2:
+		return raw
+	if raw is Array and raw.size() >= 2:
+		return Vector2(float(raw[0]), float(raw[1]))
+	return Vector2.INF
+
+func _remember_result_position(link_id: String, pos: Vector2) -> void:
+	if link_id.is_empty():
+		return
+	_position_store()[link_id] = pos
+
+func _clamp_result_pos(pos: Vector2, size: Vector2, row_y: float, free_board: bool) -> Vector2:
+	var max_y: float = BOARD_SIZE.y - size.y - BOARD_MARGIN
+	if not free_board:
+		max_y = minf(max_y, maxf(BOARD_MARGIN, row_y - size.y - 36.0))
+	return Vector2(
+		clampf(pos.x, BOARD_MARGIN, BOARD_SIZE.x - size.x - BOARD_MARGIN),
+		clampf(pos.y, BOARD_MARGIN, max_y)
+	)
+
+func _card_row_y() -> float:
+	var row_y: float = BOARD_SIZE.y - ROW_BOTTOM_PAD
+	for weapon_id in cards:
+		var card: Control = cards[weapon_id]
+		if card != null and is_instance_valid(card):
+			row_y = minf(row_y, card.position.y)
+	return row_y
+
+func _default_result_pos(recipe: Dictionary, node: Control, row_y: float) -> Vector2:
+	var knot: Vector2 = _planned_knot_for_recipe(recipe)
+	var pos := Vector2(knot.x - node.size.x * 0.5, knot.y - RESULT_GAP - node.size.y)
+	return _clamp_result_pos(pos, node.size, row_y, false)
+
+func _sync_result_node(node: Control, link_id: String, remember: bool = false) -> void:
+	node.position = _clamp_result_pos(node.position, node.size, _card_row_y(), true)
+	node.set_meta("rope_knot", _result_anchor(node))
+	node.z_index = 22 if dragging_result_id == link_id else 6
+	if remember:
+		_remember_result_position(link_id, node.position)
+
+func _separate_result_items(items: Array, row_y: float) -> void:
+	var gap: float = 10.0
+	for _pass in range(10):
+		var moved := false
+		for i in range(items.size()):
+			for j in range(i + 1, items.size()):
+				var a: Dictionary = items[i]
+				var b: Dictionary = items[j]
+				var box_a := Rect2(a["pos"], a["size"]).grow(8.0)
+				var box_b := Rect2(b["pos"], b["size"]).grow(8.0)
+				if not box_a.intersects(box_b):
+					continue
+				var center_a: Vector2 = box_a.get_center()
+				var center_b: Vector2 = box_b.get_center()
+				var need_x: float = (a["size"].x + b["size"].x) * 0.5 + gap
+				var need_y: float = (a["size"].y + b["size"].y) * 0.5 + gap
+				var delta: Vector2 = center_a - center_b
+				if absf(delta.x) < 0.5 and absf(delta.y) < 0.5:
+					delta = Vector2(1.0 if i < j else -1.0, 0.0)
+				# Prefer a horizontal split when badges share the same mid knot.
+				var axis := Vector2(signf(delta.x) if absf(delta.x) >= absf(delta.y) * 0.35 else 0.0, 0.0)
+				if axis.x == 0.0:
+					axis = Vector2(0.0, 1.0 if delta.y >= 0.0 else -1.0)
+				var push: float = (need_x if axis.x != 0.0 else need_y) - absf(delta.dot(axis))
+				if push <= 0.0:
+					continue
+				var move_a := not bool(a.get("custom", false)) or bool(b.get("custom", false))
+				var move_b := not bool(b.get("custom", false)) or bool(a.get("custom", false))
+				if move_a and move_b:
+					a["pos"] = a["pos"] + axis * (push * 0.5)
+					b["pos"] = b["pos"] - axis * (push * 0.5)
+				elif move_a:
+					a["pos"] = a["pos"] + axis * push
+				else:
+					b["pos"] = b["pos"] - axis * push
+				var free_a: bool = bool(a.get("custom", false))
+				var free_b: bool = bool(b.get("custom", false))
+				a["pos"] = _clamp_result_pos(a["pos"], a["size"], row_y, free_a)
+				b["pos"] = _clamp_result_pos(b["pos"], b["size"], row_y, free_b)
+				moved = true
+		if not moved:
+			break
+
 func _layout_result_nodes(row_y: float) -> void:
-	var placed: Array = []
+	var items: Array = []
 	for recipe in _active_recipes():
 		var link_id: String = str(recipe.get("id", ""))
 		var node: Control = results.get(link_id, null)
 		if node == null or not is_instance_valid(node):
 			continue
-		var knot: Vector2 = _planned_knot_for_recipe(recipe)
-		var pos := Vector2(knot.x - node.size.x * 0.5, knot.y - RESULT_GAP - node.size.y)
-		pos.x = clampf(pos.x, BOARD_MARGIN, BOARD_SIZE.x - node.size.x - BOARD_MARGIN)
-		pos.y = clampf(pos.y, BOARD_MARGIN, maxf(BOARD_MARGIN, row_y - node.size.y - 36.0))
-		var box := Rect2(pos, node.size)
-		for other in placed:
-			var hit: Rect2 = other
-			if not box.grow(8.0).intersects(hit):
-				continue
-			# Slide along the vertical so the node stays on its spoke instead of
-			# being shoved sideways off the rope.
-			box.position.y = maxf(BOARD_MARGIN, hit.position.y - box.size.y - 10.0)
-			if box.grow(6.0).intersects(hit):
-				if box.position.x <= hit.position.x:
-					box.position.x = maxf(BOARD_MARGIN, hit.position.x - box.size.x - 10.0)
-				else:
-					box.position.x = minf(BOARD_SIZE.x - box.size.x - BOARD_MARGIN, hit.end.x + 10.0)
-		node.position = box.position
+		if dragging_result_id == link_id:
+			_sync_result_node(node, link_id, true)
+			continue
+		var stored: Vector2 = _stored_result_position(link_id)
+		var custom: bool = stored.is_finite()
+		var pos: Vector2 = _clamp_result_pos(stored, node.size, row_y, true) if custom else _default_result_pos(recipe, node, row_y)
+		items.append({"id": link_id, "node": node, "pos": pos, "size": node.size, "custom": custom})
+	_separate_result_items(items, row_y)
+	for item in items:
+		var node: Control = item["node"]
+		node.position = item["pos"]
 		node.set_meta("rope_knot", _result_anchor(node))
-		node.z_index = 4
-		placed.append(Rect2(node.position, node.size))
+		node.z_index = 6
+		if bool(item["custom"]):
+			_remember_result_position(str(item["id"]), node.position)
+
+func result_rects_overlap() -> bool:
+	var boxes: Array = []
+	for link_id in results:
+		var node: Control = results[link_id]
+		if node == null or not is_instance_valid(node):
+			continue
+		var box := Rect2(node.position, node.size)
+		for other in boxes:
+			if box.grow(8.0).intersects(other):
+				return true
+		boxes.append(box)
+	return false
+
+func move_result(link_id: String, local_pos: Vector2) -> bool:
+	var node: Control = results.get(link_id, null)
+	if node == null or not is_instance_valid(node):
+		return false
+	node.position = local_pos
+	_sync_result_node(node, link_id, true)
+	_layout_result_nodes(_card_row_y())
+	if ropes != null and is_instance_valid(ropes):
+		ropes.queue_redraw()
+	return true
+
+func _on_result_input(event: InputEvent, link_id: String, node: Control) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			if not dragging_id.is_empty():
+				return
+			_begin_result_drag(link_id, node, event.position)
+			node.accept_event()
+		elif dragging_result_id == link_id:
+			_finish_result_drag()
+			node.accept_event()
+	elif event is InputEventMouseMotion and dragging_result_id == link_id:
+		node.global_position += event.relative
+		_sync_result_node(node, link_id, true)
+		if ropes != null and is_instance_valid(ropes):
+			ropes.queue_redraw()
+		node.accept_event()
+
+func _begin_result_drag(link_id: String, node: Control, local_pos: Vector2) -> void:
+	hide_result_tooltip()
+	dragging_result_id = link_id
+	drag_offset = local_pos
+	node.z_index = 22
+	_set_status("拖动这个联动结果到你喜欢的位置，绳子会跟着走；松开后位置会保留。")
+
+func _finish_result_drag() -> void:
+	if dragging_result_id.is_empty():
+		return
+	var link_id: String = dragging_result_id
+	var node: Control = results.get(link_id, null)
+	dragging_result_id = ""
+	if node != null and is_instance_valid(node):
+		_sync_result_node(node, link_id, true)
+	_layout_result_nodes(_card_row_y())
+	if ropes != null and is_instance_valid(ropes):
+		ropes.queue_redraw()
+	_set_status(_status_copy())
 
 func _show_result_tooltip(link_id: String) -> void:
 	if link_id.is_empty() or not Catalog.LINKS.has(link_id) or link_id == "none":
@@ -1502,6 +1653,17 @@ func _collect_text(node: Node, parts: PackedStringArray) -> void:
 		_collect_text(child, parts)
 
 func _input(event: InputEvent) -> void:
+	if not dragging_result_id.is_empty():
+		var node: Control = results.get(dragging_result_id, null)
+		if event is InputEventMouseMotion and node != null and is_instance_valid(node):
+			node.global_position = get_global_mouse_position() - drag_offset
+			_sync_result_node(node, dragging_result_id, true)
+			if ropes != null and is_instance_valid(ropes):
+				ropes.queue_redraw()
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			_finish_result_drag()
+			get_viewport().set_input_as_handled()
+		return
 	if dragging_id.is_empty():
 		return
 	if event is InputEventMouseMotion:

@@ -25,13 +25,15 @@ const PLAYER_RADIUS: float = 18.0
 static func base_damage(kind: String) -> float:
     return float(DAMAGE.get(kind, BiomeEncounters.MOBS.get(kind, {}).get("damage", 1.0)))
 
-static func spawn_pool(wave: int, elapsed: float, trial: bool, boss_round: bool) -> Array:
+static func spawn_pool(wave: int, elapsed: float, trial: bool, _boss_round: bool = false) -> Array:
+    # Regular minions on a Boss stage match a normal stage of the same wave,
+    # including heavier kinds. The Boss itself is spawned separately.
     if trial:
         return ["hunter", "hunter", "charger", "spitter", "tank", "raptor", "thrower", "armored"] + BiomeEncounters.GROVE + BiomeEncounters.VOLCANO
     if wave >= 9:
-        return ["embersnout", "ashhound", "cindertusk"] if boss_round else ["embersnout", "embersnout", "ashhound", "ashhound", "basaltroller", "cindertusk"]
+        return ["embersnout", "embersnout", "ashhound", "ashhound", "basaltroller", "cindertusk"]
     if wave >= 5:
-        return ["leafstalker", "sporeback", "reedspitter"] if boss_round else ["leafstalker", "leafstalker", "sporeback", "sporeback", "bonecaller", "reedspitter"]
+        return ["leafstalker", "leafstalker", "sporeback", "sporeback", "bonecaller", "reedspitter"]
     if wave <= 1:
         return ["hunter", "hunter"] if elapsed < 12.0 else ["hunter", "hunter", "charger"]
     var pool: Array = ["hunter", "hunter", "charger", "spitter", "tank", "raptor"]

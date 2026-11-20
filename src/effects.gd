@@ -72,17 +72,27 @@ func weapon_aura(at: Vector2, color: Color, size: float = 28.0) -> void:
 func beam(start: Vector2, end: Vector2, color: Color) -> void:
     add_particle({"at": start, "end": end, "color": color, "size": 6.5, "kind": "beam", "age": 0.0, "life": 0.20})
 
-func muzzle(at: Vector2, direction: Vector2, key: String, enchanted: bool = false, vfx_tier: int = 0) -> void:
+func muzzle(at: Vector2, direction: Vector2, key: String, enchanted: bool = false, vfx_tier: int = 0, fire_tier: int = 0, thunder_tier: int = 0) -> void:
     if key not in ["sling", "powder", "staff"]:
         return
     var axis: Vector2 = direction.normalized() if direction.length_squared() > 0.01 else Vector2.RIGHT
     var kind: String = {"sling": "sling_release", "powder": "powder_muzzle", "staff": "staff_muzzle"}[key]
     var color: Color = {"sling": Color("#ead3a0"), "powder": Color("#ffbc54"), "staff": Color("#70f2fa")}[key]
-    if key == "staff" or (key == "powder" and enchanted):
+    if key == "staff" or enchanted:
         color = BattleVisuals.staff_tint(vfx_tier)
+    elif fire_tier > 0:
+        color = BattleVisuals.fire_tint(fire_tier)
+    elif thunder_tier > 0:
+        color = BattleVisuals.thunder_tint(thunder_tier)
     add_particle({"at": at, "direction": axis, "weapon_id": key, "enchanted": enchanted, "color": color, "size": 23.0 if key == "powder" else (16.0 if key == "staff" and vfx_tier >= 1 else 14.0), "kind": kind, "age": 0.0, "life": 0.11 if key == "powder" else (0.14 if key == "sling" else 0.18), "vfx_tier": vfx_tier})
     if key == "powder":
         puff(at - axis * 3, Color("#aa967c"), 10.0, 1)
+
+func sky_lightning(start: Vector2, end: Vector2, color: Color) -> void:
+    lightning(start, end, color)
+    lightning(start + Vector2(8.0, 0.0), end + Vector2(2.0, 0.0), color.lightened(0.2))
+    burst(end, color, 62.0, "ring")
+    puff(end, color, 16.0, 4)
 
 func lightning(start: Vector2, end: Vector2, color: Color) -> void:
     var length: float = start.distance_to(end)

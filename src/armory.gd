@@ -48,6 +48,8 @@ func advance(delta: float, hero: Vector2, enemies: Array, inventory: Array, stat
         state["age"] += delta * haste
         var target: Dictionary = Rules.choose_target(hero,reach,enemies,prefer_elite)
         var damage: float = data["damage"] * (1.0+(item["level"]-1)*0.35)
+        if key == "totem":
+            events.append_array(try_sky_lightning(state, item, hero, enemies, damage, delta * haste))
         if state["phase"] == "rest" and state["cooldown"] <= 0 and not target.is_empty():
             state["direction"] = (target["position"]-hero).normalized()
             state["age"] = 0.0
@@ -217,3 +219,29 @@ func _draw() -> void:
             draw_line(point-Vector2(size,-size),point+Vector2(size,-size),Color(0.79,0.62,0.31,0.55),3.0,true)
         elif key == "boomerang" and state["phase"] != "rest":
             draw_arc(state["position"],19,-1.6+state["age"]*20,1.3+state["age"]*20,16,Color(0.96,0.84,0.52,0.65),3.0,true)
+
+func try_sky_lightning(state: Dictionary, item: Dictionary, hero: Vector2, enemies: Array, damage: float, dt: float) -> Array:
+    var level: int = clampi(int(item.get("level", 1)), 1, 5)
+    var profile: Dictionary = Evolution.sky_lightning_profile(level)
+    state["sky_cooldown"] = maxf(0.0, float(state.get("sky_cooldown", 0.0)) - maxf(0.0, dt))
+    if not bool(profile.get("unlocked", false)) or state["sky_cooldown"] > 0.0:
+        return []
+    var reach: float = 460.0
+    var target: Dictionary = Rules.choose_target(hero, reach, enemies, true)
+    if target.is_empty():
+        target = Rules.choose_target(hero, reach, enemies, false)
+    if target.is_empty():
+        return []
+    var point: Vector2 = target["position"]
+    var bolt_damage: float = damage * float(profile["damage_multiplier"])
+    state["sky_cooldown"] = float(profile["cooldown"])
+    return [{
+        "type": "sky_lightning",
+        "start": point + Vector2(0.0, -float(profile["height"])),
+        "end": point,
+        "position": point,
+        "radius": float(profile["radius"]),
+        "damage": bolt_damage,
+        "weapon_id": "totem",
+        "color": Color("#e8fbff")
+    }]

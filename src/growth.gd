@@ -21,7 +21,15 @@ const BUFFS = {
     "drone": {"name": "石灵飞行器", "glyph": "灵", "category": "support", "max_level": 999, "description": "召唤跟随飞行器，符能点射\n再选提升伤害与出手速度", "color": Color("#4f9b9f")}
 }
 
-static func stats(levels: Dictionary) -> Dictionary:
+const BASE_MAX_HP: float = 8.0
+const VITALITY_HP: float = 2.0
+const LEVEL_UP_HP: float = 1.0
+
+static func level_hp_bonus(player_level: int) -> float:
+    return LEVEL_UP_HP * float(maxi(0, player_level - 1))
+
+static func stats(levels: Dictionary, player_level: int = 1) -> Dictionary:
+
     levels = levels.duplicate()
     for key in BUFFS:
         levels[key] = clampi(int(levels.get(key, 0)), 0, int(BUFFS[key]["max_level"]))
@@ -34,7 +42,7 @@ static func stats(levels: Dictionary) -> Dictionary:
         # Layers are uncapped now, so reduction and dodge stack multiplicatively:
         # each layer removes its share of what is left, never reaching 100%.
         "reduction": 1.0 - pow(0.88, int(levels.get("armor", 0))),
-        "max_hp": 8.0 + 2.0 * int(levels.get("vitality", 0)),
+        "max_hp": BASE_MAX_HP + VITALITY_HP * float(int(levels.get("vitality", 0))) + level_hp_bonus(player_level),
         "regen": 0.12 * int(levels.get("regen", 0)),
         "dodge": 1.0 - pow(0.94, int(levels.get("dodge", 0))),
         "hit_radius": 2.0 * int(levels.get("accuracy", 0)),

@@ -79,7 +79,8 @@ func check_pools_and_growth() -> void:
         expect(all_regular.has(kind), "ordinary spawn pool can actually select " + kind)
         expect(roster.spawn_pool(1, 0.0, true, false).has(kind), "trial mode makes " + kind + " available without waiting")
     expect(not all_regular.has("boss") and not roster.spawn_pool(10, 300.0, false, true).has("boss"), "boss remains an explicit round spawn, never a random ordinary pick")
-    expect(not roster.spawn_pool(5, 120.0, false, true).has("armored"), "boss adds do not stack another heavy quake onto the boss")
+    expect(roster.spawn_pool(5, 120.0, false, true) == roster.spawn_pool(5, 120.0, false, false), "a Boss stage uses the same regular minion pool as a normal stage")
+    expect(roster.spawn_pool(5, 120.0, false, true).has("bonecaller"), "grove Boss stages still include heavy bonecallers")
     var progression = load("res://src/progression.gd")
     for kind in ["raptor", "thrower", "armored"]:
         var opening: Dictionary = progression.enemy_profile(1, kind)

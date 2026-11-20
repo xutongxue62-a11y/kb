@@ -61,6 +61,7 @@ func run_checks() -> void:
     await check_drop_face_vs_edge()
     await check_restack_cancel_and_host_enchant()
     await check_all_recipes_cancel_and_catalyst_hosts()
+    await check_draggable_result_nodes()
     print("LINK PACK RESULT: %d checks, %d failures" % [checks, failures])
     quit(1 if failures > 0 else 0)
 
@@ -791,6 +792,57 @@ func check_all_recipes_cancel_and_catalyst_hosts() -> void:
     var replaced: Dictionary = ui.try_drop("firepot", "powder")
     expect(replaced.get("ok", false) and world.has_active_link("fire_cannon") and not world.has_active_link("thunder_shell"), "a new fire enchant on the cannon replaces 导雷火炮")
     expect(world.has_active_link("thunder_sling"), "replacing the cannon enchant does not tear the totem's sling link")
+    world.close_link_pack()
+    world.queue_free()
+    await process_frame
+
+func check_draggable_result_nodes() -> void:
+    var world = make_world("drag_results")
+    world.starting_weapon = "staff"
+    world.start_run(false)
+    for weapon_id in ["spear", "bonebow", "powder", "firepot", "totem"]:
+        expect(_grant_owned(world, weapon_id), "drag fixture owns " + weapon_id)
+    expect(world.inventory.size() == 6, "drag fixture matches the six-card screenshot loadout")
+    expect(world.open_link_pack(), "pack opens for result drag checks")
+    var ui = pack(world)
+    await process_frame
+    await process_frame
+    var storm: Dictionary = ui.try_drop("bonebow", "totem")
+    var cannon: Dictionary = ui.try_drop("powder", "firepot")
+    expect(storm.get("ok", false) and world.has_active_link("storm_arrow"), "导雷骨箭 can form in the screenshot loadout")
+    expect(cannon.get("ok", false) and world.has_active_link("fire_cannon"), "烈焰火炮 can form in the screenshot loadout")
+    await process_frame
+    await process_frame
+    expect(ui.result_control("storm_arrow") != null and ui.result_control("fire_cannon") != null, "both 联动结果 badges exist")
+    expect(not ui.result_rects_overlap(), "default 联动结果 badges do not overlap")
+    var node: Control = ui.result_control("fire_cannon")
+    var old_pos: Vector2 = node.position
+    var old_knot: Vector2 = ui.rope_knot_for("fire_cannon")
+    expect(ui.move_result("fire_cannon", Vector2(36, 28)), "a result badge can be dragged freely")
+    await process_frame
+    expect(node.position.distance_to(old_pos) > 8.0, "dragging moves the 联动结果 node")
+    var new_knot: Vector2 = ui.rope_knot_for("fire_cannon")
+    expect(new_knot.distance_to(old_knot) > 8.0, "the rope knot follows the dragged node")
+    expect(new_knot.distance_to(ui._result_anchor(node)) <= 0.5, "the followed knot stays on the badge")
+    expect(not ui.result_rects_overlap(), "after a drag the badges still do not overlap")
+    var saved_pos: Vector2 = node.position
+    world.close_link_pack()
+    expect(world.open_link_pack(), "the pack can close and reopen after a drag")
+    ui = pack(world)
+    await process_frame
+    await process_frame
+    node = ui.result_control("fire_cannon")
+    expect(node != null and node.position.distance_to(saved_pos) < 2.0, "the dragged position persists for the current pack session")
+    var captured: Dictionary = world.SessionState.capture(world)
+    expect(captured.get("pack_result_positions", {}).has("fire_cannon"), "the run save stores dragged result positions")
+    expect(world.SessionState.apply(world, captured), "a save with result positions can be restored")
+    expect(world.open_link_pack(), "the restored run can open the pack")
+    ui = pack(world)
+    await process_frame
+    await process_frame
+    node = ui.result_control("fire_cannon")
+    expect(node != null and node.position.distance_to(saved_pos) < 2.0, "restoring a save keeps the dragged 联动结果 position")
+    expect(not ui.result_rects_overlap(), "restored badges still do not overlap")
     world.close_link_pack()
     world.queue_free()
     await process_frame

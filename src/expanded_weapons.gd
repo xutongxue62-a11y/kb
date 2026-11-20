@@ -46,6 +46,8 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
     var hold_aim: Vector2 = state["direction"] if Vector2(state.get("direction", Vector2.RIGHT)).length() > 0.01 else (mount - hero)
     var idle_presentation: bool = key != "bonebow" or (target.is_empty() and (not state["has_fired"] or state["age"] > 0.16))
     Rules.apply_parked_hold(view, key, hero, hold_aim, idle_presentation)
+    if key == "firepot":
+        events.append_array(try_fire_pillar(state, item, target, damage, area, dt, stage))
     if state["cooldown"] <= 0.0 and not target.is_empty() and not (key == "wardrum" and state["phase"] == "playing"):
         state["cooldown"] = data["cooldown"] / (1.0 + (level - 1) * 0.08)
         var reload_map: Dictionary = stats.get("reload_multipliers", {})
@@ -70,11 +72,16 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                         kinds = [str(stats.get("link_kind", "none"))]
                     var bonebow_hosted: bool = str(stats.get("reload_weapon", "")) == "bonebow" or (typeof(reload_map) == TYPE_DICTIONARY and float(reload_map.get("bonebow", 1.0)) > 1.0)
                     var fire_shot: bool = bonebow_hosted and kinds.has("fire_enchant")
-                    var rune_shot: bool = bonebow_hosted and kinds.has("rune_enchant")
-                    if fire_shot or rune_shot:
+                    var rune_shot: bool = bonebow_hosted and (kinds.has("rune_enchant") or kinds.has("rune"))
+                    var thunder_shot: bool = bonebow_hosted and (kinds.has("thunder_enchant") or kinds.has("storm_arrow"))
+                    if fire_shot or rune_shot or thunder_shot:
                         shot["enchanted"] = rune_shot
                         shot["fire_enchanted"] = fire_shot
-                        shot["link_kind"] = "rune_enchant" if rune_shot else "fire_enchant"
+                        shot["thunder_enchanted"] = thunder_shot
+                        shot["vfx_tier"] = int(stats.get("staff_tier", 0)) if rune_shot else 0
+                        shot["fire_tier"] = int(stats.get("firepot_tier", 0)) if fire_shot else 0
+                        shot["thunder_tier"] = int(stats.get("totem_tier", 0)) if thunder_shot else 0
+                        shot["link_kind"] = "rune_enchant" if rune_shot else ("fire_enchant" if fire_shot else "thunder_enchant")
                     state.arrows.append(shot)
             "firepot":
                 var flight: float = clampf(mount.distance_to(target["position"]) / data["speed"], 0.32, 0.65)
@@ -225,12 +232,19 @@ static func draw(canvas: Node2D, key: String, state: Dictionary) -> void:
                 var side: Vector2 = direction.orthogonal()
                 var shaft: Color = Color("#e5c794")
                 var tip: Color = Color("#f1dfb9")
-                if arrow.get("enchanted", false) or arrow.get("fire_enchanted", false):
-                    shaft = Color("#6ee7f2") if bool(arrow.get("enchanted", false)) else Color("#f3a15a")
+                if arrow.get("enchanted", false) or arrow.get("fire_enchanted", false) or arrow.get("thunder_enchanted", false):
+                    if bool(arrow.get("enchanted", false)):
+                        shaft = BattleVisuals.staff_tint(int(arrow.get("vfx_tier", 0)))
+                    elif bool(arrow.get("fire_enchanted", false)):
+                        shaft = BattleVisuals.fire_tint(int(arrow.get("fire_tier", 0)))
+                    else:
+                        shaft = BattleVisuals.thunder_tint(int(arrow.get("thunder_tier", 0)))
                     tip = shaft.lightened(0.18)
                     canvas.draw_line(point - direction * 31.0, point + direction * 11.0, Color(shaft, 0.42), 11.0, true)
                     if bool(arrow.get("fire_enchanted", false)):
-                        BattleVisuals.draw_fire_wrap(canvas, point, direction, 14.0, float(arrow.get("age", 0.0)))
+                        BattleVisuals.draw_fire_wrap(canvas, point, direction, 18.0, float(arrow.get("age", 0.0)), int(arrow.get("fire_tier", 0)))
+                    elif bool(arrow.get("thunder_enchanted", false)):
+                        BattleVisuals.draw_thunder_wrap(canvas, point, 14.0, float(arrow.get("age", 0.0)), int(arrow.get("thunder_tier", 0)))
                 canvas.draw_line(point - direction * 29.0, point + direction * 9.0, INK, 7.0, true)
                 canvas.draw_line(point - direction * 29.0, point + direction * 9.0, shaft, 3.5, true)
                 outlined_polygon(canvas, PackedVector2Array([point + direction * 19.0, point + direction * 4.0 + side * 7.0, point + direction * 6.0, point + direction * 4.0 - side * 7.0]), tip)
@@ -289,3 +303,19 @@ static func draw_pot(canvas: Node2D, point: Vector2) -> void:
     canvas.draw_line(point + Vector2(-8, 4), point + Vector2(9, 5), Color("#e7bb77"), 3.0, true)
     canvas.draw_line(point + Vector2(0, -9), point + Vector2(1, -18), INK, 3.0, true)
     canvas.draw_circle(point + Vector2(1, -18), 3.0, Color("#ffcc62"))
+
+static func try_fire_pillar(state: Dictionary, item: Dictionary, target: Dictionary, damage: float, area: float, dt: float, stage: int) -> Array:
+    var level: int = clampi(int(item.get("level", 1)), 1, 5)
+    var profile: Dictionary = Evolution.fire_pillar_profile(level)
+    state["pillar_cooldown"] = maxf(0.0, float(state.get("pillar_cooldown", 0.0)) - maxf(0.0, dt))
+    if not bool(profile.get("unlocked", false)) or state["pillar_cooldown"] > 0.0 or target.is_empty():
+        return []
+    state["pillar_cooldown"] = float(profile["cooldown"])
+    return [{
+        "type": "fire_pillar",
+        "position": target["position"],
+        "radius": float(profile["radius"]) * area,
+        "damage": damage * float(profile["damage_multiplier"]),
+        "weapon_id": "firepot",
+        "tier": stage
+    }]

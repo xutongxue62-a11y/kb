@@ -16,6 +16,28 @@ static func vector(value, fallback: Vector2 = Vector2.ZERO) -> Vector2:
             return result
     return fallback
 
+
+static func _capture_result_positions(world: Node) -> Dictionary:
+    var saved := {}
+    var raw = world.pack_result_positions if "pack_result_positions" in world else {}
+    if typeof(raw) != TYPE_DICTIONARY:
+        return saved
+    for link_id in raw:
+        var value = raw[link_id]
+        if value is Vector2:
+            saved[str(link_id)] = point(value)
+        elif value is Array and value.size() >= 2:
+            saved[str(link_id)] = [float(value[0]), float(value[1])]
+    return saved
+
+static func _restore_result_positions(raw) -> Dictionary:
+    var restored := {}
+    if typeof(raw) != TYPE_DICTIONARY:
+        return restored
+    for link_id in raw:
+        restored[str(link_id)] = vector(raw[link_id], Vector2.ZERO)
+    return restored
+
 static func capture(world: Node, finished: bool = false) -> Dictionary:
     var enemies: Array = []
     for enemy in world.enemies:
@@ -50,7 +72,8 @@ static func capture(world: Node, finished: bool = false) -> Dictionary:
         "link_ids":world.active_link_ids(),
         "enemy_adaptation":world.enemy_adaptation, "enemy_serial":world.enemy_serial, "enemies":enemies, "pickups":drops,
         "boss_round":world.boss_round, "boss_defeated":world.boss_defeated, "boss_clear_left":world.boss_clear_left, "shop_open":world.shop_open,
-        "shop_stock":world.shop_stock.duplicate(true), "rng_state":str(world.rng.state)
+        "shop_stock":world.shop_stock.duplicate(true), "rng_state":str(world.rng.state),
+        "pack_result_positions":_capture_result_positions(world)
     }
 
 static func apply(world: Node, state: Dictionary) -> bool:
@@ -78,10 +101,11 @@ static func apply(world: Node, state: Dictionary) -> bool:
     for key in state.get("buff_levels",{}):
         if Growth.BUFFS.has(key):
             world.buff_levels[key] = clampi(int(state["buff_levels"][key]),0,Growth.BUFFS[key]["max_level"])
+    world.player_level = maxi(1,int(state.get("player_level",1)))
     if world.has_method("refresh_stats"):
         world.refresh_stats()
     else:
-        world.stats = Growth.stats(world.buff_levels)
+        world.stats = Growth.stats(world.buff_levels, world.player_level)
         Catalog.apply_character_modifiers(world.stats, world.character_id)
     world.player_hp = clampf(float(state.get("player_hp",8.0)),0.0,world.stats["max_hp"])
     world.player_position = vector(state.get("player_position"),Vector2(640,401))
@@ -89,7 +113,6 @@ static func apply(world: Node, state: Dictionary) -> bool:
     world.coins = maxi(0,int(state.get("coins",0)))
     world.xp = maxf(0.0,float(state.get("xp",0.0)))
     world.xp_needed = maxi(8,int(state.get("xp_needed",8)))
-    world.player_level = maxi(1,int(state.get("player_level",1)))
     world.kills = maxi(0,int(state.get("kills",0)))
     world.collapsed = bool(state.get("collapsed",false))
     world.prefer_elite = bool(state.get("prefer_elite",false))
@@ -168,4 +191,6 @@ static func apply(world: Node, state: Dictionary) -> bool:
             world.set_loadout_visible(false)
     else:
         world.hud.hide_menu()
+    if "pack_result_positions" in world:
+        world.pack_result_positions = _restore_result_positions(state.get("pack_result_positions", {}))
     return true
