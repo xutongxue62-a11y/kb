@@ -126,6 +126,8 @@ var kills: int = 0
 var xp: float = 0.0
 var xp_needed: int = 8
 var player_level: int = 1
+var stage_hp_bonus: int = 0
+var stage_hp_granted_wave: int = 0
 var enemy_serial: int = 0
 var elite_budget: int = 0
 var spawn_clock: float = 0.0
@@ -326,6 +328,8 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     audio.stop_all()
     audio.set_paused(false)
     buff_levels.clear()
+    stage_hp_bonus = 0
+    stage_hp_granted_wave = 0
     refresh_stats()
     pickups.clear()
     companions.reset()
@@ -391,6 +395,8 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     kills = 0
     xp = 0
     player_level = 1
+    stage_hp_bonus = 0
+    stage_hp_granted_wave = 0
     xp_needed = Growth.xp_needed_for(player_level)
     spawn_clock = 0.55
     enemy_serial = 0
@@ -655,7 +661,7 @@ func record_character_wave(reached: int = -1) -> void:
     sync_character_progress()
 
 func refresh_stats() -> Dictionary:
-    stats = Growth.stats(buff_levels, player_level)
+    stats = Growth.stats(buff_levels, stage_hp_bonus)
     if not trial_mode:
         Catalog.apply_character_modifiers(stats, character_id)
     return stats
@@ -1186,8 +1192,6 @@ func _finish_successful_choice() -> void:
         xp = maxf(0.0, xp - xp_needed)
         player_level += 1
         xp_needed = Growth.xp_needed_for(player_level)
-        refresh_stats()
-        player_hp = minf(stats["max_hp"], player_hp + Growth.LEVEL_UP_HP)
         if audio != null:
             audio.play("level_up", -6.0)
     elif upgrade_reason != "chest":
@@ -1639,9 +1643,20 @@ func is_loadout_visible() -> bool:
             return true
     return false
 
+func grant_stage_clear_hp() -> void:
+    if stage_hp_granted_wave >= wave:
+        return
+    stage_hp_granted_wave = wave
+    stage_hp_bonus += 1
+    refresh_stats()
+    player_hp = minf(float(stats["max_hp"]), player_hp + Growth.STAGE_CLEAR_HP)
+    if hud != null:
+        update_hud()
+
 func start_wave_closing() -> void:
     if wave_closing or shop_open or not running:
         return
+    grant_stage_clear_hp()
     close_link_pack()
     spawn_clock = 9999.0
     expire_combat_fx()
@@ -1691,6 +1706,7 @@ func continue_round_rewards() -> void:
 func end_round() -> void:
     if not running or shop_open:
         return
+    grant_stage_clear_hp()
     wave_closing = true
     wave_buffer = 0.0
     player_frozen = true
@@ -2246,11 +2262,11 @@ func try_apply_ward(enemy: Dictionary, source: String, origin: Vector2 = Vector2
         return false
     if str(enemy.get("kind", "")) == "boss":
         duration = Rules.PARALYZE_BOSS_DURATION
-    if elapsed < float(enemy.get("ward_ready", -1000.0)):
+    if bool(enemy.get("paralyzed_once", false)):
         return false
     if elapsed < float(ward_ready.get(source, -1000.0)):
         return false
-    enemy["ward_ready"] = elapsed + float(profile.get("target_cooldown", Rules.PARALYZE_TARGET_COOLDOWN))
+    enemy["paralyzed_once"] = true
     ward_ready[source] = elapsed + float(profile.get("interval", Rules.PARALYZE_INTERVAL))
     enemy["ward_kind"] = "paralyze"
     enemy["ward_left"] = duration
@@ -2387,7 +2403,7 @@ func update_armory(delta: float) -> void:
                 var pillar_color: Color = BattleVisuals.fire_tint(pillar_tier)
                 effects.burst(command["position"], pillar_color, float(command["radius"]), "ring")
                 damage_area(command["position"], float(command["radius"]) * stats["area_multiplier"], float(command["damage"]), "firepot", true, pillar_color, "quake")
-                burning_fields.append({"position": command["position"], "age": 0.0, "life": 1.15, "tick": 0.18, "radius": float(command["radius"]) * stats["area_multiplier"], "damage": float(command["damage"]) * 0.28, "weapon_id": "firepot", "from_link": false, "residual": "fire"})
+                burning_fields.append({"position": command["position"], "age": 0.0, "life": 1.15, "tick": 0.18, "radius": float(command["radius"]) * stats["area_multiplier"], "damage": float(command["damage"]) * 0.28 * Rules.BURN_TICK_SCALE, "weapon_id": "firepot", "from_link": false, "residual": "fire"})
                 audio.play("powder", -1.0, 0.82)
                 flash_weapon("firepot")
     refresh_weapon_enchant_tint()
@@ -2913,7 +2929,7 @@ func _spawn_attachment_fire(point: Vector2, host_id: String) -> void:
     var pot_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "firepot")
     var radius: float = (56.0 if host_id == "powder" or host_id == "hammer" else 38.0) * float(stats.get("area_multiplier", 1.0)) * float(pot_bonus.get("area_multiplier", 1.0))
     var life: float = (1.35 if host_id == "powder" or host_id == "hammer" else 1.05) * float(pot_bonus.get("life_multiplier", 1.0))
-    var damage: float = 0.55 * (1.0 + (weapon_level("firepot") - 1) * 0.25) * float(pot_bonus.get("damage_multiplier", 1.0))
+    var damage: float = 0.55 * (1.0 + (weapon_level("firepot") - 1) * 0.25) * float(pot_bonus.get("damage_multiplier", 1.0)) * Rules.BURN_TICK_SCALE
     burning_fields.append({"position": point, "age": 0.0, "life": life, "tick": 0.18, "radius": radius, "damage": damage, "weapon_id": "firepot", "from_link": true})
     if burning_fields.size() > 12:
         burning_fields.pop_front()
@@ -2952,7 +2968,7 @@ func explode_powder(projectile: Dictionary) -> void:
     audio.play("blast", 0.0, 0.88)
     var stage: int=Evolution.tier(weapon_level("powder"))
     if (stage>=1 and not enchanted and not fire_cannon) or fire_cannon:
-        var field_damage: float = projectile.damage*0.16
+        var field_damage: float = projectile.damage*0.16*Rules.BURN_TICK_SCALE
         var field_radius: float = 56.0*stats.area_multiplier
         var field_life: float = 1.4
         var residual: String = "fire" if fire_cannon else "smoke"
@@ -2973,7 +2989,7 @@ func explode_powder(projectile: Dictionary) -> void:
     if burning_fields.size()>12: burning_fields.pop_front()
     if enchanted:
         var staff_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "staff")
-        var rune_damage: float = 0.7 * (1.0 + (weapon_level("staff") - 1) * 0.25) * float(staff_bonus.get("damage_multiplier", 1.0))
+        var rune_damage: float = 0.7 * (1.0 + (weapon_level("staff") - 1) * 0.25) * float(staff_bonus.get("damage_multiplier", 1.0)) * Rules.BURN_TICK_SCALE
         burning_fields.append({"position": point, "age": 0.0, "life": 1.1, "tick": 0.18, "radius": 61.0 * stats["area_multiplier"], "damage": rune_damage, "weapon_id": "staff", "from_link": true, "residual": "rune"})
         if burning_fields.size() > 12:
             burning_fields.pop_front()
@@ -3052,6 +3068,8 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
     var slammed: bool = not neutral and float(stats.get("close_damage_bonus", 0.0)) > 0.0 and player_position.distance_to(enemy["position"]) <= float(stats.get("close_damage_range", 140.0))
     if slammed:
         amount *= 1.0 + float(stats["close_damage_bonus"])
+    if not neutral:
+        amount *= Progression.outgoing_damage_scale(wave)
     enemy["hp"] = maxf(0.0, enemy["hp"] - amount)
     var push: float = 180.0 if weapon_id == "club" else (145.0 if weapon_id == "axe" else (85.0 if weapon_id == "blade" else 36.0))
     if neutral or weapon_id == "staff":

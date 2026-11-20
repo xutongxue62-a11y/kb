@@ -65,7 +65,7 @@ static func capture(world: Node, finished: bool = false) -> Dictionary:
         "wave_closing":world.wave_closing,"wave_buffer":world.wave_buffer,"boss_pending":world.boss_pending,
         "version":1, "finished":finished, "wave":world.wave, "wave_elapsed":world.wave_elapsed, "elapsed":world.elapsed,
         "player_hp":world.player_hp, "player_position":point(world.player_position), "coins":world.coins,
-        "xp":world.xp, "xp_needed":world.xp_needed, "player_level":world.player_level, "kills":world.kills,
+        "xp":world.xp, "xp_needed":world.xp_needed, "player_level":world.player_level, "stage_hp_bonus":world.stage_hp_bonus, "stage_hp_granted_wave":world.stage_hp_granted_wave, "kills":world.kills,
         "inventory":world.inventory.duplicate(true), "buff_levels":world.buff_levels.duplicate(true), "starting_weapon":world.starting_weapon,
         "character_id":world.character_id,
         "collapsed":world.collapsed, "prefer_elite":world.prefer_elite, "link_id":world.active_link["id"] if world.active_link_ids().is_empty() else str(world.active_link_ids()[0]),
@@ -102,10 +102,12 @@ static func apply(world: Node, state: Dictionary) -> bool:
         if Growth.BUFFS.has(key):
             world.buff_levels[key] = clampi(int(state["buff_levels"][key]),0,Growth.BUFFS[key]["max_level"])
     world.player_level = maxi(1,int(state.get("player_level",1)))
+    world.stage_hp_bonus = maxi(0,int(state.get("stage_hp_bonus",0)))
+    world.stage_hp_granted_wave = maxi(0,int(state.get("stage_hp_granted_wave",0)))
     if world.has_method("refresh_stats"):
         world.refresh_stats()
     else:
-        world.stats = Growth.stats(world.buff_levels, world.player_level)
+        world.stats = Growth.stats(world.buff_levels, world.stage_hp_bonus)
         Catalog.apply_character_modifiers(world.stats, world.character_id)
     world.player_hp = clampf(float(state.get("player_hp",8.0)),0.0,world.stats["max_hp"])
     world.player_position = vector(state.get("player_position"),Vector2(640,401))

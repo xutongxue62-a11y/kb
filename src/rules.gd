@@ -554,10 +554,10 @@ const MAGNET_WAVE_BONUS: float = 10.0
 const MAGNET_WAVE_STEPS: int = 10
 const WARD_INTERVAL: float = 0.70
 const WARD_TARGET_COOLDOWN: float = 1.55
-const PARALYZE_DURATION: float = 0.55
-const PARALYZE_BOSS_DURATION: float = 0.22
+const PARALYZE_DURATION: float = 0.28
+const PARALYZE_BOSS_DURATION: float = 0.12
 const PARALYZE_INTERVAL: float = 2.5
-const PARALYZE_TARGET_COOLDOWN: float = 12.0
+const BURN_TICK_SCALE: float = 0.50
 
 static func spawn_interval(wave: int) -> float:
     var stage: int = maxi(1, wave)
@@ -585,6 +585,6 @@ static func ward_profile(source: String, level: int = 1) -> Dictionary:
     if source == "thunder":
         var stage: int = 2 if level >= 5 else (1 if level >= 3 else 0)
         if stage <= 0:
-            return {"kind": "none", "distance": 0.0, "duration": 0.0, "interval": PARALYZE_INTERVAL, "target_cooldown": PARALYZE_TARGET_COOLDOWN}
-        return {"kind": "paralyze", "distance": 0.0, "duration": PARALYZE_DURATION, "interval": PARALYZE_INTERVAL, "target_cooldown": PARALYZE_TARGET_COOLDOWN}
+            return {"kind": "none", "distance": 0.0, "duration": 0.0, "interval": PARALYZE_INTERVAL, "once": true}
+        return {"kind": "paralyze", "distance": 0.0, "duration": PARALYZE_DURATION, "interval": PARALYZE_INTERVAL, "once": true}
     return {"kind": "none", "distance": 0.0, "duration": 0.0, "interval": 0.0, "target_cooldown": 0.0}

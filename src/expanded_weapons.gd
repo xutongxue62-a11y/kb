@@ -168,7 +168,7 @@ static func advance_firepots(state: Dictionary, dt: float, targets: Array, event
         var pot: Dictionary = pots[index]
         pot["age"] += dt
         if pot["age"] >= pot["flight"]:
-            fires.append({"position": pot["position"], "age": -0.18 + pot["age"] - pot["flight"], "next_tick": 0.0, "damage": pot["damage"], "radius": pot["radius"],"life":pot.get("life",1.85)})
+            fires.append({"position": pot["position"], "age": -0.18 + pot["age"] - pot["flight"], "next_tick": 0.0, "damage": pot["damage"] * Rules.BURN_TICK_SCALE, "radius": pot["radius"],"life":pot.get("life",1.85)})
             pots.remove_at(index)
 
 static func advance_drum(state: Dictionary, dt: float, hero: Vector2, targets: Array, damage: float, area: float, events: Array) -> void:

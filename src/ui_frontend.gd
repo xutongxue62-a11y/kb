@@ -457,7 +457,7 @@ static func continued(h) -> void:
         weapon_level.name = "SaveWeaponLevel" + str(slot)
         slot += 1
     line(preview, Vector2(48, 382), 724, Color(INK, 0.55))
-    var max_hp: float = Catalog.apply_character_modifiers(Growth.stats(state.get("buff_levels", {}), int(state.get("player_level", 1))), character_id)["max_hp"]
+    var max_hp: float = Catalog.apply_character_modifiers(Growth.stats(state.get("buff_levels", {}), int(state.get("stage_hp_bonus", 0))), character_id)["max_hp"]
     var wave_label: Label = label(h, preview, "第 %d 关" % int(state.get("wave", 1)), Rect2(48, 405, 144, 34), 23, INK, true)
     wave_label.name = "SaveWave"
     var life: Label = label(h, preview, "生命 %.1f / %.1f" % [float(state.get("player_hp", 8.0)), max_hp], Rect2(200, 405, 230, 34), 22)
@@ -477,7 +477,7 @@ static func help_page(h, page: String, in_run: bool) -> void:
     var heading: String = "按键操作" if page == "keys" else ("武器联动" if page == "links" else "玩法说明")
     label(h, body, heading, Rect2(40, 20, 800, 65), 40, INK, true)
     line(body, Vector2(40, 100), 904, RED)
-    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n每升一级，生命上限加一，并补满这一格。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后按 %s 打开武器背包。把可以搭配的两件拖到一起即可联动，拖开即可断开。屏幕下方会提示还差哪一件。\n获得有配方的武器时会弹出说明，写出优点和缺点。锁链类联动会从火药筒炮口弹出。\n按 %s 可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("hide_ui")]
+    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n每过一关，生命上限加一，并补满这一格。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后按 %s 打开武器背包。把可以搭配的两件拖到一起即可联动，拖开即可断开。屏幕下方会提示还差哪一件。\n获得有配方的武器时会弹出说明，写出优点和缺点。锁链类联动会从火药筒炮口弹出。\n按 %s 可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("hide_ui")]
     if page == "keys":
         text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒（不可改）\n← / → 翻页预览角色，点击画像确认选择\n%s 确认出发 · %s 返回 / 暂停\n%s 角色属性 · %s 手动保存 · %s 隐藏或显示界面\n%s 散射 / 集火切换 · %s 打开武器背包 · %s 切换瞄准目标\n%s / %s / %s 选择成长 · 商店按栏位键直接购买 · 结算页按 %s 再出发" % [KeyBindings.caption_for("confirm"), KeyBindings.caption_for("cancel"), KeyBindings.caption_for("stats"), KeyBindings.caption_for("save"), KeyBindings.caption_for("hide_ui"), KeyBindings.caption_for("scatter"), KeyBindings.caption_for("link"), KeyBindings.caption_for("aim"), KeyBindings.caption_for("shop_1"), KeyBindings.caption_for("shop_2"), KeyBindings.caption_for("shop_3"), KeyBindings.caption_for("confirm")]
     elif page == "links":

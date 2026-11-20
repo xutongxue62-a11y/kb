@@ -69,7 +69,8 @@ func run_checks() -> void:
     check_awakened_skills()
     check_enchant_color_hooks()
     check_boss_stage_matches_normal()
-    check_level_up_hp()
+    check_stage_clear_hp()
+    check_late_balance()
     print("PLAYTEST FEEL RESULT: %d checks, %d failures" % [checks, failures])
     quit(1 if failures else 0)
 
@@ -162,10 +163,11 @@ func check_thunder_ward() -> void:
     expect(str(rules.ward_profile("thunder", 1).get("kind", "none")) == "none", "base totem tiers do not yet paralyze")
     var advanced: Dictionary = rules.ward_profile("thunder", 3)
     var awakened: Dictionary = rules.ward_profile("thunder", 5)
-    expect(str(advanced.get("kind", "")) == "paralyze" and is_equal_approx(float(advanced["duration"]), 0.55), "advanced thunder roots in place for a brief 0.55s")
-    expect(is_equal_approx(float(advanced["target_cooldown"]), 12.0) and is_equal_approx(float(advanced["interval"]), 2.5), "thunder paralysis uses a long per-target cooldown and a global interval")
+    expect(str(advanced.get("kind", "")) == "paralyze" and is_equal_approx(float(advanced["duration"]), 0.28), "advanced thunder roots in place for a brief 0.28s")
+    expect(is_equal_approx(float(advanced["interval"]), 2.5) and bool(advanced.get("once", false)), "thunder paralysis uses a global interval and may only root a monster once")
+    expect(is_equal_approx(float(rules.PARALYZE_BOSS_DURATION), 0.12), "boss paralysis is shorter than the ordinary root")
     expect(is_equal_approx(float(advanced["distance"]), 0.0) and is_equal_approx(float(awakened["duration"]), float(advanced["duration"])), "awakened thunder does not shove farther; it stays an in-place root")
-    expect(str(catalog.WEAPONS["totem"]["description"]).contains("麻痹"), "totem catalog mentions the brief paralysis")
+    expect(str(catalog.WEAPONS["totem"]["description"]).contains("麻痹") and str(catalog.WEAPONS["totem"]["description"]).contains("一生仅一次"), "totem catalog mentions once-per-life paralysis")
     var world = prepare_world("thunder_ward")
     clear_field(world)
     expect(world.grant_weapon("totem") or catalog.inventory_ids(world.inventory).has("totem"), "thunder fixture owns a totem")
@@ -182,22 +184,19 @@ func check_thunder_ward() -> void:
     var start: Vector2 = enemy["position"]
     expect(world.try_apply_ward(enemy, "thunder"), "an advanced thunder hit can paralyze")
     expect(bool(enemy.get("paralyzed", false)) and str(enemy.get("ward_kind", "")) == "paralyze", "thunder applies in-place paralysis, not a shove")
-    world.simulate(0.30, Vector2.ZERO)
+    expect(bool(enemy.get("paralyzed_once", false)), "a successful root marks the monster for life")
+    world.simulate(0.14, Vector2.ZERO)
     expect(enemy["position"].distance_to(start) < 6.0, "a paralyzed monster stays in place instead of running away")
-    expect(bool(enemy.get("paralyzed", false)) or float(enemy.get("ward_left", 0.0)) > 0.0, "the brief root is still active at 0.30s")
-    var ready_at: float = float(enemy.get("ward_ready", 0.0))
-    expect(ready_at >= world.elapsed + 8.0, "the same monster cannot be paralyzed again for a long cooldown")
-    expect(not world.try_apply_ward(enemy, "thunder"), "a second thunder hit is blocked by the per-target cooldown")
-    # After the root ends, the monster still cannot be re-paralyzed until the long cooldown.
+    expect(bool(enemy.get("paralyzed", false)) or float(enemy.get("ward_left", 0.0)) > 0.0, "the brief root is still active at 0.14s")
+    expect(not world.try_apply_ward(enemy, "thunder"), "a second thunder hit cannot re-root the same monster")
+    # After the root ends, the same monster must never be paralyzed again.
     enemy["ward_left"] = 0.0
     enemy["paralyzed"] = false
     enemy["ward_kind"] = ""
-    world.elapsed = ready_at - 1.0
-    expect(not world.try_apply_ward(enemy, "thunder"), "the per-target cooldown still blocks before it expires")
-    world.elapsed = ready_at + 0.01
-    # Global interval may also still be blocking; expire it too.
+    world.elapsed += 20.0
     world.ward_ready["thunder"] = world.elapsed - 0.01
-    expect(world.try_apply_ward(enemy, "thunder"), "the same monster can be paralyzed again only after the long cooldown")
+    expect(not world.try_apply_ward(enemy, "thunder"), "the same monster can never be paralyzed a second time")
+    expect(bool(enemy.get("paralyzed_once", false)) and not bool(enemy.get("paralyzed", false)), "the once-per-life flag survives after the root expires")
     world.queue_free()
 
     # Global interval: a second monster is not instantly rooted.
@@ -477,37 +476,134 @@ func check_boss_stage_matches_normal() -> void:
         expect(not world.enemies.any(func(enemy): return enemy["kind"] == "boss" and float(enemy.get("hp", 0.0)) > 0.0), "cleanup still does not spawn another Boss")
     world.queue_free()
 
-func check_level_up_hp() -> void:
+func pick_non_vitality(world) -> String:
+    for key in world.upgrade_choices:
+        if str(key) != "vitality":
+            return str(key)
+    return str(world.upgrade_choices[0]) if not world.upgrade_choices.is_empty() else ""
+
+func check_stage_clear_hp() -> void:
     var growth = load("res://src/growth.gd")
-    expect(is_equal_approx(growth.level_hp_bonus(1), 0.0), "level 1 adds no extra health pips")
-    expect(is_equal_approx(growth.level_hp_bonus(2), 1.0), "the first level-up adds one max HP")
-    expect(is_equal_approx(growth.level_hp_bonus(5), 4.0), "each further level adds another pip")
-    expect(is_equal_approx(growth.stats({}, 1)["max_hp"], 8.0), "base max HP at level 1 stays 8")
-    expect(is_equal_approx(growth.stats({}, 3)["max_hp"], 10.0), "level 3 has 10 max HP before vitality")
-    var world = prepare_world("level_hp")
+    var session = load("res://src/session_state.gd")
+    expect(is_equal_approx(growth.stage_hp_bonus(0), 0.0), "no cleared stages add no extra health pips")
+    expect(is_equal_approx(growth.stage_hp_bonus(1), 1.0), "the first cleared stage adds one max HP")
+    expect(is_equal_approx(growth.stage_hp_bonus(5), 5.0), "each further cleared stage adds another pip")
+    expect(is_equal_approx(growth.stats({}, 0)["max_hp"], 8.0), "base max HP with no clears stays 8")
+    expect(is_equal_approx(growth.stats({}, 3)["max_hp"], 11.0), "three cleared stages have 11 max HP before vitality")
+    var world = prepare_world("stage_hp")
     world.refresh_stats()
     var start_max: float = float(world.stats["max_hp"])
-    expect(world.player_level == 1, "the level-up fixture starts at level 1")
+    expect(world.player_level == 1 and world.stage_hp_bonus == 0, "a new run starts with no stage-clear HP bonus")
+    # XP level-up must not raise max or current HP.
     world.player_hp = start_max
     world.xp = world.xp_needed
     world.present_upgrade("xp")
     expect(world.upgrade_pending and not world.upgrade_choices.is_empty(), "gaining enough XP presents a level-up choice")
-    var choice: String = str(world.upgrade_choices[0])
-    world.on_choice(choice)
+    world.on_choice(pick_non_vitality(world))
     expect(world.player_level == 2, "taking the upgrade raises the player level")
-    expect(is_equal_approx(float(world.stats["max_hp"]), start_max + 1.0), "leveling up adds 1 maximum HP")
-    expect(is_equal_approx(world.player_hp, start_max + 1.0), "the new health pip is filled when the player was already at full HP")
+    expect(is_equal_approx(float(world.stats["max_hp"]), start_max), "XP level-up no longer adds maximum HP")
+    expect(is_equal_approx(world.player_hp, start_max), "XP level-up does not add a current HP pip")
+    # Full bar: clearing a stage adds a filled pip.
+    world.grant_stage_clear_hp()
+    expect(world.stage_hp_bonus == 1, "clearing a stage records one bonus pip")
+    expect(is_equal_approx(float(world.stats["max_hp"]), start_max + 1.0), "clearing a stage adds 1 maximum HP")
+    expect(is_equal_approx(world.player_hp, start_max + 1.0), "a full bar gains a filled new pip")
     expect(is_equal_approx(world.hud.current_max_hp, start_max + 1.0), "the health bar maximum visibly gains the new pip")
     expect(world.hud.health_label.text.contains("%.0f" % (start_max + 1.0)), "the health label shows the raised maximum")
-    # A later level-up while injured still adds the pip and one current HP, without a full heal.
+    world.grant_stage_clear_hp()
+    expect(world.stage_hp_bonus == 1, "the same wave cannot grant the bonus twice")
+    # Injured: later clear adds one current HP, not a full heal.
+    world.wave = 2
     world.player_hp = float(world.stats["max_hp"]) - 3.0
     var injured: float = world.player_hp
     var injured_max: float = float(world.stats["max_hp"])
+    world.grant_stage_clear_hp()
+    expect(world.stage_hp_bonus == 2, "the next wave can grant another pip")
+    expect(is_equal_approx(float(world.stats["max_hp"]), injured_max + 1.0), "the second cleared stage adds another max HP pip")
+    expect(is_equal_approx(world.player_hp, injured + 1.0), "an injured clear restores only the new pip, not a full heal")
+    # A later XP level-up still must not add leftover player_level HP.
     world.xp = world.xp_needed
     world.present_upgrade("xp")
     expect(world.upgrade_pending and not world.upgrade_choices.is_empty(), "a second level-up can be presented")
-    world.on_choice(str(world.upgrade_choices[0]))
+    world.on_choice(pick_non_vitality(world))
     expect(world.player_level == 3, "the second upgrade reaches level 3")
-    expect(is_equal_approx(float(world.stats["max_hp"]), injured_max + 1.0), "the second level-up adds another max HP pip")
-    expect(is_equal_approx(world.player_hp, injured + 1.0), "an injured level-up restores only the new pip, not a full heal")
+    expect(is_equal_approx(float(world.stats["max_hp"]), injured_max + 1.0), "a later XP level-up still does not add max HP")
+    # Mid-run save keeps the bonus; leftover player_level does not recreate it.
+    var snap: Dictionary = session.capture(world)
+    var saved_bonus: int = world.stage_hp_bonus
+    var saved_max: float = float(world.stats["max_hp"])
+    var saved_hp: float = world.player_hp
+    world.queue_free()
+    var restored = prepare_world("stage_hp_restore")
+    expect(session.apply(restored, snap), "a mid-run save can be restored")
+    expect(restored.stage_hp_bonus == saved_bonus, "the stage-clear bonus is restored")
+    expect(is_equal_approx(float(restored.stats["max_hp"]), saved_max), "restored max HP keeps the cleared-stage pips")
+    expect(is_equal_approx(restored.player_hp, saved_hp), "restored current HP is not lost")
+    restored.player_level = 9
+    restored.refresh_stats()
+    expect(is_equal_approx(float(restored.stats["max_hp"]), saved_max), "leftover player_level does not grant extra max HP")
+    restored.queue_free()
+    # The actual 过关 hook, and begin_round jumping ahead, must not invent bonuses.
+    var closer = prepare_world("stage_hp_close")
+    var close_max: float = float(closer.stats["max_hp"])
+    closer.player_hp = close_max
+    closer.start_wave_closing()
+    expect(closer.stage_hp_bonus == 1 and is_equal_approx(float(closer.stats["max_hp"]), close_max + 1.0), "start_wave_closing grants the stage-clear pip")
+    expect(is_equal_approx(closer.player_hp, close_max + 1.0), "a full bar is filled when the stage actually closes")
+    closer.start_wave_closing()
+    expect(closer.stage_hp_bonus == 1, "a second close of the same wave does not stack")
+    closer.queue_free()
+    var jumper = prepare_world("stage_hp_jump")
+    var jump_max: float = float(jumper.stats["max_hp"])
+    jumper.begin_round(5)
+    expect(jumper.stage_hp_bonus == 0 and is_equal_approx(float(jumper.stats["max_hp"]), jump_max), "starting a later wave without clearing does not invent prior pips")
+    jumper.queue_free()
+
+func check_late_balance() -> void:
+    var progression = load("res://src/progression.gd")
+    var rules = load("res://src/rules.gd")
+    var first: Dictionary = progression.enemy_profile(1, "hunter")
+    var fifth: Dictionary = progression.enemy_profile(5, "hunter")
+    var eighth: Dictionary = progression.enemy_profile(8, "hunter")
+    var twentieth: Dictionary = progression.enemy_profile(20, "hunter")
+    var thirtieth: Dictionary = progression.enemy_profile(30, "hunter")
+    expect(is_equal_approx(first["hp"], 5.0) and is_equal_approx(first["damage"], 1.0), "wave 1 hunter HP and damage stay at the opening baseline")
+    var old5_hp: float = 5.0 * exp(4.0 * log(1.10) + log(1.45))
+    var old5_dmg: float = (1.0 + 0.06 * 4.0) * exp(log(1.18))
+    expect(is_equal_approx(fifth["hp"], old5_hp) and is_equal_approx(fifth["damage"], old5_dmg), "wave 5 hunter growth is unchanged")
+    var old8_hp: float = 5.0 * exp(7.0 * log(1.10) + log(1.45))
+    expect(is_equal_approx(eighth["hp"], old8_hp), "wave 8 still follows the original HP curve")
+    var old20_hp: float = 5.0 * exp(19.0 * log(1.10) + 4.0 * log(1.45))
+    var old20_dmg: float = (1.0 + 0.06 * 19.0) * exp(3.0 * log(1.18) + log(1.10))
+    expect(twentieth["hp"] > old20_hp * 2.2, "wave 20 hunter HP is substantially above the previous curve")
+    expect(twentieth["damage"] > old20_dmg * 1.6, "wave 20 hunter damage is substantially above the previous curve")
+    var old30_hp: float = 5.0 * exp(29.0 * log(1.10) + 6.0 * log(1.45))
+    expect(thirtieth["hp"] > old30_hp * 8.0, "wave 30 hunter HP ramps much harder in the late game")
+    expect(is_equal_approx(progression.outgoing_damage_scale(1), 1.0) and is_equal_approx(progression.outgoing_damage_scale(8), 1.0), "player damage is unchanged through wave 8")
+    expect(progression.outgoing_damage_scale(16) < 0.90 and progression.outgoing_damage_scale(30) <= 0.73, "mid-to-late outgoing player damage is gently reduced")
+    expect(is_equal_approx(rules.BURN_TICK_SCALE, 0.50), "burn and residual DoT ticks are halved")
+    var world = prepare_world("burn_scale")
+    var pot_level: int = maxi(1, world.weapon_level("firepot"))
+    world._spawn_attachment_fire(world.player_position, "sling")
+    expect(not world.burning_fields.is_empty(), "a fire attachment leaves a burning field")
+    var expected_burn: float = 0.55 * (1.0 + float(pot_level - 1) * 0.25) * rules.BURN_TICK_SCALE
+    expect(is_equal_approx(float(world.burning_fields[0]["damage"]), expected_burn), "attachment burn uses the lowered tick scale")
+    world.burning_fields.clear()
+    world.explode_powder({"position": world.player_position, "damage": 10.0, "enchanted": false, "fire_enchanted": true})
+    var powder_field: Dictionary = {}
+    for field in world.burning_fields:
+        if str(field.get("residual", "")) == "fire":
+            powder_field = field
+            break
+    expect(not powder_field.is_empty() and is_equal_approx(float(powder_field["damage"]), 10.0 * 0.16 * rules.BURN_TICK_SCALE), "fire-cannon residual burn is halved")
+    world.stats["crit_chance"] = 0.0
+    world.wave = 30
+    world.spawn_enemy("hunter", world.player_position + Vector2(80, 0))
+    var enemy: Dictionary = world.enemies.back()
+    enemy["hp"] = 100.0
+    enemy["max_hp"] = 100.0
+    enemy["dodge"] = 0.0
+    world.hurt_enemy(enemy, 10.0, "sling", false, Vector2.RIGHT)
+    var expected: float = 10.0 * float(world.stats["damage_multiplier"]) * progression.outgoing_damage_scale(30)
+    expect(is_equal_approx(enemy["hp"], 100.0 - expected), "late-wave outgoing player damage uses the reduced scale")
     world.queue_free()

@@ -79,12 +79,47 @@ static func adaptation(wave: int, power: float, previous: float = 1.0) -> float:
     var raw: float = clampf(maxf(previous, pow(ratio, 0.32)), 1.0, ADAPT_CAP)
     return minf(raw, adapt_ceiling(wave))
 
+# Extra mid-to-late monster growth starts after wave 8 so early stages stay
+# close to the original curve while later waves stop being stand-and-DPS fodder.
+const LATE_GROWTH_START: int = 8
+const LATE_GROWTH_MID: int = 16
+const LATE_GROWTH_DEEP: int = 24
+
+static func late_hp_log(stage: int) -> float:
+    var late: float = 0.0
+    if stage > LATE_GROWTH_START:
+        late += float(stage - LATE_GROWTH_START) * log(1.06)
+    if stage > LATE_GROWTH_MID:
+        late += float(stage - LATE_GROWTH_MID) * log(1.07)
+    if stage > LATE_GROWTH_DEEP:
+        late += float(stage - LATE_GROWTH_DEEP) * log(1.06)
+    return late
+
+static func late_damage_log(stage: int) -> float:
+    var late: float = 0.0
+    if stage > LATE_GROWTH_START:
+        late += float(stage - LATE_GROWTH_START) * log(1.04)
+    if stage > LATE_GROWTH_MID:
+        late += float(stage - LATE_GROWTH_MID) * log(1.05)
+    if stage > LATE_GROWTH_DEEP:
+        late += float(stage - LATE_GROWTH_DEEP) * log(1.04)
+    return late
+
+# Mild outgoing player-damage softening in mid-to-late waves. Waves 1-8 stay at 1.0.
+static func outgoing_damage_scale(wave: int) -> float:
+    var stage: int = maxi(1, wave)
+    if stage <= LATE_GROWTH_START:
+        return 1.0
+    if stage <= LATE_GROWTH_MID:
+        return 1.0 - 0.015 * float(stage - LATE_GROWTH_START)
+    return maxf(0.72, 0.88 - 0.012 * float(stage - LATE_GROWTH_MID))
+
 static func enemy_profile(wave: int, kind: String, adaptive: float = 1.0, elite: bool = false) -> Dictionary:
     var stage: int = maxi(1, wave)
     var milestones: int = stage / 5
-    var hp_scale: float = exp(minf(27.6, (stage - 1) * log(1.10) + milestones * log(1.45))) * clampf(adaptive, 1.0, ADAPT_CAP)
+    var hp_scale: float = exp(minf(27.6, (stage - 1) * log(1.10) + milestones * log(1.45) + late_hp_log(stage))) * clampf(adaptive, 1.0, ADAPT_CAP)
     var milestone_log: float = minf(float(milestones), 3.0) * log(1.18) + maxf(0.0, float(milestones) - 3.0) * log(1.10)
-    var damage_scale: float = minf(1000000.0, (1.0 + 0.06 * (stage - 1)) * exp(minf(14.0, milestone_log)))
+    var damage_scale: float = minf(1000000.0, (1.0 + 0.06 * (stage - 1)) * exp(minf(14.0, milestone_log + late_damage_log(stage))))
     var dodge: float = minf(0.22, maxf(0, stage - 2) * 0.006 + milestones * 0.012) if stage > 2 else 0.0
     if kind in ["tank", "boss", "armored", "basaltroller"]:
         dodge *= 0.35

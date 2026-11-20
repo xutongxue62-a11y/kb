@@ -1399,7 +1399,7 @@ func configure_save(available: bool, autosave: bool, note: String = "", summary:
         var hp_label: Label = overlay.find_child("SaveHp", true, false) as Label
         if hp_label != null:
             var character_id: String = str(summary.get("character_id", Catalog.character_id_for_weapon(str(summary.get("starting_weapon", "sling")))))
-            var max_hp: float = Catalog.apply_character_modifiers(Growth.stats(summary.get("buff_levels", {})), character_id)["max_hp"]
+            var max_hp: float = Catalog.apply_character_modifiers(Growth.stats(summary.get("buff_levels", {}), int(summary.get("stage_hp_bonus", 0))), character_id)["max_hp"]
             hp_label.text = "生命 %.1f / %.1f" % [float(summary.get("player_hp", 8.0)), max_hp]
     if is_instance_valid(autosave_toggle):
         autosave_toggle.set_pressed_no_signal(autosave_enabled)

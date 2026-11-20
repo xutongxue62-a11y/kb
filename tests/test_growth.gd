@@ -72,10 +72,12 @@ func _initialize() -> void:
             saw_club = true
             break
     expect(saw_club, "the last legal weapon upgrade remains selectable")
-    expect(is_equal_approx(growth.level_hp_bonus(1), 0.0) and is_equal_approx(growth.stats({}, 1)["max_hp"], 8.0), "level 1 health stays at the base 8")
-    expect(is_equal_approx(growth.stats({}, 2)["max_hp"], 9.0) and is_equal_approx(growth.stats({}, 5)["max_hp"], 12.0), "each player level adds 1 max HP")
+    expect(is_equal_approx(growth.stage_hp_bonus(0), 0.0) and is_equal_approx(growth.stats({}, 0)["max_hp"], 8.0), "no cleared stages keep the base 8 health")
+    expect(is_equal_approx(growth.stats({}, 1)["max_hp"], 9.0) and is_equal_approx(growth.stats({}, 5)["max_hp"], 13.0), "each cleared stage adds 1 max HP")
+    expect(is_equal_approx(growth.stats({}, 2)["max_hp"], 10.0), "two cleared stages give 10 max HP")
     growth.apply(levels, "vitality")
-    expect(is_equal_approx(growth.stats(levels, 4)["max_hp"], 13.0), "level HP stacks with vitality: 8 + 2 + 3")
+    expect(is_equal_approx(growth.stats(levels, 3)["max_hp"], 13.0), "stage-clear HP stacks with vitality: 8 + 2 + 3")
+    expect(is_equal_approx(growth.stats(levels, 0)["max_hp"], 10.0), "player level is not used; vitality alone is 10")
     finish()
 
 func finish() -> void:

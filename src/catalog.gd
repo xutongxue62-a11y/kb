@@ -14,7 +14,7 @@ const WEAPONS = {
     "spear": {"name": "骨矛", "kind": "special", "damage": 7.4, "cooldown": 0.52, "range": 185.0, "speed": 600.0, "size": 58.0, "color": Color("#edddb3"), "description": "定向贯刺 · 一线穿敌\n保持距离，刺出收回"},
     "hammer": {"name": "石槌", "kind": "special", "damage": 13.0, "cooldown": 0.90, "range": 140.0, "speed": 500.0, "size": 50.0, "color": Color("#b5a98c"), "description": "蓄势重砸 · 范围震击\n清理近处成群恐龙"},
     "boomerang": {"name": "回旋骨镖", "kind": "special", "damage": 3.6, "cooldown": 0.76, "range": 300.0, "speed": 540.0, "size": 42.0, "color": Color("#ebcc87"), "description": "掷出再返回身边\n往返各可命中一次"},
-    "totem": {"name": "雷鸣图腾", "kind": "special", "damage": 2.8, "cooldown": 0.68, "range": 320.0, "speed": 600.0, "size": 48.0, "color": Color("#78bac3"), "description": "连锁雷击 · 最多三敌\n3级起短暂麻痹，同敌冷却很长"},
+    "totem": {"name": "雷鸣图腾", "kind": "special", "damage": 2.8, "cooldown": 0.68, "range": 320.0, "speed": 600.0, "size": 48.0, "color": Color("#78bac3"), "description": "连锁雷击 · 最多三敌\n3级起短暂麻痹，同敌一生仅一次"},
     "bonebow": {"name": "骨弩", "kind": "special", "damage": 4.0, "cooldown": 0.64, "range": 430.0, "speed": 660.0, "size": 48.0, "color": Color("#e8d8ad"), "description": "骨箭直射 · 穿透三敌\n真实飞行，沿途贯穿"},
     "firepot": {"name": "火种壶", "kind": "special", "damage": 2.2, "cooldown": 1.60, "range": 300.0, "speed": 340.0, "size": 43.0, "color": Color("#e89a4c"), "description": "抛壶落地 · 延迟燃烧\n5级召炎柱砸向敌群"},
     "wardrum": {"name": "战鼓", "kind": "special", "damage": 3.2, "cooldown": 1.26, "range": 148.0, "speed": 440.0, "size": 49.0, "color": Color("#d5ac64"), "description": "三拍鼓震 · 近身扩环\n声波逐圈扫过敌人"},

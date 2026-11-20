@@ -13,7 +13,7 @@ const COPY={
     "spear":["近战 · 贯刺伤害","朝目标直线刺出骨矛，\n贯穿同一直线上的敌人。"],
     "hammer":["近战 · 范围震击","挥槌重砸近处目标，\n落点周围敌人同时受伤。"],
     "boomerang":["投掷 · 往返命中","掷出骨镖后飞回角色，\n去程、回程各可命中一次。"],
-    "totem":["远程 · 连锁雷击","雷击在附近敌人间跳跃，\n3级起可短暂麻痹，同敌冷却很长。"],
+    "totem":["远程 · 连锁雷击","雷击在附近敌人间跳跃，\n3级起可短暂麻痹，同敌一生仅一次。"],
     "bonebow":["远程 · 贯穿骨箭","向目标发射直线骨箭，\n沿飞行路径贯穿多个敌人。"],
     "firepot":["投掷 · 持续灼伤","抛出火壶，落地形成火场，\n5级可召炎柱砸向敌群。"],
     "wardrum":["范围 · 波纹震击","击鼓向外扩散多道震波，\n波纹扫过敌人时造成伤害。"],
@@ -43,8 +43,8 @@ static func links(key: String) -> String:
 
 static func attack(key: String,level: int) -> String:
     if key=="spear" and level>=3: return "朝目标扇面刺出骨矛，\n贯穿扇面内的沿途敌人。"
-    if key=="totem" and level>=5: return "四跃连锁并向旁侧分叉，\n可短暂麻痹，冷却完毕后召唤天雷。"
-    if key=="totem" and level>=3: return "雷击跳跃，最多连锁 4 敌，\n命中时可短暂麻痹，同敌冷却很长。"
+    if key=="totem" and level>=5: return "四跃连锁并向旁侧分叉，\n可短暂麻痹且同敌一生仅一次，冷却完毕后召唤天雷。"
+    if key=="totem" and level>=3: return "雷击跳跃，最多连锁 4 敌，\n命中时可短暂麻痹，同敌一生仅一次。"
     if key=="totem": return "雷击跳跃，最多连锁 %d 敌，\n每次跳跃伤害逐步递减。" % (4 if level>=3 else 3)
     if key=="staff" and level>=5: return "向目标同时发射多枚符弹，\n只有伤害；冷却完毕后在身旁展开符阵轰击。"
     if key=="firepot" and level>=5: return "抛出火壶形成火场，\n冷却完毕后召炎柱砸向敌群。"

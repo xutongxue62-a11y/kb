@@ -23,12 +23,12 @@ const BUFFS = {
 
 const BASE_MAX_HP: float = 8.0
 const VITALITY_HP: float = 2.0
-const LEVEL_UP_HP: float = 1.0
+const STAGE_CLEAR_HP: float = 1.0
 
-static func level_hp_bonus(player_level: int) -> float:
-    return LEVEL_UP_HP * float(maxi(0, player_level - 1))
+static func stage_hp_bonus(stages_cleared: int) -> float:
+    return STAGE_CLEAR_HP * float(maxi(0, stages_cleared))
 
-static func stats(levels: Dictionary, player_level: int = 1) -> Dictionary:
+static func stats(levels: Dictionary, stages_cleared: int = 0) -> Dictionary:
 
     levels = levels.duplicate()
     for key in BUFFS:
@@ -42,7 +42,7 @@ static func stats(levels: Dictionary, player_level: int = 1) -> Dictionary:
         # Layers are uncapped now, so reduction and dodge stack multiplicatively:
         # each layer removes its share of what is left, never reaching 100%.
         "reduction": 1.0 - pow(0.88, int(levels.get("armor", 0))),
-        "max_hp": BASE_MAX_HP + VITALITY_HP * float(int(levels.get("vitality", 0))) + level_hp_bonus(player_level),
+        "max_hp": BASE_MAX_HP + VITALITY_HP * float(int(levels.get("vitality", 0))) + stage_hp_bonus(stages_cleared),
         "regen": 0.12 * int(levels.get("regen", 0)),
         "dodge": 1.0 - pow(0.94, int(levels.get("dodge", 0))),
         "hit_radius": 2.0 * int(levels.get("accuracy", 0)),
