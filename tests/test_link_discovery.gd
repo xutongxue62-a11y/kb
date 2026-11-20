@@ -77,39 +77,33 @@ func check_discovery_flow() -> void:
     world.start_run(false)
     expect(world.active_link["id"] == "none", "a new run still defaults to no link")
     expect(Catalog.inventory_ids(world.inventory).has(world.starting_weapon), "the starter weapon is in the inventory")
-    expect(world.pending_link_notice.size() > 0, "starting weapon queues unseen recipes")
-    var shown: bool = world.try_present_link_discovery()
-    expect(shown and world.link_notice_open and world.hud.screen == "link_discover", "starter weapon can discover incomplete recipes once")
-    await process_frame
-    await process_frame
-    var body: String = overlay_text(world.hud.overlay)
-    expect(body.contains("优点") and body.contains("缺点"), "first acquire shows a notice with benefit and cost")
-    expect(body.contains("还差") and (body.contains("燃石弹") or body.contains("符能弹")), "starter notice lists incomplete sling recipes")
-    expect(body.contains("知道了") or body.contains("先不用"), "incomplete recipes can be dismissed without enabling")
-    expect(world.active_link["id"] == "none", "the starter notice does not auto-enable a link")
-    world.hud.cancel_link_discovery()
-    expect(not world.link_notice_open and world.active_link["id"] == "none", "dismissing an incomplete notice leaves no link")
-    var seen: Array = world.settings.get("seen_link_recipes", [])
-    expect(seen.has("fire_sling") and seen.has("rune_sling"), "dismissing marks the shown starter recipes as seen")
-    world.pending_link_notice.clear()
+    expect(world.pending_link_notice.is_empty(), "starting weapon does not queue recipes whose partners are missing")
+    expect(not world.try_present_link_discovery() and not world.link_notice_open, "no discovery parchment appears for incomplete starter recipes")
     world.queue_link_discovery(world.starting_weapon)
-    expect(world.pending_link_notice.is_empty() and not world.try_present_link_discovery(), "seen flag prevents the same starter recipes from showing again")
+    expect(world.pending_link_notice.is_empty(), "re-queuing the starter still ignores incomplete recipes")
     world.queue_free()
     await process_frame
 
     world = make_world("complete")
     world.start_run(false)
     expect(world.grant_weapon("firepot"), "firepot can be granted to complete a sling recipe")
-    shown = world.try_present_link_discovery()
+    expect(world.pending_link_notice.size() == 1 and str(world.pending_link_notice[0].get("id", "")) == "fire_sling", "only the completing sling recipe is queued")
+    var shown: bool = world.try_present_link_discovery()
     expect(shown and world.link_notice_open, "first acquire of a partnering weapon shows the parchment")
     await process_frame
     await process_frame
-    body = overlay_text(world.hud.overlay)
+    var body: String = overlay_text(world.hud.overlay)
     expect(body.contains("燃石弹") and body.contains("优点") and body.contains("缺点") and body.contains("现在可启用"), "completing a pair lists the link with benefit, cost, and an enable status")
     expect(body.contains("启用") and body.contains("先不用"), "a complete pair offers enable and decline")
+    expect(not body.contains("还差"), "the notice does not list recipes whose partners are still missing")
     expect(world.active_link["id"] == "none", "completing a pair does not auto-enable")
     world.hud.cancel_link_discovery()
     expect(not world.link_notice_open and world.active_link["id"] == "none", "declining leaves the link at 不联动")
+    var seen: Array = world.settings.get("seen_link_recipes", [])
+    expect(seen.has("fire_sling"), "dismissing marks the shown completing recipe as seen")
+    world.pending_link_notice.clear()
+    world.queue_link_discovery("firepot")
+    expect(world.pending_link_notice.is_empty() and not world.try_present_link_discovery(), "seen flag prevents the same completing recipe from showing again")
     world.queue_free()
     await process_frame
 
@@ -124,6 +118,29 @@ func check_discovery_flow() -> void:
     expect(body.contains("符能弹") and body.contains("启用"), "the enable option names the completed rune recipe")
     world.hud.confirm_link_discovery()
     expect(not world.link_notice_open and world.active_link["id"] == "rune_sling", "enabling selects the completed link")
+    world.queue_free()
+    await process_frame
+
+    world = make_world("batch")
+    world.start_run(false)
+    for key in ["club", "axe", "blade", "spear"]:
+        expect(world.grant_weapon(key), "batch fixture can add " + key)
+    world.pending_link_notice.clear()
+    expect(world.grant_weapon("staff"), "staff completes several recipes at once")
+    var queued_ids: Array = []
+    for recipe in world.pending_link_notice:
+        queued_ids.append(str(recipe.get("id", "")))
+    expect(queued_ids.size() >= 4, "staff plus several owned hosts queues more than three completing recipes")
+    expect(not queued_ids.any(func(link_id): return not Catalog.recipe_complete(Catalog.LINKS[link_id], Catalog.inventory_ids(world.inventory))), "queued recipes all have both partners in the pack")
+    shown = world.try_present_link_discovery()
+    expect(shown and world.link_notice_open, "a large completing batch still opens one parchment")
+    await process_frame
+    await process_frame
+    expect(world.hud.link_discovery_recipes().size() == 3, "one parchment shows at most three recipes")
+    expect(world.pending_link_notice.size() == queued_ids.size() - 3, "recipes beyond the first three stay queued")
+    body = overlay_text(world.hud.overlay)
+    expect(not body.contains("还差"), "the capped parchment still omits incomplete recipes")
+    world.hud.cancel_link_discovery()
     world.queue_free()
     await process_frame
 
@@ -148,6 +165,8 @@ func check_old_settings() -> void:
     var world = make_world("old")
     world.settings = loaded
     world.start_run(false)
-    expect(world.pending_link_notice.size() > 0, "missing seen_link_recipes treats every recipe as eligible to be shown once")
+    expect(world.pending_link_notice.is_empty(), "a lone starter still has no complete recipe to announce")
+    expect(world.grant_weapon("firepot"), "a partner can be granted under old settings")
+    expect(world.pending_link_notice.size() > 0, "missing seen_link_recipes still treats a newly completed recipe as eligible once")
     world.queue_free()
     await process_frame

@@ -84,15 +84,23 @@ static func adaptation(wave: int, power: float, previous: float = 1.0) -> float:
 const LATE_GROWTH_START: int = 8
 const LATE_GROWTH_MID: int = 16
 const LATE_GROWTH_DEEP: int = 24
+# After wave 20, HP compounding switches to a gentler rate so late Bosses
+# stay hard but are no longer effectively unkillable. Waves 1-20 keep the
+# original curve exactly. Monster damage and outgoing player damage are unchanged.
+const LATE_GROWTH_SOFTEN: int = 20
+const LATE_GROWTH_SOFT_RATE: float = 1.047
 
 static func late_hp_log(stage: int) -> float:
+    var capped: int = mini(stage, LATE_GROWTH_SOFTEN)
     var late: float = 0.0
-    if stage > LATE_GROWTH_START:
-        late += float(stage - LATE_GROWTH_START) * log(1.06)
-    if stage > LATE_GROWTH_MID:
-        late += float(stage - LATE_GROWTH_MID) * log(1.07)
-    if stage > LATE_GROWTH_DEEP:
-        late += float(stage - LATE_GROWTH_DEEP) * log(1.06)
+    if capped > LATE_GROWTH_START:
+        late += float(capped - LATE_GROWTH_START) * log(1.06)
+    if capped > LATE_GROWTH_MID:
+        late += float(capped - LATE_GROWTH_MID) * log(1.07)
+    if capped > LATE_GROWTH_DEEP:
+        late += float(capped - LATE_GROWTH_DEEP) * log(1.06)
+    if stage > LATE_GROWTH_SOFTEN:
+        late += float(stage - LATE_GROWTH_SOFTEN) * log(LATE_GROWTH_SOFT_RATE)
     return late
 
 static func late_damage_log(stage: int) -> float:

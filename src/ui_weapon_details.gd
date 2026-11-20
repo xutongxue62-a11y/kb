@@ -24,6 +24,15 @@ static func attack_type(key: String) -> String: return str(COPY[key][0]) if COPY
 # formulas combat uses: damage grows +35% of base per level; the interval
 # divisor differs per weapon family (basic 0.12, expanded 0.08, armory none).
 # Buff multipliers are not included — this is the figure cards are compared by.
+# Keep "0.48秒" as one typographic unit so AUTOWRAP_WORD_SMART cannot
+# break the interval at the decimal point ("0." / "48 秒").
+const WORD_JOINER := "⁠"
+const NBSP := " "
+
+static func interval_phrase(interval: float) -> String:
+    var amount: String = ("%.2f" % interval).replace(".", "." + WORD_JOINER)
+    return "间隔%s%s秒" % [NBSP, amount]
+
 static func stats_line(key: String, level: int) -> String:
     if not Catalog.WEAPONS.has(key): return ""
     var data: Dictionary = Catalog.WEAPONS[key]
@@ -36,8 +45,8 @@ static func stats_line(key: String, level: int) -> String:
         divisor = 1.0 + float(lvl - 1) * 0.12
     var interval: float = float(data["cooldown"]) / divisor
     if key == "staff":
-        return "每弹伤害 %.1f × %d 弹｜间隔 %.2f 秒" % [damage, Evolution.shot_count(key, lvl), interval]
-    return "伤害 %.1f · 间隔 %.2f 秒" % [damage, interval]
+        return "每弹伤害 %.1f × %d 弹｜%s" % [damage, Evolution.shot_count(key, lvl), interval_phrase(interval)]
+    return "伤害 %.1f · %s" % [damage, interval_phrase(interval)]
 static func links(key: String) -> String:
     return Catalog.link_details_text(key)
 

@@ -96,6 +96,7 @@ var link_pack_open: bool = false
 var pending_link_notice: Array = []
 var _run_bootstrapping: bool = false
 var _link_notice_return: String = ""
+var _link_pack_return: String = ""
 var _hinted_complete_links: Dictionary = {}
 var _pending_departure_discovery: bool = false
 var link_demo: bool = false
@@ -911,11 +912,17 @@ func _seen_link_ids() -> Array:
                 seen.append(link_id)
     return seen
 
+const LINK_DISCOVERY_BATCH: int = 3
+
 func queue_link_discovery(weapon_id: String) -> void:
     if weapon_id.is_empty() or not Catalog.WEAPONS.has(weapon_id):
         return
     var seen: Array = _seen_link_ids()
+    var owned: Array = Catalog.inventory_ids(inventory)
     for recipe in Catalog.recipes_for_weapon(weapon_id):
+        # Only announce recipes whose partner is already in the pack.
+        if not Catalog.recipe_complete(recipe, owned):
+            continue
         var link_id: String = str(recipe.get("id", ""))
         if link_id.is_empty() or seen.has(link_id):
             continue
@@ -938,6 +945,8 @@ func try_present_link_discovery(force: bool = false) -> bool:
     if upgrade_pending and replace_pending.is_empty():
         return false
     var recipes: Array = pending_link_notice.duplicate(true)
+    if recipes.size() > LINK_DISCOVERY_BATCH:
+        recipes = recipes.slice(0, LINK_DISCOVERY_BATCH)
     var owned: Array = Catalog.inventory_ids(inventory)
     _link_notice_return = "shop" if shop_open else str(hud.screen)
     link_notice_open = true
@@ -945,7 +954,7 @@ func try_present_link_discovery(force: bool = false) -> bool:
     if not shop_open and not upgrade_pending and audio != null and not paused:
         audio.set_paused(true)
     hud.show_link_discovery(recipes, owned)
-    pending_link_notice.clear()
+    pending_link_notice = pending_link_notice.slice(recipes.size())
     update_hud()
     return true
 
@@ -1009,13 +1018,13 @@ func switch_combo_mode() -> void:
 func _can_open_link_pack() -> bool:
     if not running or inventory.is_empty() or player_hp <= 0.0:
         return false
-    if upgrade_pending or wave_closing or shop_open or link_notice_open or departure_left > 0.0 or animation_demo or paused or stats_open:
+    if upgrade_pending or wave_closing or link_notice_open or departure_left > 0.0 or animation_demo or paused or stats_open:
         return false
     if not replace_pending.is_empty():
         return false
     if hud == null:
         return true
-    return hud.screen in ["combat", "link_pack", ""]
+    return hud.screen in ["combat", "link_pack", "shop", ""]
 
 func toggle_link_pack() -> void:
     if link_pack_open:
@@ -1030,9 +1039,10 @@ func open_link_pack() -> bool:
         return true
     if not _can_open_link_pack():
         return false
+    _link_pack_return = "shop" if shop_open else (str(hud.screen) if hud != null else "")
     link_pack_open = true
     player_frozen = true
-    if audio != null and not paused:
+    if audio != null and not paused and not shop_open:
         audio.set_paused(true)
     if hud != null and hud.has_method("show_link_pack"):
         hud.show_link_pack(self)
@@ -1043,10 +1053,14 @@ func close_link_pack() -> void:
     if not link_pack_open and (hud == null or hud.link_pack == null):
         link_pack_open = false
         return
+    var reopen_shop: bool = shop_open
     link_pack_open = false
+    _link_pack_return = ""
     if hud != null and hud.has_method("hide_link_pack"):
-        hud.hide_link_pack()
-    if not shop_open and not upgrade_pending and not link_notice_open and not paused and running and player_hp > 0.0 and not wave_closing:
+        hud.hide_link_pack(reopen_shop)
+    if reopen_shop and running and player_hp > 0.0:
+        show_current_shop(false)
+    elif not shop_open and not upgrade_pending and not link_notice_open and not paused and running and player_hp > 0.0 and not wave_closing:
         player_frozen = false
         if audio != null:
             audio.set_paused(false)

@@ -5,7 +5,7 @@ const NEW_IDS = ["spear", "hammer", "boomerang", "totem"]
 const EXPANDED_IDS = ["bonebow", "firepot", "wardrum", "crystal"]
 const IDS = ["club", "axe", "blade", "sling", "powder", "staff", "spear", "hammer", "boomerang", "totem", "bonebow", "firepot", "wardrum", "crystal"]
 const WEAPONS = {
-    "club": {"name": "木棒", "kind": "melee", "damage": 7.0, "cooldown": 0.28, "orbit_speed": 10.0, "size": 43.0, "color": Color("#d9a65c"), "description": "7 重击 · 一击小怪\n快速环绕，强力击退"},
+    "club": {"name": "木棒", "kind": "melee", "damage": 7.5, "cooldown": 0.28, "orbit_speed": 10.0, "size": 43.0, "color": Color("#d9a65c"), "description": "7.5 重击 · 一击小怪\n快速环绕，强力击退"},
     "axe": {"name": "石斧", "kind": "melee", "damage": 12.0, "cooldown": 0.38, "orbit_speed": 8.2, "size": 46.0, "color": Color("#e8d8b2"), "description": "12 劈砍 · 近身高伤\n重斧破阵，大片斩击"},
     "blade": {"name": "骨刃", "kind": "melee", "damage": 7.0, "cooldown": 0.14, "orbit_speed": 14.0, "size": 38.0, "color": Color("#a2e6ec"), "description": "7 切割 · 高频环绕\n近距离连续收割"},
     "sling": {"name": "弹弓", "kind": "ranged", "damage": 2.6, "cooldown": 0.30, "range": 360.0, "speed": 620.0, "size": 33.0, "color": Color("#b88b5b"), "description": "2.6 石弹 · 快速连射\n安全射程，自动瞄准"},

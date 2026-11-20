@@ -77,7 +77,7 @@ func run_checks() -> void:
 func check_attack_feel() -> void:
     var catalog = load("res://src/catalog.gd")
     var expected := {
-        "club": [7.0, 0.28],
+        "club": [7.5, 0.28],
         "axe": [12.0, 0.38],
         "blade": [7.0, 0.14],
         "sling": [2.6, 0.30],
@@ -99,6 +99,8 @@ func check_attack_feel() -> void:
     expect(float(catalog.WEAPONS["hammer"]["cooldown"]) > float(catalog.WEAPONS["blade"]["cooldown"]), "hammer stays slower than blade")
     expect(float(catalog.WEAPONS["axe"]["cooldown"]) > float(catalog.WEAPONS["club"]["cooldown"]), "axe stays slower than club")
     expect(float(catalog.WEAPONS["powder"]["cooldown"]) > float(catalog.WEAPONS["sling"]["cooldown"]), "cannon stays slower than sling")
+    expect(is_equal_approx(float(catalog.WEAPONS["club"]["damage"]), 7.5) and str(catalog.WEAPONS["club"]["description"]).contains("7.5 重击") and str(catalog.WEAPONS["club"]["description"]).contains("一击小怪"), "club copy matches its 7.5 one-shot-minion damage")
+    expect(is_equal_approx(float(catalog.DINOS["raptor"]["hp"]), 7.5), "raptor base HP stays at 7.5")
     expect(is_equal_approx(load("res://src/progression.gd").HIT_CAP_RATIO, 0.70), "incoming combat damage cap stays at 70 percent")
 
 func check_pickup_radius() -> void:
@@ -578,9 +580,14 @@ func check_late_balance() -> void:
     expect(twentieth["hp"] > old20_hp * 2.2, "wave 20 hunter HP is substantially above the previous curve")
     expect(twentieth["damage"] > old20_dmg * 1.6, "wave 20 hunter damage is substantially above the previous curve")
     var old30_hp: float = 5.0 * exp(29.0 * log(1.10) + 6.0 * log(1.45))
-    expect(thirtieth["hp"] > old30_hp * 8.0, "wave 30 hunter HP ramps much harder in the late game")
+    expect(thirtieth["hp"] > twentieth["hp"] and thirtieth["hp"] > old30_hp * 4.0 and thirtieth["hp"] < old30_hp * 8.0, "wave 30 hunter HP still ramps, but the post-20 compounding is gentler")
+    var boss20: float = float(progression.enemy_profile(20, "boss", 1.75)["hp"])
+    var boss30: float = float(progression.enemy_profile(30, "boss", 1.75)["hp"])
+    var previous_boss30: float = 68857.0
+    expect(is_equal_approx(boss20, 160.0 * exp(minf(27.6, 19.0 * log(1.10) + 4.0 * log(1.45) + 12.0 * log(1.06) + 4.0 * log(1.07))) * 1.75), "wave 20 Boss HP is unchanged")
+    expect(boss30 >= previous_boss30 * 2.0 and boss30 <= previous_boss30 * 3.0, "wave 30 Boss formula HP is 2-3x the previous version")
     expect(is_equal_approx(progression.outgoing_damage_scale(1), 1.0) and is_equal_approx(progression.outgoing_damage_scale(8), 1.0), "player damage is unchanged through wave 8")
-    expect(progression.outgoing_damage_scale(16) < 0.90 and progression.outgoing_damage_scale(30) <= 0.73, "mid-to-late outgoing player damage is gently reduced")
+    expect(progression.outgoing_damage_scale(16) < 0.90 and is_equal_approx(progression.outgoing_damage_scale(30), 0.72), "mid-to-late outgoing player damage stays gently reduced, 0.72 at wave 30")
     expect(is_equal_approx(rules.BURN_TICK_SCALE, 0.50), "burn and residual DoT ticks are halved")
     var world = prepare_world("burn_scale")
     var pot_level: int = maxi(1, world.weapon_level("firepot"))

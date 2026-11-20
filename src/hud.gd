@@ -1526,12 +1526,15 @@ func refresh_link_pack() -> void:
     if link_pack != null and is_instance_valid(link_pack) and link_pack.has_method("refresh"):
         link_pack.refresh()
 
-func hide_link_pack() -> void:
+func hide_link_pack(keep_shop: bool = false) -> void:
     if link_pack != null and is_instance_valid(link_pack):
         if link_pack.get_parent() == overlay:
             overlay.remove_child(link_pack)
         link_pack.queue_free()
     link_pack = null
+    if keep_shop:
+        screen = "shop"
+        return
     if screen == "link_pack":
         hide_menu()
 

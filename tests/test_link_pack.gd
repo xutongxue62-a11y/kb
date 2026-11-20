@@ -479,16 +479,17 @@ func check_discovery_still_works() -> void:
     var world = make_world("discover")
     world.start_run(false)
     expect(world.active_link["id"] == "none", "a normal run still defaults to 不联动")
-    expect(world.pending_link_notice.size() > 0, "starter weapon still queues unseen recipes")
+    expect(world.pending_link_notice.is_empty(), "starter weapon does not queue incomplete recipes")
     expect(world.open_link_pack() and world.link_pack_open, "the pack can open in combat before a discovery parchment")
     world.close_link_pack()
     expect(not world.link_pack_open, "the pack closes before the discovery parchment is shown")
+    expect(world.grant_weapon("firepot"), "granting a partner queues a completing recipe")
     var shown: bool = world.try_present_link_discovery()
-    expect(shown and world.link_notice_open and world.hud.screen == "link_discover", "first-acquire parchment still appears")
+    expect(shown and world.link_notice_open and world.hud.screen == "link_discover", "first-acquire parchment still appears for a completed pair")
     expect(world.active_link["id"] == "none", "discovery still does not auto-enable a link")
     expect(not world.open_link_pack() and not world.link_pack_open, "Q does not open the pack over the discovery parchment")
     var body: String = overlay_text(world.hud.overlay)
-    expect(body.contains("优点") and body.contains("缺点"), "discovery still lists benefit and cost")
+    expect(body.contains("优点") and body.contains("缺点") and body.contains("燃石弹"), "discovery still lists benefit and cost")
     world.hud.cancel_link_discovery()
     expect(not world.link_notice_open and world.active_link["id"] == "none", "declining discovery still leaves 不联动")
     world.queue_free()
@@ -529,13 +530,20 @@ func check_blocked_screens() -> void:
     world.shop_open = true
     world.player_frozen = true
     world.hud.show_shop([{"id": "heal", "price": 1, "level": 1}], 10, 1, world.inventory, {}, world.player_hp, world.stats["max_hp"], false)
-    expect(not world.open_link_pack() and world.hud.screen == "shop", "the pack does not open over the shop")
+    expect(world.open_link_pack() and world.link_pack_open and world.shop_open, "the pack can open over the camp shop")
+    expect(world.hud.screen == "link_pack" and world.player_frozen, "opening the pack from the shop freezes on the pack screen")
+    press_key(world, KeyBindings.code_of("link"))
+    expect(not world.link_pack_open and world.shop_open and world.hud.screen == "shop", "the same key closes the pack and returns to the shop")
+    expect(world.player_frozen, "returning to the shop leaves the run paused")
     world.shop_open = false
     world.hud.hide_menu()
     world.player_frozen = false
     expect(world.open_link_pack(), "pack opens again in combat")
     world.open_round_shop()
     expect(not world.link_pack_open and world.shop_open, "opening the shop dismisses the pack first")
+    expect(world.open_link_pack() and world.shop_open, "the official round shop can also open the pack")
+    world.close_link_pack()
+    expect(not world.link_pack_open and world.shop_open and world.hud.screen == "shop", "closing the pack from the official shop restores the shop")
     world.queue_free()
     await process_frame
 

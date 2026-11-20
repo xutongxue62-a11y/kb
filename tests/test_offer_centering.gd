@@ -44,6 +44,41 @@ func verify_cards(hud, prefix: String, ids: Array, min_height: float, hide_buff_
         if hide_buff_notes and Growth.BUFFS.has(ids[i]):
             expect(not copy.contains("无限叠加") and not copy.contains("不占武器槽"), "%s %s omits generic attribute copy" % [prefix, ids[i]])
 
+func visible_copy(node: Node) -> String:
+    return str(node.text).replace("\u2060", "").replace("\u00A0", " ")
+
+func find_named(card: Node, name: String) -> Label:
+    var node = card.find_child(name, true, false)
+    return node if node is Label else null
+
+func verify_link_fits(hud, prefix: String, index: int, fragments: Array) -> void:
+    var card: Button = hud.find_child("%s%d" % [prefix, index], true, false)
+    var link: Label = find_named(card, "OfferLink")
+    expect(link != null, "%s %d has a link line" % [prefix, index])
+    if link == null:
+        return
+    var copy: String = visible_copy(link)
+    for fragment in fragments:
+        expect(copy.contains(str(fragment)), "%s %d link shows %s" % [prefix, index, fragment])
+    expect(not copy.ends_with("…") and not copy.ends_with("..."), "%s %d link is not ellipsized" % [prefix, index])
+    expect(link.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART, "%s %d link wraps instead of trimming" % [prefix, index])
+    expect(link.text_overrun_behavior != TextServer.OVERRUN_TRIM_ELLIPSIS, "%s %d link does not trim with an ellipsis" % [prefix, index])
+    expect(link.get_rect().end.y <= card.size.y - 2.0, "%s %d link stays inside the card" % [prefix, index])
+
+func verify_staff_interval(hud, prefix: String, index: int) -> void:
+    var card: Button = hud.find_child("%s%d" % [prefix, index], true, false)
+    var stats: Label = find_named(card, "OfferStats")
+    expect(stats != null, "%s %d has a stats line" % [prefix, index])
+    if stats == null:
+        return
+    var copy: String = visible_copy(stats)
+    expect(copy.contains("间隔") and copy.contains("秒"), "%s %d stats include the interval" % [prefix, index])
+    expect(not copy.contains("0.\n") and not copy.contains("间隔 0.\n"), "%s %d interval does not break after the decimal" % [prefix, index])
+    var phrase_start: int = copy.find("间隔")
+    if phrase_start >= 0:
+        var phrase: String = copy.substr(phrase_start)
+        expect(phrase.contains("秒") and not phrase.contains("\n"), "%s %d interval stays on one typographic unit" % [prefix, index])
+
 func settle() -> void:
     await process_frame
     await process_frame
@@ -72,6 +107,27 @@ func run() -> void:
     world.hud.show_choices(growth, [{"id":"staff","level":2}], {}, "xp", 4)
     await settle()
     verify_cards(world.hud, "GrowthOffer", growth, 5.0, true)
+    verify_staff_interval(world.hud, "GrowthOffer", 0)
+    var held := [{"id":"totem","level":1},{"id":"powder","level":1},{"id":"sling","level":1}]
+    world.hud.show_shop([
+        {"id":"crystal","price":20,"level":1},
+        {"id":"club","price":20,"level":1},
+        {"id":"staff","price":20,"level":1},
+        {"id":"axe","price":20,"level":1},
+        {"id":"heal","price":8},
+        {"id":"power","price":20}
+    ], 100, 2, held, {}, 6.9, 8.0, false)
+    await settle()
+    verify_cards(world.hud, "ShopOffer", ["crystal","club","staff","axe","heal","power"], 5.0, true)
+    verify_link_fits(world.hud, "ShopOffer", 0, ["触发更强碎晶", "优点", "缺点"])
+    verify_link_fits(world.hud, "ShopOffer", 1, ["优点", "缺点"])
+    verify_staff_interval(world.hud, "ShopOffer", 2)
+    var complete_growth := ["crystal","staff","armor"]
+    world.hud.show_choices(complete_growth, held, {}, "xp", 4)
+    await settle()
+    verify_cards(world.hud, "GrowthOffer", complete_growth, 5.0, true)
+    verify_link_fits(world.hud, "GrowthOffer", 0, ["触发更强碎晶", "优点", "缺点"])
+    verify_staff_interval(world.hud, "GrowthOffer", 1)
     var keys := ["totem","powder","spear","crystal","axe","staff"]
     var inventory := keys.map(func(key): return {"id":key,"level":3})
     world.hud.show_replace({"id":"boomerang","level":1,"price":22,"source":"shop"},inventory,4)

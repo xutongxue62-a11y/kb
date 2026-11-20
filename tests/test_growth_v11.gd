@@ -16,7 +16,9 @@ func _initialize() -> void:
     for key in ["power", "haste"]:
         for index in range(10):
             expect(growth.apply(levels, key), key + " stacks to ten")
-    expect(is_equal_approx(growth.stats(levels)["attack_speed"], 3.0), "ten haste yields 3.0x actual speed")
+    expect(is_equal_approx(growth.stats(levels)["attack_speed"], 2.0), "ten haste yields 2.0x actual speed")
+    expect(is_equal_approx(growth.stats({"haste": 1})["attack_speed"], 1.10), "one haste stack is +10%")
+    expect(is_equal_approx(growth.stats({"armor": 1})["reduction"], 0.06), "one armor stack is -6%")
     expect(is_equal_approx(growth.stats(levels)["damage_multiplier"], 2.8), "ten power yields 2.8x damage")
     for key in ["power", "haste"]:
         expect(growth.apply(levels, key), key + " can still grow past ten")
@@ -99,7 +101,7 @@ func _initialize() -> void:
                 if event["type"] == "flash":
                     count += 1
         attacks.append(count)
-    expect(attacks[1] > attacks[0] * 2.5, "real armory produces well over twice the attacks at ten haste")
+    expect(attacks[1] > attacks[0] * 1.7, "real armory produces nearly twice the attacks at ten haste")
     print("ARMORY HASTE: base=%d high=%d over 10s" % [attacks[0], attacks[1]])
     armory.free()
     view.free()
