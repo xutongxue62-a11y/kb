@@ -28,7 +28,12 @@ var base_scale: Vector2
 var kind: String
 var walk_time: float = 0.0
 var hit_time: float = 0.0
-var health_fraction: float = 1.0
+var health_fraction: float = 1.0:
+    set(value):
+        var changed: bool = absf(health_fraction - value) >= 0.02 or value <= 0.0 or (health_fraction >= 0.99 and value < 0.99)
+        health_fraction = value
+        if changed:
+            queue_redraw()
 var elite: bool = false:
     set(value):
         elite = value
@@ -47,6 +52,7 @@ var foot_phase: float = 0.0
 var gait_amount: float = 0.0
 var frames: Node2D
 var facing: float = 1.0
+var _egg_draw_accum: float = 0.0
 
 func setup(library, creature_kind: String, size: float, is_elite: bool) -> void:
     asset_library = library
@@ -132,7 +138,10 @@ func animate(velocity: Vector2, delta: float, state: String = "walk", travelled:
     hit_time = maxf(hit_time - delta, 0.0)
     if shell == "egg":
         walk_time += delta * 2.2
-        queue_redraw()
+        _egg_draw_accum += delta
+        if _egg_draw_accum >= 0.065:
+            _egg_draw_accum = 0.0
+            queue_redraw()
         return
     if absf(velocity.x) > 3.0:
         face_attack(velocity)
@@ -151,7 +160,6 @@ func animate(velocity: Vector2, delta: float, state: String = "walk", travelled:
     var tint: Color = Color(2.0, 1.75, 1.55) if hit_time > 0.13 else encounter_tint
     frames.modulate = tint
     sprite.modulate = tint
-    queue_redraw()
 
 func hit() -> void:
     hit_time = 0.2
@@ -221,10 +229,10 @@ func _egg_highlight(origin: Vector2, radius: float) -> PackedVector2Array:
 func _draw_ground_shadow() -> void:
     var width: float = display_width * (0.33 if shell == "egg" else 0.37)
     var foot := Vector2(0,display_width * (0.33 if shell == "egg" else 0.28))
-    for layer in range(6,0,-1):
-        var extent: float = 1.0 + float(layer)*0.07
-        draw_set_transform(foot,0,Vector2(width*extent,width*0.27*extent))
-        draw_circle(Vector2.ZERO,1.0,Color(0.10,0.07,0.06,0.035),true,-1,true)
+    draw_set_transform(foot, 0.0, Vector2(width * 1.28, width * 0.27 * 1.28))
+    draw_circle(Vector2.ZERO, 1.0, Color(0.10, 0.07, 0.06, 0.09), true, -1, true)
+    draw_set_transform(foot, 0.0, Vector2(width, width * 0.27))
+    draw_circle(Vector2.ZERO, 1.0, Color(0.10, 0.07, 0.06, 0.13), true, -1, true)
     draw_set_transform(Vector2.ZERO)
 
 func _draw() -> void:

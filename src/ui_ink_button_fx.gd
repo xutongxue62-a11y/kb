@@ -78,10 +78,21 @@ func paper_outline() -> PackedVector2Array:
     return Edge.fray(PackedVector2Array([Vector2(slant,2),Vector2(w-3,0),Vector2(w-4,h*0.42),Vector2(w-7,h*0.45),Vector2(w-slant,h-2),Vector2(w*0.53,h),Vector2(w*0.51,h-3),Vector2(2,h-1),Vector2(4,h*0.68),Vector2(2,h*0.62)]),minf(3.2,h*0.055),23)
 
 func _process(delta: float) -> void:
-    if not is_instance_valid(button): return
-    brush_progress=0.0 if button.disabled else Brush.advance(brush_progress,target_hover,delta)
-    hover = lerpf(hover,0.0 if button.disabled else target_hover,1-exp(-delta*16))
-    down = move_toward(down,target_down,delta*20)
+    if not is_instance_valid(button) or not button.is_visible_in_tree(): return
+    var prev_b: float = brush_progress
+    var prev_h: float = hover
+    var prev_d: float = down
+    var want_h: float = 0.0 if button.disabled else target_hover
+    brush_progress = 0.0 if button.disabled else Brush.advance(brush_progress, want_h, delta)
+    hover = lerpf(hover, want_h, 1.0 - exp(-delta * 16.0))
+    if absf(hover - want_h) < 0.002: hover = want_h
+    down = move_toward(down, target_down, delta * 20.0)
+    var cur_pressed: bool = button.toggle_mode and button.button_pressed
+    var state_key: int = (1 if button.disabled else 0) | (2 if cur_pressed else 0)
+    var prev_state: int = int(get_meta("_last_state_key", -1))
+    if is_equal_approx(prev_b, brush_progress) and is_equal_approx(prev_h, hover) and is_equal_approx(prev_d, down) and state_key == prev_state:
+        return
+    set_meta("_last_state_key", state_key)
     button.pivot_offset = button.size*0.5
     button.scale = Vector2.ONE*(1-down*0.035)
     _sync_brush()

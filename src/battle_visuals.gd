@@ -47,26 +47,32 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
     var normal: Vector2 = direction.orthogonal()
     match key:
         "sling":
+            var sling_ench: bool = bool(projectile.get("enchanted", false)) or bool(projectile.get("fire_enchanted", false)) or bool(projectile.get("thunder_enchanted", false))
             var sling_body: Color = _shot_body_color(projectile, Color("#c6bfa9"))
             var sling_shine: Color = _shot_shine_color(projectile, Color("#fff4d7"))
+            if sling_ench:
+                canvas.draw_circle(point, 11.0, Color(sling_body.r, sling_body.g, sling_body.b, 0.34))
             canvas.draw_line(point - direction * 19, point - direction * 5, Color(0.14, 0.12, 0.10, 0.55), 4.0, true)
-            canvas.draw_line(point - direction * 18, point - direction * 6, sling_shine, 1.7, true)
+            canvas.draw_line(point - direction * 18, point - direction * 6, sling_body if sling_ench else sling_shine, 2.2 if sling_ench else 1.7, true)
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(8, -1), Vector2(3, -7), Vector2(-4, -6), Vector2(-7, 1), Vector2(-2, 7), Vector2(5, 5)]), INK)
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(5.8, -0.7), Vector2(2.2, -4.9), Vector2(-2.7, -4.2), Vector2(-4.8, 0.7), Vector2(-1.2, 4.8), Vector2(3.4, 3.4)]), sling_body)
             canvas.draw_line(point - direction * 2 - normal * 3.6, point + direction * 2.8 - normal * 3.2, sling_shine, 1.8, true)
             canvas.draw_polyline(PackedVector2Array([point + direction * 2 + normal * 0.2, point - direction * 1.5 + normal * 1.5, point - direction * 0.5 + normal * 4]), sling_body.darkened(0.35), 1.2, true)
         "powder":
             var enchanted: bool = bool(projectile.get("enchanted", false))
+            var any_ench: bool = enchanted or bool(projectile.get("fire_enchanted", false)) or bool(projectile.get("thunder_enchanted", false))
             var rune_color: Color = _shot_body_color(projectile, Color("#ff8e36"))
             var rune_core: Color = _shot_shine_color(projectile, Color("#fff0a1"))
             var flicker: float = sin(elapsed * 33.0 + point.x * 0.13) * 3.0
+            if any_ench:
+                canvas.draw_circle(point, 15.5, Color(rune_color.r, rune_color.g, rune_color.b, 0.30))
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-4, -6), Vector2(-18, -7), Vector2(-14, -3), Vector2(-34 - flicker, 0), Vector2(-20, 3), Vector2(-24, 7), Vector2(-5, 6)]), INK)
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -4), Vector2(-17, -5), Vector2(-13, -1), Vector2(-29 - flicker, 0), Vector2(-17, 2), Vector2(-20, 5), Vector2(-5, 4)]), rune_color)
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -2), Vector2(-22 - flicker * 0.5, 0), Vector2(-6, 2.5)]), rune_core)
             canvas.draw_circle(point, 10.0, INK)
-            canvas.draw_circle(point, 7.6, Color("#57534c"))
-            canvas.draw_arc(point, 7.7, 0.0, TAU, 24, Color("#c6a366"), 1.6, true)
-            canvas.draw_arc(point + Vector2(-1.0, -1.4), 4.7, -2.8, -0.4, 12, Color("#e3dbc4"), 1.7, true)
+            canvas.draw_circle(point, 7.6, rune_color.darkened(0.22) if any_ench else Color("#57534c"))
+            canvas.draw_arc(point, 7.7, 0.0, TAU, 24, rune_color if any_ench else Color("#c6a366"), 1.8 if any_ench else 1.6, true)
+            canvas.draw_arc(point + Vector2(-1.0, -1.4), 4.7, -2.8, -0.4, 12, rune_core if any_ench else Color("#e3dbc4"), 1.8 if any_ench else 1.7, true)
             if enchanted:
                 var rune := _shape(point, direction.rotated(sin(elapsed * 5.0) * 0.15), [Vector2(14, 0), Vector2(0, 11), Vector2(-14, 0), Vector2(0, -11), Vector2(14, 0)])
                 canvas.draw_polyline(rune, INK, 3.5, true)
@@ -90,50 +96,54 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
                 if staff_tier >= 2:
                     canvas.draw_arc(point, 11.0 + spark, elapsed * 6.0, elapsed * 6.0 + 4.2, 10, Color(body, 0.7), 1.4, true)
         "hostile":
+            # High-contrast crimson danger aura + pulsing warning ring so ALL enemy projectiles stand out unmistakably from coins & XP!
+            var danger_pulse: float = 1.0 + 0.16 * sin(elapsed * 20.0 + point.x * 0.05)
+            canvas.draw_circle(point, 15.5 * danger_pulse, Color(1.0, 0.14, 0.24, 0.30))
+            canvas.draw_arc(point, 13.0 * danger_pulse, 0.0, TAU, 18, Color(1.0, 0.22, 0.30, 0.88), 2.2, true)
+            canvas.draw_line(point - direction * 28.0, point - direction * 4.0, Color(0.96, 0.18, 0.28, 0.62), 5.2, true)
             var style: String = str(projectile.get("hostile_style",""))
             if style in ["quill", "reed"]:
-                var pigment := Color("#a7a66a") if style == "quill" else Color("#83aa80")
-                canvas.draw_line(point - direction * 23.0, point - direction * 3.0, Color(pigment,0.55),3.0,true)
-                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(13,0),Vector2(1,-5),Vector2(-12,-2),Vector2(-10,4),Vector2(1,6)]),INK)
-                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(10,0),Vector2(1,-3),Vector2(-8,0),Vector2(0,3)]),pigment)
-                canvas.draw_line(point - direction * 6.0,point + direction * 7.0,Color("#efe0b0"),1.6,true)
+                var pigment := Color("#ff4c4c") if style == "quill" else Color("#ff3868")
+                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(15,0),Vector2(2,-6.5),Vector2(-13,-3),Vector2(-11,5),Vector2(2,7)]),INK)
+                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(11.5,0),Vector2(1.5,-4),Vector2(-9,0),Vector2(0.5,4)]),pigment)
+                canvas.draw_line(point - direction * 6.0,point + direction * 8.0,Color("#fff0f2"),2.2,true)
                 return true
             if style == "sonic":
                 for i in range(3):
-                    var center: Vector2 = point - direction * (13.0 + 7.0 * i)
-                    var edge : Color = Color("#e4b170",0.90 - 0.19 * i)
+                    var center: Vector2 = point - direction * (12.0 + 7.0 * i)
+                    var edge : Color = Color("#ff4655", 0.96 - 0.18 * i)
                     var sweep: float = direction.angle()
-                    canvas.draw_arc(center,19.0,sweep-0.63,sweep+0.63,10,Color("#684637",edge.a),6.2,true)
-                    canvas.draw_arc(center,19.0,sweep-0.63,sweep+0.63,10,edge,3.0,true)
+                    canvas.draw_arc(center,21.0,sweep-0.68,sweep+0.68,12,Color("#3b0e18",edge.a),7.2,true)
+                    canvas.draw_arc(center,21.0,sweep-0.68,sweep+0.68,12,edge,3.6,true)
                 return true
             if style in ["spore","fire"]:
-                var pigment: Color = Color("#d47c42") if style == "fire" else Color("#8fa25b")
-                var glow: Color = Color("#f0c074") if style == "fire" else Color("#d6db9d")
+                var pigment: Color = Color("#ff4d24") if style == "fire" else Color("#ff3366")
+                var glow: Color = Color("#fff0c4") if style == "fire" else Color("#ffd9e8")
                 for i in range(3):
-                    var spot: Vector2 = point - direction * (7.0 + i * 6.0) + normal * sin(elapsed * 21.0 + i * 2.0) * (i + 1)
-                    canvas.draw_circle(spot,5.0-i,Color(pigment,0.60-i*0.13),true,-1.0,true)
-                canvas.draw_circle(point,9.0,INK,true,-1.0,true)
-                canvas.draw_circle(point,6.6,pigment,true,-1.0,true)
-                canvas.draw_circle(point + Vector2(-1.8,-2.0),2.7,glow,true,-1.0,true)
+                    var spot: Vector2 = point - direction * (8.0 + i * 6.5) + normal * sin(elapsed * 21.0 + i * 2.0) * (i + 1)
+                    canvas.draw_circle(spot,5.8-i,Color(pigment,0.72-i*0.14),true,-1.0,true)
+                canvas.draw_circle(point,10.8,INK,true,-1.0,true)
+                canvas.draw_circle(point,8.0,pigment,true,-1.0,true)
+                canvas.draw_circle(point + Vector2(-1.8,-2.0),3.4,glow,true,-1.0,true)
                 return true
             if projectile.get("hostile_style","")=="stone":
-                canvas.draw_line(point-direction*24,point-direction*4,Color("#4f3e31"),5.5,true)
-                canvas.draw_line(point-direction*22,point-direction*6,Color("#d7b17f"),2.5,true)
-                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(11,0),Vector2(5,-10),Vector2(-6,-8),Vector2(-10,4),Vector2(0,10)]),INK)
-                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(8,0),Vector2(4,-7),Vector2(-4,-5),Vector2(-7,3),Vector2(0,7)]),Color("#be9c78"))
-                canvas.draw_line(point+Vector2(-4,-4),point+Vector2(2,-5),Color("#ffe0ac"),2.0,true)
+                canvas.draw_line(point-direction*26,point-direction*4,Color("#ff3a2e", 0.72),6.2,true)
+                canvas.draw_line(point-direction*24,point-direction*6,Color("#ffcf8a"),2.6,true)
+                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(12,0),Vector2(6,-11),Vector2(-7,-9),Vector2(-11,5),Vector2(0,11)]),INK)
+                canvas.draw_colored_polygon(_shape(point,direction,[Vector2(9,0),Vector2(4.5,-8),Vector2(-4.5,-6),Vector2(-7.5,3.5),Vector2(0,7.5)]),Color("#e05a3a"))
+                canvas.draw_line(point+Vector2(-4,-4),point+Vector2(2,-5),Color("#fff2cc"),2.2,true)
                 return true
-            canvas.draw_line(point - direction * 23, point, INK, 6.0, true)
-            canvas.draw_line(point - direction * 21, point, Color("#bd4e8e"), 2.8, true)
+            canvas.draw_line(point - direction * 26, point, INK, 6.8, true)
+            canvas.draw_line(point - direction * 24, point, Color("#ff2e63"), 3.4, true)
             var outer := PackedVector2Array()
             var inner := PackedVector2Array()
             for index in range(12):
-                var spike: Vector2 = Vector2.from_angle(float(index) * TAU / 12.0) * (11.0 if index % 2 == 0 else 6.6)
+                var spike: Vector2 = Vector2.from_angle(float(index) * TAU / 12.0) * (12.8 if index % 2 == 0 else 7.6)
                 outer.append(point + spike)
                 inner.append(point + spike * 0.76)
             canvas.draw_colored_polygon(outer, INK)
-            canvas.draw_colored_polygon(inner, Color("#c4377e"))
-            canvas.draw_circle(point + Vector2(-1.3, -1.8), 3.0, Color("#ffcade"))
+            canvas.draw_colored_polygon(inner, Color("#ff2a6d"))
+            canvas.draw_circle(point + Vector2(-1.2, -1.6), 4.0, Color("#fff0f5"))
     return true
 
 
@@ -155,45 +165,46 @@ static func staff_highlight(tier: int) -> Color:
 
 static func fire_tint(tier: int) -> Color:
     if tier >= 2:
-        return Color("#ff4d24")
+        return Color("#2ee67a")
     if tier >= 1:
-        return Color("#ff7320")
+        return Color("#ff5e1a")
     return Color("#ff8e36")
 
 static func fire_core(tier: int) -> Color:
     if tier >= 2:
-        return Color("#ffe58a")
+        return Color("#c8ff9e")
     if tier >= 1:
         return Color("#ffd36a")
     return Color("#fff0a1")
 
 static func fire_highlight(tier: int) -> Color:
     if tier >= 2:
-        return Color("#fff6c8")
+        return Color("#ebffd8")
     if tier >= 1:
         return Color("#ffe9a8")
     return Color("#fff4c8")
 
 static func thunder_tint(tier: int) -> Color:
+    # Bright electric silver-white (distinct from blue/cyan staff magic!)
     if tier >= 2:
-        return Color("#e8fbff")
+        return Color("#ffffff")
     if tier >= 1:
-        return Color("#9be8ff")
-    return Color("#83e2ee")
+        return Color("#eef6ff")
+    return Color("#dce8f2")
 
 static func thunder_core(tier: int) -> Color:
     if tier >= 2:
         return Color("#ffffff")
     if tier >= 1:
-        return Color("#d8f7ff")
-    return Color("#c8f4f8")
+        return Color("#f7fbff")
+    return Color("#edf5fc")
 
 static func thunder_highlight(tier: int) -> Color:
     if tier >= 2:
         return Color("#ffffff")
     if tier >= 1:
-        return Color("#f0fbff")
-    return Color("#e4f8fa")
+        return Color("#ffffff")
+    return Color("#f5faff")
 
 static func _shot_body_color(projectile: Dictionary, fallback: Color) -> Color:
     if bool(projectile.get("enchanted", false)):
@@ -201,6 +212,8 @@ static func _shot_body_color(projectile: Dictionary, fallback: Color) -> Color:
     if bool(projectile.get("fire_enchanted", false)):
         return fire_tint(int(projectile.get("fire_tier", 0)))
     if bool(projectile.get("thunder_enchanted", false)):
+        if bool(projectile.get("thunder_red", false)):
+            return Color("#ff3a2e")
         return thunder_tint(int(projectile.get("thunder_tier", 0)))
     return fallback
 
@@ -210,13 +223,15 @@ static func _shot_shine_color(projectile: Dictionary, fallback: Color) -> Color:
     if bool(projectile.get("fire_enchanted", false)):
         return fire_highlight(int(projectile.get("fire_tier", 0)))
     if bool(projectile.get("thunder_enchanted", false)):
+        if bool(projectile.get("thunder_red", false)):
+            return Color("#ffd8cc")
         return thunder_highlight(int(projectile.get("thunder_tier", 0)))
     return fallback
 
 static func weapon_enchant_modulate(kind: String, tier: int) -> Color:
     if kind == "fire":
         if tier >= 2:
-            return Color(1.22, 0.68, 0.52)
+            return Color(0.62, 1.24, 0.78)
         if tier >= 1:
             return Color(1.16, 0.78, 0.58)
         return Color(1.12, 0.84, 0.64)
@@ -226,10 +241,10 @@ static func weapon_enchant_modulate(kind: String, tier: int) -> Color:
         return Color(0.82, 0.96, 1.10)
     if kind == "thunder":
         if tier >= 2:
-            return Color(0.86, 1.12, 1.20)
+            return Color(1.12, 1.15, 1.20)
         if tier >= 1:
-            return Color(0.86, 1.06, 1.14)
-        return Color(0.90, 1.04, 1.10)
+            return Color(1.08, 1.11, 1.16)
+        return Color(1.04, 1.08, 1.13)
     return Color.WHITE
 
 static func draw_fire_wrap(canvas, point: Vector2, direction: Vector2, size: float, elapsed: float, tier: int = 0) -> void:
@@ -253,9 +268,9 @@ static func draw_fire_wrap(canvas, point: Vector2, direction: Vector2, size: flo
         ]), Color(wrap.r, clampf(wrap.g + 0.12 * float(index % 2), 0.0, 1.0), wrap.b, 0.86 * flicker))
     canvas.draw_circle(point + axis * 1.5, radius * 0.38, Color(core, 0.62 * flicker))
 
-static func draw_thunder_wrap(canvas, point: Vector2, size: float, elapsed: float, tier: int = 0) -> void:
-    var tint: Color = thunder_tint(tier)
-    var core: Color = thunder_highlight(tier)
+static func draw_thunder_wrap(canvas, point: Vector2, size: float, elapsed: float, tier: int = 0, is_red: bool = false) -> void:
+    var tint: Color = Color("#ff3a2e") if is_red else thunder_tint(tier)
+    var core: Color = Color("#ffd8cc") if is_red else thunder_highlight(tier)
     var pulse: float = 0.80 + 0.20 * sin(elapsed * 16.0)
     var radius: float = size * (0.95 + 0.12 * float(tier))
     canvas.draw_circle(point, radius * pulse, Color(tint, 0.16 + 0.05 * float(tier)))

@@ -36,7 +36,7 @@ func _ready() -> void:
     alignment = HORIZONTAL_ALIGNMENT_LEFT
     for state in ["normal", "hover", "pressed", "disabled", "focus"]:
         var empty := StyleBoxEmpty.new()
-        empty.content_margin_left = 54 if size.y > 50 else 45
+        empty.content_margin_left = 68 if size.y > 50 else 60
         empty.content_margin_right = 18
         empty.content_margin_top = 6
         empty.content_margin_bottom = 6
@@ -78,10 +78,19 @@ func _has_point(point: Vector2) -> bool:
     return Geometry2D.is_point_in_polygon(point, paper_outline())
 
 func _process(delta: float) -> void:
+    if not is_visible_in_tree(): return
+    var prev_b: float = brush_progress
+    var prev_h: float = hover_amount
+    var prev_p: float = press_amount
     var wanted: float = 0.0 if disabled else maxf(target_hover, 1.0 if has_focus() else 0.0)
-    brush_progress=0.0 if disabled else Brush.advance(brush_progress,wanted,delta)
+    brush_progress = 0.0 if disabled else Brush.advance(brush_progress, wanted, delta)
     hover_amount = lerpf(hover_amount, wanted, 1.0 - exp(-delta * 14.0))
-    press_amount = move_toward(press_amount, target_press, delta * 18)
+    if absf(hover_amount - wanted) < 0.002: hover_amount = wanted
+    press_amount = move_toward(press_amount, target_press, delta * 18.0)
+    var dis_flag: int = 1 if disabled else 0
+    if is_equal_approx(prev_b, brush_progress) and is_equal_approx(prev_h, hover_amount) and is_equal_approx(prev_p, press_amount) and dis_flag == int(get_meta("_last_dis", -1)):
+        return
+    set_meta("_last_dis", dis_flag)
     position = rest_position + Vector2(hover_amount * 3, -hover_amount * 3 + press_amount * 4)
     _sync_brush()
     if face != null: face.queue_redraw()
@@ -122,7 +131,7 @@ func draw_paper(canvas: Control) -> void:
     var ink: Color=hover_ink if brush_progress>0.13 else normal_ink
     if press_amount>0.1: ink=Brush.DARK_INK
     if disabled: ink.a = 0.4
-    var center := Vector2(31 if size.y > 50 else 27, size.y * 0.5)
+    var center := Vector2(42 if size.y > 50 else 38, size.y * 0.5)
     if paper_icon == "enter":
         center.x += hover_amount * 2
         canvas.draw_line(center + Vector2(-9, 0), center + Vector2(8, 0), ink, 2.2, true)

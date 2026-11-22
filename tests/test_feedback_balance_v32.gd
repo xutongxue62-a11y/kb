@@ -163,6 +163,58 @@ func _test_world_behavior() -> void:
     expect(is_equal_approx(world.player_hp, 5.0), "picking up a blood pack heals 2 HP")
     world.wave = 9
     expect(world.pickup_magnet_radius() > float(world.stats["pickup_radius"]), "later waves extend auto-magnet range")
+    var blood_pos: Vector2 = world.player_position + Vector2(60.0, 0.0)
+    var coin_pos: Vector2 = world.player_position + Vector2(90.0, 0.0)
+    var top_xp_pos: Vector2 = world.visible_world_rect().position + Vector2(320.0, 40.0)
+    world.pickups = [
+        {"kind": "blood", "position": blood_pos, "value": 2.0},
+        {"kind": "coin", "position": coin_pos, "value": 1},
+        {"kind": "xp", "position": top_xp_pos, "value": 1}
+    ]
+    world.update_pickups(0.1)
+    expect(world.pickups.size() == 3, "non-collected pickups remain on field")
+    expect(world.pickups[0]["position"].is_equal_approx(blood_pos), "blood packs are NOT magnetized toward the player")
+    expect(world.pickups[1]["position"].x < coin_pos.x, "coins ARE magnetized toward the player")
+    expect(world.pickups[2]["position"].is_equal_approx(top_xp_pos), "top-screen-edge pickups are NOT pushed downward")
+    world.map_view.set_view(world.player_position, 9)
+    var lava_center := Vector2.ZERO
+    for key in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1)]:
+        for prop in world.map_view.chunk_content(key):
+            if prop["kind"] == "lava":
+                lava_center = prop["point"]
+                break
+        if lava_center != Vector2.ZERO:
+            break
+    expect(lava_center != Vector2.ZERO, "volcano biome populates a lava pit in nearby chunks")
+    if lava_center != Vector2.ZERO:
+        expect(world.map_view.is_in_lava(lava_center), "volcano lava pool is detected by is_in_lava")
+        var clip_res: Dictionary = world._clip_point_before_lava(lava_center + Vector2(-220.0, 0.0), lava_center, 4.0)
+        expect(bool(clip_res["hit"]) and not world.map_view.is_in_lava(clip_res["point"], 3.5), "lightning vein stops cleanly before entering the lava rim")
+        world.effects.expire_all()
+        world.trigger_lava_lightning_splash(lava_center, 1.0)
+        expect(world.effects.particles.any(func(p): return str(p.get("kind", "")) == "fire_blast"), "lightning hitting lava spawns a molten explosion splash")
+    var evol = load("res://src/weapon_evolution.gd")
+    expect(evol.damage_multiplier("club", 5) > evol.damage_multiplier("club", 3) and evol.damage_multiplier("club", 3) > evol.damage_multiplier("sling", 3), "evolution jumps meaningfully at Lv.3/5 and boosts melee weapons")
+    expect(evol.damage_multiplier("firepot", 5) > evol.damage_multiplier("sling", 5) and evol.damage_multiplier("staff", 5) > evol.damage_multiplier("sling", 5), "awakened fire and staff receive extra Lv.5+ amplification")
+    expect(Economy.price("power", 20, 6) < 140 and Economy.price("sling", 20, 5) < 100, "repeat buff and high-level weapon upgrades are cut in price so builds scale smoothly")
+    expect(evol.damage_multiplier("sling", 5) >= 4.5 and evol.damage_multiplier("powder", 5) >= 4.5, "late-game sling and cannon evolution multipliers scale smoothly")
+    expect(world.Growth.MAX_WEAPON_LEVEL == 10 and evol.damage_multiplier("hammer", 10) > evol.damage_multiplier("hammer", 7), "weapon level cap is 10 and late upgrades keep scaling cleanly")
+    var fire_link := [{"id": "fire_cannon", "kind": "fire_enchant", "weapons": ["firepot", "powder"]}]
+    expect(world.Rules.enchant_damage_bonus(fire_link, "powder", 0, 0, 0) >= 1.28 and world.Rules.enchant_damage_bonus(fire_link, "powder", 2, 0, 0) >= 1.50, "enchanted weapons gain balanced direct-hit damage amplification")
+    world.start_run(false)
+    world.stats["crit_chance"] = 0.0
+    world.stats["crit_multiplier"] = 2.0
+    world.spawn_enemy("hunter", world.player_position + Vector2(80, 0))
+    var red_target: Dictionary = world.enemies.back()
+    red_target["hp"] = 500.0
+    red_target["max_hp"] = 500.0
+    red_target["dodge"] = 0.0
+    world.hurt_enemy(red_target, 10.0, "totem", false, Vector2.RIGHT, 0)
+    var normal_dealt: float = 500.0 - float(red_target["hp"])
+    red_target["hp"] = 500.0
+    world.hurt_enemy(red_target, 10.0, "totem", false, Vector2.RIGHT, 1)
+    var red_dealt: float = 500.0 - float(red_target["hp"])
+    expect(is_equal_approx(red_dealt, normal_dealt * float(world.stats["crit_multiplier"])), "red lightning guarantees a critical hit even with 0% crit chance")
     world.hurt_flash = 0.0
     world.hero.hurt()
     # Direct combat path

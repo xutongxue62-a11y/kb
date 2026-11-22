@@ -154,6 +154,21 @@ func run_checks() -> void:
         world.effects.expire_all()
         expect(world.effects.particles.is_empty(), "expire_all advances leftover combat effects to expiry")
     check_close_ranged_targets(world)
+    # Weapon hits, criticals, AoE blasts and fused weapons must not shake the screen.
+    world.start_run(false)
+    clear_enemies(world)
+    world.spawn_enemy("tank", world.player_position + Vector2(120, 0))
+    var target: Dictionary = world.enemies[0]
+    target["hp"] = 5000.0
+    target["max_hp"] = 5000.0
+    target["dodge"] = 0.0
+    world.stats["crit_chance"] = 1.0
+    for key in ["club", "axe", "blade", "hammer", "powder", "staff"]:
+        world.hurt_enemy(target, 5.0, key, false, Vector2.RIGHT)
+    world.damage_area(target["position"], 90.0, 5.0, "hammer", false, Color("#ffad40"), "quake")
+    world.damage_area(target["position"], 90.0, 5.0, "powder", true, Color("#70f2fa"), "rune_blast")
+    world.simulate(0.01, Vector2.ZERO)
+    expect(is_equal_approx(world.impact_strength, 0.0) and world.world_camera.offset.is_zero_approx(), "weapon hits, criticals, AoE and fused blasts produce no camera shake")
     world.queue_free()
     await process_frame
     print("IMPACT RESULT: %d checks, %d failures" % [checks, failures])

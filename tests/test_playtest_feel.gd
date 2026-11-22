@@ -77,20 +77,20 @@ func run_checks() -> void:
 func check_attack_feel() -> void:
     var catalog = load("res://src/catalog.gd")
     var expected := {
-        "club": [7.5, 0.28],
-        "axe": [12.0, 0.38],
-        "blade": [7.0, 0.14],
+        "club": [7.5, 0.32],
+        "axe": [13.5, 0.62],
+        "blade": [5.5, 0.12],
         "sling": [2.6, 0.30],
-        "powder": [4.2, 0.82],
-        "staff": [1.6, 0.54],
+        "powder": [9.0, 1.45],
+        "staff": [1.6, 0.72],
         "spear": [7.4, 0.52],
-        "hammer": [13.0, 0.90],
+        "hammer": [20.0, 2.00],
         "boomerang": [3.6, 0.76],
-        "totem": [2.8, 0.68],
+        "totem": [3.4, 0.68],
         "bonebow": [4.0, 0.64],
         "firepot": [2.2, 1.60],
         "wardrum": [3.2, 1.26],
-        "crystal": [5.8, 1.66]
+        "crystal": [10.5, 0.95]
     }
     for key in expected.keys():
         var data: Dictionary = catalog.WEAPONS[key]
@@ -165,9 +165,9 @@ func check_thunder_ward() -> void:
     expect(str(rules.ward_profile("thunder", 1).get("kind", "none")) == "none", "base totem tiers do not yet paralyze")
     var advanced: Dictionary = rules.ward_profile("thunder", 3)
     var awakened: Dictionary = rules.ward_profile("thunder", 5)
-    expect(str(advanced.get("kind", "")) == "paralyze" and is_equal_approx(float(advanced["duration"]), 0.28), "advanced thunder roots in place for a brief 0.28s")
-    expect(is_equal_approx(float(advanced["interval"]), 2.5) and bool(advanced.get("once", false)), "thunder paralysis uses a global interval and may only root a monster once")
-    expect(is_equal_approx(float(rules.PARALYZE_BOSS_DURATION), 0.12), "boss paralysis is shorter than the ordinary root")
+    expect(str(advanced.get("kind", "")) == "paralyze" and is_equal_approx(float(advanced["duration"]), 0.12), "advanced thunder roots in place for a brief 0.12s")
+    expect(is_equal_approx(float(advanced["interval"]), 3.5) and bool(advanced.get("once", false)), "thunder paralysis uses a global interval and may only root a monster once")
+    expect(is_equal_approx(float(rules.PARALYZE_BOSS_DURATION), 0.0), "bosses are immune to paralysis")
     expect(is_equal_approx(float(advanced["distance"]), 0.0) and is_equal_approx(float(awakened["duration"]), float(advanced["duration"])), "awakened thunder does not shove farther; it stays an in-place root")
     expect(str(catalog.WEAPONS["totem"]["description"]).contains("麻痹") and str(catalog.WEAPONS["totem"]["description"]).contains("一生仅一次"), "totem catalog mentions once-per-life paralysis")
     var world = prepare_world("thunder_ward")
@@ -187,9 +187,9 @@ func check_thunder_ward() -> void:
     expect(world.try_apply_ward(enemy, "thunder"), "an advanced thunder hit can paralyze")
     expect(bool(enemy.get("paralyzed", false)) and str(enemy.get("ward_kind", "")) == "paralyze", "thunder applies in-place paralysis, not a shove")
     expect(bool(enemy.get("paralyzed_once", false)), "a successful root marks the monster for life")
-    world.simulate(0.14, Vector2.ZERO)
+    world.simulate(0.06, Vector2.ZERO)
     expect(enemy["position"].distance_to(start) < 6.0, "a paralyzed monster stays in place instead of running away")
-    expect(bool(enemy.get("paralyzed", false)) or float(enemy.get("ward_left", 0.0)) > 0.0, "the brief root is still active at 0.14s")
+    expect(bool(enemy.get("paralyzed", false)) or float(enemy.get("ward_left", 0.0)) > 0.0, "the brief root is still active at 0.06s")
     expect(not world.try_apply_ward(enemy, "thunder"), "a second thunder hit cannot re-root the same monster")
     # After the root ends, the same monster must never be paralyzed again.
     enemy["ward_left"] = 0.0
@@ -229,19 +229,21 @@ func check_spawns() -> void:
     expect(is_equal_approx(rules.spawn_interval(3), 0.32), "wave 3 interval is 0.32")
     expect(is_equal_approx(rules.spawn_interval(10), maxf(0.14, 0.32 - 7.0 * 0.008)), "mid-game interval keeps falling")
     expect(is_equal_approx(rules.spawn_interval(40), 0.14), "late-game interval floors at 0.14")
-    expect(is_equal_approx(rules.spawn_interval_for(5, true, false), rules.spawn_interval(5)), "a live Boss stage uses the same spawn interval as a normal stage")
-    expect(is_equal_approx(rules.spawn_interval_for(5, true, true), rules.spawn_interval(5)), "after the Boss dies, the spawn interval stays the same as a normal stage")
-    expect(rules.enemy_limit_for(1) == 50, "early alive cap starts at 50")
-    expect(rules.enemy_limit_for(10) == 66, "wave 10 alive cap is 66")
-    expect(rules.enemy_limit_for(26) == 106, "late-game alive cap keeps growing past the old wave-26 plateau")
-    expect(rules.enemy_limit_for(40) == 156, "wave 40 alive cap reaches 156")
+    expect(is_equal_approx(rules.spawn_interval_for(5, true, false), rules.spawn_interval(5) * 1.65), "a live Boss stage slows minion spawn cadence")
+    expect(is_equal_approx(rules.spawn_interval_for(5, true, true), rules.spawn_interval(5) * 1.65), "Boss stage keeps throttled minion cadence in cleanup")
+    expect(rules.spawn_interval_for(10, false, false, 30) > rules.spawn_interval_for(10, false, false, 0), "crowded stages slow down spawn cadence smoothly")
+    expect(rules.enemy_limit_for(1) == 24, "early alive cap starts at 24")
+    expect(rules.enemy_limit_for(10) == 33, "wave 10 alive cap is 33")
+    expect(rules.enemy_limit_for(26) == 39, "wave 26 alive cap is 39")
+    expect(rules.enemy_limit_for(40) == 40, "wave 40 alive cap tops out at 40 for smooth performance")
+    expect(rules.enemy_limit_for(10, true) == int(roundi(33 * 0.5)), "Boss stage halves regular enemy cap")
     var world = prepare_world("spawns")
     world.begin_round(5)
     world.invulnerable = 999.0
     world.xp_needed = 99999
     world.simulate(0.56, Vector2.ZERO)
     expect(world.boss_round and not world.boss_defeated, "spawn check is on a live Boss stage")
-    expect(is_equal_approx(Rules_from_world_interval(world), rules.spawn_interval(5)), "world Boss-stage cadence matches the normal stage formula")
+    expect(is_equal_approx(Rules_from_world_interval(world), rules.spawn_interval(5) * 1.65), "world Boss-stage cadence uses the throttled Boss interval")
     var boss: Dictionary = {}
     for enemy in world.enemies:
         if enemy["kind"] == "boss":
@@ -271,7 +273,8 @@ func check_vfx_helpers() -> void:
     expect(visuals.staff_tint(2) != visuals.staff_tint(0), "only 觉醒 (level 5+) staff shots turn purple")
     expect(not visuals.WEAPON_ORBIT_RINGS, "orbiting weapons no longer draw rotating wrap or aura rings")
     expect(visuals.weapon_enchant_modulate("rune", 1) == visuals.weapon_enchant_modulate("rune", 0), "rune-enchanted views also stay blue until 觉醒")
-    expect(visuals.fire_tint(2).r >= visuals.fire_tint(0).r and visuals.fire_tint(2).g < visuals.fire_tint(0).g, "later fire upgrades shift toward a hotter crimson")
+    var fire2: Color = visuals.fire_tint(2)
+    expect(fire2.g > fire2.r and fire2.g > 0.7, "awakened fire (Lv.5+) shifts to emerald green flame")
     expect(visuals.thunder_tint(2).g >= visuals.thunder_tint(0).g and visuals.thunder_tint(2).b >= visuals.thunder_tint(0).b, "later thunder upgrades shift toward a brighter white-blue")
     var rune_shell := {"enchanted": true, "vfx_tier": 2}
     var fire_shell := {"fire_enchanted": true, "fire_tier": 2}
@@ -440,8 +443,8 @@ func check_boss_stage_matches_normal() -> void:
         normal.sort()
         boss.sort()
         expect(normal == boss, "wave %d Boss minion pool matches the normal stage" % wave)
-        expect(is_equal_approx(rules.spawn_interval_for(wave, true, false), rules.spawn_interval(wave)), "wave %d live Boss interval matches normal" % wave)
-        expect(is_equal_approx(rules.spawn_interval_for(wave, true, true), rules.spawn_interval(wave)), "wave %d post-Boss interval still matches normal" % wave)
+        expect(is_equal_approx(rules.spawn_interval_for(wave, true, false), rules.spawn_interval(wave) * 1.65), "wave %d live Boss interval is throttled" % wave)
+        expect(is_equal_approx(rules.spawn_interval_for(wave, true, true), rules.spawn_interval(wave) * 1.65), "wave %d post-Boss interval keeps Boss-stage cadence" % wave)
     expect(roster.spawn_pool(5, 16.0, false, true).has("bonecaller"), "a grove Boss stage still includes heavy bonecallers")
     expect(roster.spawn_pool(9, 16.0, false, true).has("basaltroller"), "a volcano Boss stage still includes heavy basaltrollers")
     expect(roster.spawn_pool(4, 16.0, false, true).has("armored"), "an early Boss stage still includes armored heavies")
@@ -452,8 +455,8 @@ func check_boss_stage_matches_normal() -> void:
     world.xp_needed = 99999
     world.simulate(0.56, Vector2.ZERO)
     expect(world.boss_round and not world.boss_defeated, "composition check is on a live Boss stage")
-    expect(is_equal_approx(world.Rules.spawn_interval_for(world.wave, true, false), world.Rules.spawn_interval(5)), "live Boss world cadence matches a normal wave 5")
-    expect(world.enemy_limit() == world.Rules.enemy_limit_for(5), "Boss-stage on-screen cap matches the same-wave normal cap")
+    expect(is_equal_approx(world.Rules.spawn_interval_for(world.wave, true, false), world.Rules.spawn_interval(5) * 1.65), "live Boss world cadence is throttled")
+    expect(world.enemy_limit() == world.Rules.enemy_limit_for(5, true), "Boss-stage on-screen cap matches the halved Boss cap")
     var boss := {}
     var minion_kinds := {}
     for enemy in world.enemies:
@@ -470,7 +473,7 @@ func check_boss_stage_matches_normal() -> void:
         world.simulate(0.01, Vector2.ZERO)
         var after_death: int = world.enemies.size()
         var post_interval: float = world.Rules.spawn_interval_for(world.wave, world.boss_round, world.boss_defeated)
-        expect(is_equal_approx(post_interval, world.Rules.spawn_interval(5)), "cleanup cadence stays on the normal-stage interval")
+        expect(is_equal_approx(post_interval, world.Rules.spawn_interval(5) * 1.65), "cleanup cadence keeps the Boss-stage interval")
         world.spawn_clock = 0.0
         world.simulate(post_interval + 0.05, Vector2.ZERO)
         expect(world.boss_defeated and not world.wave_closing, "cleanup window stays live after the Boss dies")
@@ -588,13 +591,14 @@ func check_late_balance() -> void:
     expect(boss30 >= previous_boss30 * 2.0 and boss30 <= previous_boss30 * 3.0, "wave 30 Boss formula HP is 2-3x the previous version")
     expect(is_equal_approx(progression.outgoing_damage_scale(1), 1.0) and is_equal_approx(progression.outgoing_damage_scale(8), 1.0), "player damage is unchanged through wave 8")
     expect(progression.outgoing_damage_scale(16) < 0.90 and is_equal_approx(progression.outgoing_damage_scale(30), 0.72), "mid-to-late outgoing player damage stays gently reduced, 0.72 at wave 30")
-    expect(is_equal_approx(rules.BURN_TICK_SCALE, 0.50), "burn and residual DoT ticks are halved")
+    expect(is_equal_approx(rules.BURN_TICK_SCALE, 0.68), "burn and residual DoT ticks scale with weapon progression")
     var world = prepare_world("burn_scale")
+    var evolution = load("res://src/weapon_evolution.gd")
     var pot_level: int = maxi(1, world.weapon_level("firepot"))
     world._spawn_attachment_fire(world.player_position, "sling")
     expect(not world.burning_fields.is_empty(), "a fire attachment leaves a burning field")
-    var expected_burn: float = 0.55 * (1.0 + float(pot_level - 1) * 0.25) * rules.BURN_TICK_SCALE
-    expect(is_equal_approx(float(world.burning_fields[0]["damage"]), expected_burn), "attachment burn uses the lowered tick scale")
+    var expected_burn: float = 1.65 * evolution.damage_multiplier("firepot", pot_level) * rules.BURN_TICK_SCALE
+    expect(is_equal_approx(float(world.burning_fields[0]["damage"]), expected_burn), "attachment burn uses the upgraded Evolution scaling")
     world.burning_fields.clear()
     world.explode_powder({"position": world.player_position, "damage": 10.0, "enchanted": false, "fire_enchanted": true})
     var powder_field: Dictionary = {}
@@ -602,7 +606,7 @@ func check_late_balance() -> void:
         if str(field.get("residual", "")) == "fire":
             powder_field = field
             break
-    expect(not powder_field.is_empty() and is_equal_approx(float(powder_field["damage"]), 10.0 * 0.16 * rules.BURN_TICK_SCALE), "fire-cannon residual burn is halved")
+    expect(not powder_field.is_empty() and is_equal_approx(float(powder_field["damage"]), 10.0 * 0.36 * rules.BURN_TICK_SCALE), "fire-cannon residual burn uses the upgraded DoT scale")
     world.stats["crit_chance"] = 0.0
     world.wave = 30
     world.spawn_enemy("hunter", world.player_position + Vector2(80, 0))

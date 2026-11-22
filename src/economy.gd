@@ -18,21 +18,24 @@ const BUFF_PRICE_BASE := {
 }
 
 static func price(key: String, stage: int, level: int = 0) -> int:
-    var inflation: int = mini(24, maxi(0, stage - 1) / 2)
+    var inflation: int = mini(14, maxi(0, stage - 1) / 3)
     if key == "heal":
         return 12 + mini(18, maxi(0, stage - 1) / 3)
     if Catalog.WEAPONS.has(key):
         var target: int = clampi(level, 1, Growth.MAX_WEAPON_LEVEL)
-        return 26 + int(round(10.0 * pow(float(target), 1.7))) + inflation
+        return 20 + int(round(5.0 * pow(float(target), 1.55))) + inflation
     if Growth.BUFFS.has(key):
         var base: int = int(BUFF_PRICE_BASE.get(key, 30 if Growth.BUFFS[key]["category"] == "support" else 20))
-        return int(round(float(base) * (1.0 + 0.45 * float(maxi(0, level))))) + inflation
+        var lvl: int = maxi(0, level)
+        if lvl == 0:
+            return base + inflation
+        return int(round(float(base) * (1.0 + 0.24 * float(lvl) + 0.025 * float(lvl * lvl)))) + inflation
     return 999999
 
 # Rerolling the camp shop costs gold and gets pricier each time within the
 # same camp visit, so spare gold has somewhere to go without becoming free.
 static func reroll_price(stage: int, rerolls: int) -> int:
-    return 15 + maxi(0, stage) + 15 * maxi(0, rerolls)
+    return 10 + maxi(0, stage) / 2 + 8 * maxi(0, rerolls)
 
 static func stock(inventory: Array, levels: Dictionary, stage: int, random: RandomNumberGenerator) -> Array:
     var result: Array = []

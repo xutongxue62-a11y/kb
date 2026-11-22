@@ -82,34 +82,55 @@ static func scaled_range(data: Dictionary, stats: Dictionary) -> float:
 static func choose_target(origin: Vector2, attack_range: float, candidates: Array, prefer_elite: bool = false) -> Dictionary:
     if attack_range < 0.0:
         return {}
-    var nearest: Dictionary = {}
-    var elite: Dictionary = {}
-    var nearest_distance: float = INF
-    var elite_distance: float = INF
-    var has_enemy: bool = has_monster_in_range(origin, attack_range, candidates)
-    var has_egg: bool = false
-    if not has_enemy:
-        for candidate in candidates:
-            if is_egg(candidate) and float(candidate.get("hp", 0.0)) > 0.0 and origin.distance_squared_to(candidate["position"]) <= attack_range * attack_range:
-                has_egg = true
-                break
+    var range_sq: float = attack_range * attack_range
+    var nearest_boss: Dictionary = {}
+    var nearest_boss_dist: float = INF
+    var nearest_monster: Dictionary = {}
+    var nearest_monster_dist: float = INF
+    var elite_monster: Dictionary = {}
+    var elite_monster_dist: float = INF
+    var nearest_egg: Dictionary = {}
+    var nearest_egg_dist: float = INF
+    var elite_egg: Dictionary = {}
+    var elite_egg_dist: float = INF
+    var nearest_stone: Dictionary = {}
+    var nearest_stone_dist: float = INF
     for candidate in candidates:
-        if has_enemy and (is_stone(candidate) or is_egg(candidate)):
-            continue
-        if not has_enemy and has_egg and is_stone(candidate):
-            continue
         if float(candidate.get("hp", 0.0)) <= 0.0:
             continue
         var distance: float = origin.distance_squared_to(candidate["position"])
-        if distance > attack_range * attack_range:
+        if distance > range_sq:
             continue
-        if distance < nearest_distance:
-            nearest = candidate
-            nearest_distance = distance
-        if candidate.get("elite", false) and distance < elite_distance:
-            elite = candidate
-            elite_distance = distance
-    return elite if prefer_elite and not elite.is_empty() else nearest
+        if is_stone(candidate):
+            if nearest_boss.is_empty() and nearest_monster.is_empty() and nearest_egg.is_empty() and distance < nearest_stone_dist:
+                nearest_stone = candidate
+                nearest_stone_dist = distance
+        elif is_egg(candidate):
+            if nearest_boss.is_empty() and nearest_monster.is_empty():
+                if distance < nearest_egg_dist:
+                    nearest_egg = candidate
+                    nearest_egg_dist = distance
+                if prefer_elite and candidate.get("elite", false) and distance < elite_egg_dist:
+                    elite_egg = candidate
+                    elite_egg_dist = distance
+        elif str(candidate.get("kind", "")) == "boss":
+            if distance < nearest_boss_dist:
+                nearest_boss = candidate
+                nearest_boss_dist = distance
+        else:
+            if distance < nearest_monster_dist:
+                nearest_monster = candidate
+                nearest_monster_dist = distance
+            if prefer_elite and candidate.get("elite", false) and distance < elite_monster_dist:
+                elite_monster = candidate
+                elite_monster_dist = distance
+    if not nearest_boss.is_empty():
+        return nearest_boss
+    if not nearest_monster.is_empty():
+        return elite_monster if prefer_elite and not elite_monster.is_empty() else nearest_monster
+    if not nearest_egg.is_empty():
+        return elite_egg if prefer_elite and not elite_egg.is_empty() else nearest_egg
+    return nearest_stone
 
 static func link_options(owned: Array) -> Array:
     var result: Array = []
@@ -267,6 +288,42 @@ static func has_link_id(links: Array, link_id: String) -> bool:
             return true
     return false
 
+static func red_lightning_chance(totem_level: int) -> float:
+    if totem_level >= 5:
+        return 0.32
+    if totem_level >= 3:
+        return 0.18
+    return 0.0
+
+static func red_lightning_multiplier(totem_level: int) -> float:
+    if totem_level >= 5:
+        return 1.40
+    if totem_level >= 3:
+        return 1.25
+    return 1.0
+
+static func enchant_damage_bonus(links: Array, host_id: String, fire_tier: int, rune_tier: int, thunder_tier: int) -> float:
+    if host_is_fire_enchanted(links, host_id):
+        return 1.50 if fire_tier >= 2 else (1.38 if fire_tier >= 1 else 1.28)
+    if host_is_rune_enchanted(links, host_id):
+        return 1.50 if rune_tier >= 2 else (1.38 if rune_tier >= 1 else 1.28)
+    if host_is_thunder_enchanted(links, host_id):
+        return 1.50 if thunder_tier >= 2 else (1.38 if thunder_tier >= 1 else 1.28)
+    return 1.0
+
+static func attack_speed_scale(weapon_id: String) -> float:
+    if weapon_id in ["powder", "hammer", "firepot", "crystal"]:
+        return 0.50
+    if weapon_id in ["axe", "wardrum"]:
+        return 0.75
+    return 1.0
+
+static func effective_attack_speed(weapon_id: String, raw_attack_speed: float) -> float:
+    var bonus: float = raw_attack_speed - 1.0
+    if bonus <= 0.0:
+        return maxf(0.25, raw_attack_speed)
+    return 1.0 + bonus * attack_speed_scale(weapon_id)
+
 static func weapon_cooldown_multiplier(weapon_id: String, links: Array) -> float:
     var penalty: float = 1.0
     for recipe in links:
@@ -284,8 +341,8 @@ static func powder_attack_range(links: Array) -> float:
     var reach: float = -1.0
     for recipe in links:
         if recipe.get("weapons", []).has("powder"):
-            reach = maxf(reach, float(recipe.get("range", 395.0)))
-    return 395.0 if reach < 0.0 else reach
+            reach = maxf(reach, float(recipe.get("range", 290.0)))
+    return 290.0 if reach < 0.0 else reach
 
 static func host_enchant_kinds(links: Array, weapon_id: String) -> Array:
     var kinds: Array = []
@@ -554,10 +611,11 @@ const MAGNET_WAVE_BONUS: float = 10.0
 const MAGNET_WAVE_STEPS: int = 10
 const WARD_INTERVAL: float = 0.70
 const WARD_TARGET_COOLDOWN: float = 1.55
-const PARALYZE_DURATION: float = 0.28
-const PARALYZE_BOSS_DURATION: float = 0.12
-const PARALYZE_INTERVAL: float = 2.5
-const BURN_TICK_SCALE: float = 0.50
+const PARALYZE_DURATION: float = 0.12
+const PARALYZE_BOSS_DURATION: float = 0.0
+const PARALYZE_INTERVAL: float = 3.5
+const BURN_TICK_SCALE: float = 0.68
+const SECONDARY_HIT_DECAY: float = 0.40
 
 static func spawn_interval(wave: int) -> float:
     var stage: int = maxi(1, wave)
@@ -565,14 +623,23 @@ static func spawn_interval(wave: int) -> float:
         return 0.40 - float(stage - 1) * 0.04
     return maxf(0.14, 0.32 - float(stage - 3) * 0.008)
 
-static func spawn_interval_for(wave: int, _boss_round: bool = false, _boss_defeated: bool = false) -> float:
-    # A Boss stage, including the post-death cleanup window, uses the same
-    # regular spawn cadence as a normal stage of this wave.
-    return spawn_interval(wave)
+static func spawn_interval_for(wave: int, boss_round: bool = false, _boss_defeated: bool = false, alive_count: int = 0) -> float:
+    var interval: float = spawn_interval(wave)
+    if boss_round:
+        interval *= 1.65
+    if alive_count > 0:
+        var cap: int = enemy_limit_for(wave, boss_round)
+        var load: float = clampf(float(alive_count) / maxf(1.0, float(cap)), 0.0, 1.0)
+        if load > 0.45:
+            interval *= lerpf(1.0, 2.1, (load - 0.45) / 0.55)
+    return interval
 
-static func enemy_limit_for(wave: int) -> int:
+static func enemy_limit_for(wave: int, boss_round: bool = false) -> int:
     var stage: int = maxi(1, wave)
-    return 50 + clampi((stage - 2) * 2, 0, 50) + clampi((stage - 24) * 4, 0, 56)
+    var base_cap: int = 24 + clampi(stage - 1, 0, 10) + clampi((stage - 11) / 3, 0, 6)
+    if boss_round:
+        return maxi(12, int(roundi(float(base_cap) * 0.5)))
+    return base_cap
 
 static func magnet_wave_bonus(wave: int) -> float:
     return MAGNET_WAVE_BONUS * float(clampi(wave - 3, 0, MAGNET_WAVE_STEPS))

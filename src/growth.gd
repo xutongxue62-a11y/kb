@@ -14,7 +14,7 @@ const BUFFS = {
     "dodge": {"name": "灵巧闪避", "glyph": "闪", "category": "passive", "max_level": 999, "description": "闪避率 +6 个百分点\n触发时显示“闪避”", "color": Color("#7b9b9c")},
     "accuracy": {"name": "鹰眼瞄准", "glyph": "准", "category": "passive", "max_level": 999, "description": "弹速 +8% · 命中半径 +2\n轻微追踪 · 抵消敌闪避 4%", "color": Color("#518f99")},
     "explorer": {"name": "探险拾荒", "glyph": "探", "category": "passive", "max_level": 999, "description": "拾取范围 +30 · 经验 +15%\n经验石会向你靠拢", "color": Color("#8b9460")},
-    "area": {"name": "震荡扩散", "glyph": "域", "category": "passive", "max_level": 999, "description": "爆炸与灼烧范围 +18%\n范围圆圈对应实际伤害区", "color": Color("#b2824c")},
+    "area": {"name": "震荡扩散", "glyph": "域", "category": "passive", "max_level": 999, "description": "爆炸与灼烧范围 +6%（上限 +100%）\n范围圆圈对应实际伤害区", "color": Color("#b2824c")},
     "pierce": {"name": "贯穿石弹", "glyph": "穿", "category": "passive", "max_level": 999, "description": "石弹与符能弹额外穿透 1 敌\n火药范围弹不参与", "color": Color("#5c949b")},
     "ricochet": {"name": "弹射技巧", "glyph": "弹", "category": "passive", "max_level": 999, "description": "石弹与符能弹额外弹射 1 敌\n同一发不会重复伤害同一敌人", "color": Color("#6f86a2")},
     "pet": {"name": "幼龙伙伴", "glyph": "龙", "category": "support", "max_level": 999, "description": "召唤跟随幼龙，自动扑咬\n再选提升伤害与出手速度", "color": Color("#b98245")},
@@ -51,7 +51,7 @@ static func stats(levels: Dictionary, stages_cleared: int = 0) -> Dictionary:
         "dodge_ignore": 0.04 * int(levels.get("accuracy", 0)),
         "pickup_radius": 100.0 + 30.0 * int(levels.get("explorer", 0)),
         "xp_multiplier": 1.0 + 0.15 * int(levels.get("explorer", 0)),
-        "area_multiplier": 1.0 + 0.18 * int(levels.get("area", 0)),
+        "area_multiplier": minf(2.0, 1.0 + 0.06 * int(levels.get("area", 0))),
         "pierce": int(levels.get("pierce", 0)),
         "ricochet": int(levels.get("ricochet", 0)),
         "range_multiplier": 1.0,
@@ -88,8 +88,8 @@ static func candidate_pool(inventory: Array, levels: Dictionary, include_heal: b
     return pool
 
 static func pick_weight(_key: String, level: int) -> float:
-    # All types use the same transparent curve; no hidden category guarantees.
-    return 1.0 / pow(1.0 + maxi(0, level), 1.1)
+    # Steeper diminishing weight so repeatedly stacking the same buff makes it noticeably rarer.
+    return 1.0 / pow(1.0 + maxi(0, level), 1.45)
 
 static func effective_weight(key: String, inventory: Array, levels: Dictionary) -> float:
     var weight: float = pick_weight(key, item_level(key, inventory, levels))
@@ -144,14 +144,14 @@ static func xp_needed_for(level: int) -> int:
 # Early stages heavily favor Lv.1; mid/high levels ramp in later, with the top end uncommon.
 # Batch 3: cap raised to 7 and the high end cut again — direct Lv.5+ draws are
 # now rare at every stage, and Lv.6/7 are jackpots rather than a plan.
-const MAX_WEAPON_LEVEL: int = 7
-const MAX_NEW_WEAPON_LEVEL: int = 7
-# Stage-band weights for Lv.1 .. Lv.7. Rows stay positive so every level can appear.
+const MAX_WEAPON_LEVEL: int = 10
+const MAX_NEW_WEAPON_LEVEL: int = 10
+# Stage-band weights for Lv.1 .. Lv.10. Rows stay positive so every level can appear.
 const NEW_WEAPON_LEVEL_WEIGHTS := {
-    1: [90.0, 7.0, 2.2, 0.6, 0.15, 0.04, 0.01],
-    4: [76.0, 16.0, 5.5, 1.7, 0.55, 0.17, 0.08],
-    7: [64.0, 22.0, 9.0, 3.2, 1.2, 0.4, 0.2],
-    10: [55.0, 26.0, 12.0, 4.4, 1.7, 0.6, 0.3]
+    1: [90.0, 7.0, 2.0, 0.55, 0.20, 0.10, 0.06, 0.04, 0.03, 0.02],
+    4: [75.0, 16.0, 5.5, 1.8, 0.7, 0.4, 0.25, 0.15, 0.12, 0.08],
+    7: [62.0, 22.0, 9.0, 3.4, 1.5, 0.8, 0.5, 0.35, 0.25, 0.20],
+    10: [52.0, 25.0, 12.0, 5.0, 2.4, 1.3, 0.9, 0.6, 0.45, 0.35]
 }
 
 static func new_weapon_level_weights(stage: int) -> Array:

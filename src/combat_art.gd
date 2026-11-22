@@ -32,7 +32,7 @@ static func source(family: String,frame: int) -> String:
             content='<path d="M-45 9Q-58 -10 -37 -17Q-39 -35 -17 -30Q-13 -49 5 -32Q23 -48 29 -25Q50 -32 46 -11Q59 0 43 15Q45 34 24 30Q13 47 -1 32Q-20 44 -25 27Q-48 32 -45 9Z" fill="url(#fire)" stroke-width="2.2"/><path d="M-29 7L-23 -11L-12 -6L-7 -26L4 -11L22 -24L22 -5L38 3L20 9L18 26L3 15L-10 29L-11 11Z" fill="#ffdf91" stroke="none"/><path d="M-15 2Q-3 -10 14 -2L5 13L-7 10Z" fill="#fff1c3" stroke="none"/>'
             for i in range(4): content+=shard(Vector2.from_angle(i*1.7)*(40+t*10),i*1.7,5,2,"wood")
         "rune":
-            content='<path d="M-34 -10L-34 -24L-18 -28M14 -32L29 -28L34 -13M35 10L30 27L12 31M-15 33L-32 25L-35 11" fill="none" stroke="#5b9b9a" stroke-width="4"/><path d="M-31 -10L-31 -22L-18 -25M14 -29L27 -25L31 -13M32 10L27 24L12 28M-15 30L-29 23L-32 11" fill="none" stroke="#d6f3d0" stroke-width="1.5"/>'
+            content='<circle cx="0" cy="0" r="%.1f" fill="url(#rune)" opacity="0.34" stroke="none"/>' % [24.0 + t * 14.0]
             for i in range(4): content+=shard(Vector2.from_angle(i*PI/2+0.3)*(15+t*22),i*PI/2+0.3,9,5,"rune")
             content+=shard(Vector2.ZERO,0,13*(1-t*0.45),8,"rune")
         "spear":

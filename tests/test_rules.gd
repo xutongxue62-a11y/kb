@@ -43,6 +43,10 @@ func _initialize() -> void:
     var monster: Dictionary = {"id": 10, "hp": 5.0, "position": Vector2(80, 0), "stone": false, "kind": "hunter", "elite": false, "radius": 22.0}
     expect(int(rules.choose_target(Vector2.ZERO, 120.0, [rock, monster]).get("id", -1)) == 10, "a living monster in range beats a closer rock")
     expect(int(rules.choose_target(Vector2.ZERO, 120.0, [rock]).get("id", -1)) == 9, "a rock can still be targeted when no monster is in range")
+    var boss_enemy: Dictionary = {"id": 11, "hp": 100.0, "position": Vector2(110, 0), "stone": false, "kind": "boss", "elite": false, "radius": 40.0}
+    var near_elite: Dictionary = {"id": 12, "hp": 10.0, "position": Vector2(30, 0), "stone": false, "kind": "hunter", "elite": true, "radius": 22.0}
+    expect(int(rules.choose_target(Vector2.ZERO, 120.0, [near_elite, boss_enemy], true).get("id", -1)) == 11, "an in-range Boss is prioritized over closer normal/elite monsters")
+    expect(int(rules.choose_target(Vector2.ZERO, 90.0, [near_elite, boss_enemy], true).get("id", -1)) == 12, "an out-of-range Boss does not hijack targeting from in-range monsters")
     expect(rules.has_monster_in_range(Vector2.ZERO, 120.0, [rock, monster]) and not rules.has_monster_in_range(Vector2.ZERO, 40.0, [rock, monster]), "monster presence is measured inside the weapon range")
     var boundary = [{"id": 8, "position": Vector2(100, 0), "hp": 1, "elite": false}]
     expect(rules.choose_target(Vector2.ZERO, 100.0, boundary).get("id", -1) == 8, "exact range boundary is included")

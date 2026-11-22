@@ -12,6 +12,7 @@ const BattleUI = preload("res://src/ui_battle_hud.gd")
 const OfferUI = preload("res://src/ui_offer_layout.gd")
 const KeyBindings = preload("res://src/key_bindings.gd")
 const LinkPackUI = preload("res://src/ui_link_pack.gd")
+const TornCard = preload("res://src/ui_torn_card.gd")
 
 signal start_requested(trial: bool)
 signal formation_requested
@@ -38,11 +39,13 @@ signal settings_changed(autosave: bool)
 signal music_changed(enabled: bool)
 signal volume_changed(kind: String, value: float)
 signal damage_numbers_changed(enabled: bool)
+signal vfx_mode_changed(mode: String)
 signal display_mode_changed(fullscreen: bool)
 signal key_bindings_changed
 signal link_discovery_enable(link_id)
 signal link_discovery_closed
 signal link_pack_closed
+signal training_requested
 
 var library
 var root: Control
@@ -118,6 +121,7 @@ var debug_cheats: bool = false
 var music_volume: float = 1.0
 var sfx_volume: float = 1.0
 var damage_numbers_enabled: bool = true
+var vfx_mode: String = "full"
 var fullscreen_enabled: bool = false
 var shop_state: Dictionary = {}
 var choice_reason: String = ""
@@ -135,6 +139,10 @@ var hurt_flash_layer: Control
 var front_return_screen: String = "title"
 var modal_snapshot: Texture2D
 var page_snapshot: Texture2D
+var cast_flip_direction: int = 0
+var cast_sheet_snapshot: Texture2D
+var cast_keep_static: bool = false
+var suppress_next_transition: bool = false
 var save_summary: Dictionary = {}
 var input_lock_until: int = 0
 var launch_committed: bool = false
@@ -302,13 +310,20 @@ func present_backdrop(kind: String) -> void:
 func play_transition(screen_name: String, _sfx: String = "") -> void:
     var first_page: bool = entered_screen.is_empty()
     entered_screen = screen_name
+    if suppress_next_transition:
+        suppress_next_transition = false
+        return
     if first_page or previous_screen == screen_name or previous_screen.is_empty():
         return
-    var mode: String = "compose"
-    if previous_screen in ["settings", "help", "continue"]:
+    var mode: String = "fade"
+    if previous_screen in ["settings", "help", "continue", "keybindings"]:
         mode = "fade"
-    elif screen_name in ["title", "start"]:
-        mode = "page"
+    elif screen_name == "cast" and previous_screen in ["title", "start"]:
+        mode = "chronicle_enter"
+    elif screen_name in ["title", "start"] and previous_screen in ["pause", "win", "lose", "combat", "shop", "growth", "replace", "stats", "link_pack", "training"]:
+        mode = "crumple_drop"
+    elif screen_name == "stats":
+        mode = "compose"
     page_turn(page_snapshot, mode)
 
 func make_display(text: String, size: int = 36, color: Color = ink) -> Label:
@@ -801,8 +816,12 @@ func setup(asset_library) -> void:
     preload_ui_sfx()
     show_title()
 
+func _set_text(node: Control, value: String) -> void:
+    if node != null and node.text != value:
+        node.text = value
+
 func update_state(hp: float, elapsed: float, kills: int, xp: float, xp_needed: int, inventory: Array, collapsed: bool, link: Dictionary, prefer_elite: bool, trial: bool) -> void:
-    health_label.text = "%.1f / %.0f" % [maxf(0, hp), current_max_hp]
+    _set_text(health_label, "%.1f / %.0f" % [maxf(0, hp), current_max_hp])
     if hp_bar != null:
         hp_bar.max_value = maxf(0.001, current_max_hp)
         hp_bar.value = maxf(0.0, hp)
@@ -810,43 +829,59 @@ func update_state(hp: float, elapsed: float, kills: int, xp: float, xp_needed: i
             pulse(hp_bar)
             pulse(health_label)
         last_hp = hp
-    score_label.text = "击败 %d" % kills
+    _set_text(score_label, "击败 %d" % kills)
     if last_kills >= 0 and kills != last_kills:
         pulse(score_label)
     last_kills = kills
     var seconds: int = maxi(0, ceili(30.0 - fmod(elapsed, 30.0)))
-    timer_label.text = "第 %d 关  %02d:%02d" % [floori(elapsed / 30.0) + 1, seconds / 60, seconds % 60]
+    _set_text(timer_label, "第 %d 关  %02d:%02d" % [floori(elapsed / 30.0) + 1, seconds / 60, seconds % 60])
     if formation_button != null:
-        formation_button.text = "收束集火" if collapsed else "展开扫荡"
-        KeyBindings.attach_to_button(formation_button, "scatter")
+        var form_text: String = "收束集火" if collapsed else "展开扫荡"
+        if formation_button.get_meta("_raw_label", "") != form_text or formation_button.get_meta("_bind_caption", "") != KeyBindings.caption_for("scatter"):
+            formation_button.set_meta("_raw_label", form_text)
+            formation_button.set_meta("_bind_caption", KeyBindings.caption_for("scatter"))
+            formation_button.text = form_text
+            KeyBindings.attach_to_button(formation_button, "scatter")
     if combo_button != null:
-        combo_button.text = str(link["name"])
-        KeyBindings.attach_to_button(combo_button, "link")
-        combo_button.tooltip_text = link["cost"]
+        var link_name: String = str(link["name"])
+        if combo_button.get_meta("_raw_label", "") != link_name or combo_button.get_meta("_bind_caption", "") != KeyBindings.caption_for("link"):
+            combo_button.set_meta("_raw_label", link_name)
+            combo_button.set_meta("_bind_caption", KeyBindings.caption_for("link"))
+            combo_button.text = link_name
+            KeyBindings.attach_to_button(combo_button, "link")
+        if combo_button.tooltip_text != str(link["cost"]):
+            combo_button.tooltip_text = link["cost"]
     if elite_button != null:
-        elite_button.text = "射程内精英优先" if prefer_elite else "最近目标"
-        KeyBindings.attach_to_button(elite_button, "aim")
-    notice_label.text = ("试用：按 %s 自选成长" % KeyBindings.caption_for("growth_trial")) if trial else "绿石经验 · 金币用于营地"
+        var elite_text: String = "射程内精英优先" if prefer_elite else "最近目标"
+        if elite_button.get_meta("_raw_label", "") != elite_text or elite_button.get_meta("_bind_caption", "") != KeyBindings.caption_for("aim"):
+            elite_button.set_meta("_raw_label", elite_text)
+            elite_button.set_meta("_bind_caption", KeyBindings.caption_for("aim"))
+            elite_button.text = elite_text
+            KeyBindings.attach_to_button(elite_button, "aim")
+    _set_text(notice_label, ("试用：按 %s 自选成长" % KeyBindings.caption_for("growth_trial")) if trial else "绿石经验 · 金币用于营地")
     growth_button.visible = trial and screen == "combat" and not hud_hidden and not menu_hides_hud
-    combo_label.text = str(link["summary"]).replace("\n", " · ")
+    _set_text(combo_label, str(link["summary"]).replace("\n", " · "))
     xp_bar.max_value = maxf(1.0, float(xp_needed))
     xp_bar.value = xp
     if xp_label != null:
-        xp_label.text = "%.0f / %d" % [xp, xp_needed]
+        _set_text(xp_label, "%.0f / %d" % [xp, xp_needed])
         if last_xp >= 0.0 and not is_equal_approx(xp, last_xp):
             pulse(xp_bar)
             pulse(xp_label)
         last_xp = xp
+    var recipes: Array = link.get("links", [link]) if typeof(link) == TYPE_DICTIONARY else []
+    var suppressed: Array = link.get("suppressed", []) if typeof(link) == TYPE_DICTIONARY else []
     for index in range(slots.size()):
         var slot: Dictionary = slots[index]
         if index < inventory.size():
             var item: Dictionary = inventory[index]
-            slot["icon"].texture = library.weapon_texture(item["id"],item["level"])
-            slot["name"].text = Catalog.WEAPONS[item["id"]]["name"]
+            var item_key: String = "%s:%d" % [item["id"], item["level"]]
+            if slot.get("_tex_key", "") != item_key:
+                slot["_tex_key"] = item_key
+                slot["icon"].texture = library.weapon_texture(item["id"],item["level"])
+            _set_text(slot["name"], Catalog.WEAPONS[item["id"]]["name"])
             slot["name"].modulate = Color.WHITE
             var tag: String = ""
-            var recipes: Array = link.get("links", [link]) if typeof(link) == TYPE_DICTIONARY else []
-            var suppressed: Array = link.get("suppressed", []) if typeof(link) == TYPE_DICTIONARY else []
             var tagged_attach: bool = false
             var tagged_chain: bool = false
             for recipe in recipes:
@@ -865,12 +900,14 @@ func update_state(hp: float, elapsed: float, kills: int, xp: float, xp_needed: i
                 tag = " · 弹射"
             elif tagged_attach or suppressed.has(item["id"]):
                 tag = " · 附着"
-            slot["level"].text = "Lv.%d" % item["level"] + (" · 觉醒" if item.level>=5 else (" · 进阶" if item.level>=3 else "")) + tag
+            _set_text(slot["level"], "Lv.%d" % item["level"] + (" · 觉醒" if item.level>=5 else (" · 进阶" if item.level>=3 else "")) + tag)
         else:
-            slot["icon"].texture = null
-            slot["name"].text = "未装备"
+            if slot.get("_tex_key", "") != "":
+                slot["_tex_key"] = ""
+                slot["icon"].texture = null
+            _set_text(slot["name"], "未装备")
             slot["name"].modulate = Color(1, 1, 1, 0.6)
-            slot["level"].text = ""
+            _set_text(slot["level"], "")
 
 func update_growth(levels: Dictionary, stats: Dictionary, _wave: int) -> void:
     current_max_hp = stats["max_hp"]
@@ -999,7 +1036,7 @@ func action(parent: Node, key: String, text: String, callback: Callable, color: 
         if not ui_busy():
             if key not in ["EnterCamp", "StartSling", "StartClub", "StartSpear", "ConfirmContinue", "Back", "CloseModal", "Settings", "HelpGameplay", "HelpKeys", "Stats", "Home", "NextRound"]:
                 play_ui("button_press")
-            if key in ["NextRound","Home"] and screen == "shop":
+            if key == "NextRound" and screen == "shop":
                 close_scroll_then(callback)
             else:
                 callback.call())
@@ -1255,8 +1292,9 @@ func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = 
     present_backdrop("none")
     dim_overlay(false)
     screen = "stats"
-    var column: VBoxContainer = menu_column(1040, 64)
-    column.add_theme_constant_override("separation", 12)
+    var column: VBoxContainer = parchment_column(1084, 34)
+    column.get_meta("scroll_frame").opening_mode = "fold"
+    column.add_theme_constant_override("separation", 10)
     var heading: Label = make_display("属性与 Buff · 战斗已暂停" if bool(difficulty.get("in_combat", false)) else "属性与 Buff", 28)
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
@@ -1269,24 +1307,34 @@ func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = 
         difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         column.add_child(difficulty_label)
     var scroll: ScrollContainer = ScrollContainer.new()
-    scroll.custom_minimum_size = Vector2(1008, 318)
+    scroll.custom_minimum_size = Vector2(990, 318)
     scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     column.add_child(scroll)
     var grid: GridContainer = GridContainer.new()
     grid.columns = 2
     grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    grid.add_theme_constant_override("h_separation", 16)
+    grid.add_theme_constant_override("h_separation", 14)
     grid.add_theme_constant_override("v_separation", 8)
     scroll.add_child(grid)
+    var buff_idx: int = 0
     for key in Growth.BUFFS:
         var data: Dictionary = Growth.BUFFS[key]
         var level: int = int(levels.get(key, 0))
         var entry: PanelContainer = PanelContainer.new()
-        entry.custom_minimum_size = Vector2(484, 64)
-        entry.add_theme_stylebox_override("panel", style(Color("#dce6cc") if level > 0 else Color("#eee4cb")))
+        entry.custom_minimum_size = Vector2(478, 64)
+        TornCard.apply(
+            entry,
+            Color("#dce6cc") if level > 0 else Color("#f1e6cc"),
+            Color("#6d7d59") if level > 0 else Color("#9a8462"),
+            53 + buff_idx * 11,
+            2.6,
+            1.25,
+            Vector4(14, 8, 14, 8)
+        )
         grid.add_child(entry)
         var label: Label = make_label(("已选  " if level > 0 else "可成长  ") + data["name"] + "  Lv.%d\n" % [level] + data["description"].split("\n")[0], 16, ink if level > 0 else Color("#8b806b"))
         entry.add_child(label)
+        buff_idx += 1
     var legend: Label = make_label("%s 查看属性 · %s 保存    品红尖刺是敌方攻击    绿石给经验，金币用于营地购买" % [KeyBindings.caption_for("stats"), KeyBindings.caption_for("save")], 16, Color("#78674d"))
     legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(legend)
@@ -1296,6 +1344,7 @@ func show_stats(levels: Dictionary, stats: Dictionary, difficulty: Dictionary = 
     resume.pressed.connect(func(): stats_requested.emit())
     KeyBindings.attach_to_button(resume, "stats")
     column.add_child(resume)
+    open_parchment(column, false)
     play_transition("stats", "ui_open")
 
 func _choose(key: String) -> void:
@@ -1406,16 +1455,23 @@ func configure_save(available: bool, autosave: bool, note: String = "", summary:
         autosave_toggle.text = "开启" if autosave_enabled else "关闭"
 
 func update_round(stage: int, stage_time: float, is_boss: bool, coins: int, boss_hp: float = 0.0, boss_max: float = 0.0, boss_name: String = "") -> void:
-    var remaining: int = maxi(0,ceili(30.0-stage_time))
-    timer_label.text = "第 %d 关 · Boss不限时" % stage if is_boss else "第 %d 关  %02d:%02d" % [stage,remaining/60,remaining%60]
-    var urgent: bool = not is_boss and remaining <= 10
-    timer_label.add_theme_font_size_override("font_size",18 if urgent else 17)
-    timer_label.add_theme_color_override("font_color",Color("#b2362b") if urgent else ink)
-    if urgent:
-        timer_label.text = "第 %d 关 · 最后 %d 秒" % [stage,remaining]
-        if can_animate() and remaining<=5:
-            timer_label.modulate = Color(1,0.76+0.24*absf(sin(stage_time*7)),0.76+0.24*absf(sin(stage_time*7)))
-    else: timer_label.modulate = Color.WHITE
+    var limit_sec: float = 180.0 if is_boss else 30.0
+    var remaining: int = maxi(0, ceili(limit_sec - stage_time))
+    if stage < 0:
+        timer_label.text = "训练营 · 按T配置 / Q联动"
+        timer_label.add_theme_font_size_override("font_size", 16)
+        timer_label.add_theme_color_override("font_color", Color("#2e6f6b"))
+        timer_label.modulate = Color.WHITE
+    else:
+        timer_label.text = "第 %d 关 · Boss %02d:%02d" % [stage, remaining / 60, remaining % 60] if is_boss else "第 %d 关  %02d:%02d" % [stage, remaining / 60, remaining % 60]
+        var urgent: bool = (not is_boss and remaining <= 10) or (is_boss and remaining <= 15)
+        timer_label.add_theme_font_size_override("font_size",18 if urgent else 17)
+        timer_label.add_theme_color_override("font_color",Color("#b2362b") if urgent else ink)
+        if urgent:
+            timer_label.text = "第 %d 关 · 最后 %d 秒" % [stage,remaining]
+            if can_animate() and remaining<=5:
+                timer_label.modulate = Color(1,0.76+0.24*absf(sin(stage_time*7)),0.76+0.24*absf(sin(stage_time*7)))
+        else: timer_label.modulate = Color.WHITE
     coin_label.text = "金币 %d" % coins
     if last_coins >= 0 and coins != last_coins:
         pulse(coin_label)
@@ -1703,6 +1759,7 @@ func show_shop(stock: Array, coins: int, finished_wave: int, inventory: Array, l
         "reroll_cost": reroll_cost,
     }
     reset_overlay()
+    suppress_next_transition = false
     set_battle_visible(false)
     present_backdrop("none")
     dim_overlay(false,true)
@@ -1765,11 +1822,37 @@ func snapshot_ui() -> Texture2D:
         return null
     return ImageTexture.create_from_image(image)
 
+func snapshot_region(logical_rect: Rect2) -> Texture2D:
+    if not can_animate() or not is_inside_tree():
+        return null
+    var texture: Texture2D = get_viewport().get_texture()
+    if texture == null or texture.get_width() < 2:
+        return null
+    var image: Image = texture.get_image()
+    if image == null or image.is_empty():
+        return null
+    var view_size: Vector2 = root.size if root != null and root.size.x > 4.0 and root.size.y > 4.0 else Vector2(1280.0, 800.0)
+    var sx: float = float(image.get_width()) / view_size.x
+    var sy: float = float(image.get_height()) / view_size.y
+    var px: int = clampi(int(round(logical_rect.position.x * sx)), 0, image.get_width() - 2)
+    var py: int = clampi(int(round(logical_rect.position.y * sy)), 0, image.get_height() - 2)
+    var pw: int = clampi(int(round(logical_rect.size.x * sx)), 2, image.get_width() - px)
+    var ph: int = clampi(int(round(logical_rect.size.y * sy)), 2, image.get_height() - py)
+    var sub: Image = image.get_region(Rect2i(px, py, pw, ph))
+    if sub == null or sub.is_empty():
+        return null
+    return ImageTexture.create_from_image(sub)
+
 func lock_ui(seconds: float) -> void:
     input_lock_until = maxi(input_lock_until, Time.get_ticks_msec() + int(seconds * 1000.0))
 
 func ui_busy() -> bool:
-    return scroll_closing or screen == "departure" or Time.get_ticks_msec() < input_lock_until or (veil != null and veil.active())
+    var flip_active: bool = false
+    if overlay != null:
+        var flip_node: Node = overlay.find_child("CastPageFlip", false, false)
+        if flip_node != null and flip_node.has_method("active") and flip_node.active():
+            flip_active = true
+    return scroll_closing or flip_active or screen == "departure" or Time.get_ticks_msec() < input_lock_until or (veil != null and veil.active())
 
 func page_turn(previous: Texture2D, effect: String = "compose", sound: bool = true) -> void:
     if veil == null:
@@ -1777,7 +1860,18 @@ func page_turn(previous: Texture2D, effect: String = "compose", sound: bool = tr
     veil.effect = effect
     if not can_animate():
         return
-    var cue: String = {"burn":"parchment_burn", "page":"page_turn", "fade":"paper_close", "compose":"paper_popup"}.get(effect, "paper_popup")
+    var cue: String = {
+        "burn": "parchment_burn",
+        "crumple_drop": "paper_close",
+        "chronicle_enter": "paper_popup",
+        "page": "page_turn",
+        "scroll_open": "page_turn",
+        "scroll_close": "paper_close",
+        "brush_sweep": "paper_popup",
+        "brush_back": "paper_close",
+        "fade": "paper_close",
+        "compose": "paper_popup"
+    }.get(effect, "paper_popup")
     if sound:
         play_ui(cue)
     veil.play(previous, effect)
@@ -1787,15 +1881,55 @@ func remember_modal_origin() -> void:
         front_return_screen = screen
         modal_snapshot = snapshot_ui()
 
-func close_front_modal() -> void:
-    var origin: String = front_return_screen
+func _finish_close_front_modal(origin: String) -> void:
     modal_snapshot = null
     if origin == "cast":
-        show_cast("ui_back")
+        cast_keep_static = true
+        show_cast("ui_back", true)
     elif origin == "pause":
         show_menu("pause", menu_kills, "ui_back")
     else:
         show_title()
+
+func close_front_modal() -> void:
+    if scroll_closing:
+        return
+    var origin: String = front_return_screen
+    var sheet: Control = overlay.find_child("HanddrawnPaper", true, false) as Control if overlay != null else null
+    if can_animate() and sheet != null:
+        scroll_closing = true
+        lock_ui(0.26)
+        play_ui("paper_close")
+        var dim: ColorRect = overlay.find_child("ModalDim", false, false) as ColorRect
+        var tw: Tween = create_tween()
+        tw.set_parallel(true)
+        if sheet.get("opening_mode") == "fold":
+            tw.tween_property(sheet, "reveal", 0.02, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+        else:
+            sheet.pivot_offset = sheet.size * 0.5
+            tw.tween_property(sheet, "scale", Vector2(0.94, 0.94), 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+            tw.tween_property(sheet, "modulate:a", 0.0, 0.20).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+        if dim != null:
+            tw.tween_property(dim, "color:a", 0.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+        tw.chain().tween_callback(func():
+            scroll_closing = false
+            suppress_next_transition = (origin != "pause")
+            _finish_close_front_modal(origin))
+        return
+    _finish_close_front_modal(origin)
+
+func close_cast_to_title() -> void:
+    if scroll_closing or ui_busy():
+        return
+    if can_animate() and veil != null:
+        var sheet_rect := Rect2(52, 134, 1176, 520)
+        var sheet_tex: Texture2D = snapshot_region(sheet_rect)
+        suppress_next_transition = true
+        show_title()
+        play_ui("paper_close")
+        veil.play_shards(sheet_tex, sheet_rect, "shard_scatter")
+        return
+    show_title()
 
 func show_continue() -> void:
     if not save_available:
@@ -1817,7 +1951,11 @@ func change_character(direction: int) -> void:
     var index: int = maxi(0, Catalog.CHARACTER_ORDER.find(displayed_character()))
     index = posmod(index + direction, Catalog.CHARACTER_ORDER.size())
     preview_character = Catalog.CHARACTER_ORDER[index]
-    show_cast("ui_hover", true)
+    cast_sheet_snapshot = snapshot_region(Rect2(62, 144, 1156, 500))
+    cast_flip_direction = 1 if direction >= 0 else -1
+    if can_animate():
+        play_ui("page_turn")
+    show_cast("page_turn", true)
 
 func commit_character(id: String = "") -> void:
     if ui_busy():
@@ -1827,6 +1965,7 @@ func commit_character(id: String = "") -> void:
         chosen = "caveman"
     selected_character = chosen
     preview_character = chosen
+    cast_keep_static = true
     show_cast("ui_click", true)
 
 func show_departure(seconds: float) -> void:
@@ -1894,7 +2033,7 @@ func handle_front_key(code: int) -> bool:
             confirm_cast()
             return true
         if KeyBindings.matches_code(code, "cancel"):
-            show_title()
+            close_cast_to_title()
             return true
     elif screen in ["title", "start"] and KeyBindings.matches_code(code, "confirm"):
         show_cast()
@@ -2270,15 +2409,35 @@ func configure_volumes(music_value: float, sfx_value: float) -> void:
 func volume_percent(value: float) -> String:
     return "%d%%" % int(round(clampf(value, 0.0, 1.0) * 100.0))
 
-func configure_display(show_numbers: bool, fullscreen: bool) -> void:
+static func vfx_mode_label(mode: String) -> String:
+    if mode == "off":
+        return "无"
+    if mode == "minimal":
+        return "极简"
+    return "开启"
+
+func configure_display(show_numbers: bool, fullscreen: bool, mode_vfx: String = "full") -> void:
     damage_numbers_enabled = show_numbers
     fullscreen_enabled = fullscreen
+    vfx_mode = mode_vfx if mode_vfx in ["full", "minimal", "off"] else "full"
     if overlay == null:
         return
     var numbers: BaseButton = overlay.find_child("DamageNumbers", true, false) as BaseButton
     if numbers != null:
         numbers.set_pressed_no_signal(damage_numbers_enabled)
         numbers.text = "开启" if damage_numbers_enabled else "关闭"
+    var vfx_btn: Button = overlay.find_child("VfxToggle", true, false) as Button
+    if vfx_btn != null:
+        vfx_btn.text = vfx_mode_label(vfx_mode)
+        var vbg: Color = Color("#b34d34") if vfx_mode == "full" else (Color("#dfa84c") if vfx_mode == "minimal" else Color("#faf3e3"))
+        var vfg: Color = Color("#faf3e3") if vfx_mode == "full" else Color("#30251c")
+        var vbd: Color = Color("#faf3e3") if vfx_mode == "full" else Color(Color("#30251c"), 0.65)
+        vfx_btn.add_theme_stylebox_override("normal", FrontUI.action_style(vbg, vbd))
+        vfx_btn.add_theme_stylebox_override("hover", FrontUI.action_style(vbg.lightened(0.08), Color("#30251c")))
+        vfx_btn.add_theme_stylebox_override("pressed", FrontUI.action_style(vbg.darkened(0.08), Color("#30251c")))
+        vfx_btn.add_theme_color_override("font_color", vfg)
+        vfx_btn.add_theme_color_override("font_hover_color", vfg)
+        vfx_btn.add_theme_color_override("font_pressed_color", vfg)
     var mode: BaseButton = overlay.find_child("FullscreenMode", true, false) as BaseButton
     if mode != null:
         mode.set_pressed_no_signal(fullscreen_enabled)
@@ -2293,20 +2452,28 @@ func set_hurt_flash(amount: float) -> void:
         hurt_flash_layer.queue_redraw()
 
 func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: float, links: Array, link_hint: String = "") -> void:
-    map_label.text = map_name + " · 向四周自由探索"
-    dodge_label.text = "就绪" if dodge_cooldown <= 0 else "%.1fs" % dodge_cooldown
+    _set_text(map_label, map_name + " · 向四周自由探索")
+    _set_text(dodge_label, "就绪" if dodge_cooldown <= 0 else "%.1fs" % dodge_cooldown)
     dodge_bar.value = 1 - clampf(dodge_cooldown / maxf(0.01,dodge_total),0,1)
-    if combo_button != null and combo_button.text.begins_with("不联动"):
-        combo_button.text = "联动可用" if links.size() > 1 else "等待配方"
-        KeyBindings.attach_to_button(combo_button, "link")
+    if combo_button != null and combo_button.get_meta("_raw_label", "") == "不联动":
+        var world_link_text: String = "联动可用" if links.size() > 1 else "等待配方"
+        if combo_button.get_meta("_display_label", "") != world_link_text or combo_button.get_meta("_bind_caption", "") != KeyBindings.caption_for("link"):
+            combo_button.set_meta("_display_label", world_link_text)
+            combo_button.set_meta("_bind_caption", KeyBindings.caption_for("link"))
+            combo_button.text = world_link_text
+            KeyBindings.attach_to_button(combo_button, "link")
+    elif combo_button != null:
+        combo_button.set_meta("_display_label", combo_button.get_meta("_raw_label", ""))
     if links.size() <= 1:
         if combo_button != null:
-            combo_button.tooltip_text = "获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包拖拽启用，不会自动开启。" % KeyBindings.caption_for("link")
+            var tip: String = "获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包拖拽启用，不会自动开启。" % KeyBindings.caption_for("link")
+            if combo_button.tooltip_text != tip:
+                combo_button.tooltip_text = tip
         # When the player already holds one half of a recipe, main passes a
         # hint naming the missing piece instead of the generic recipe list.
-        combo_label.text = link_hint if link_hint != "" else ("获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包，拖到一起即可联动。" % KeyBindings.caption_for("link"))
+        _set_text(combo_label, link_hint if link_hint != "" else ("获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包，拖到一起即可联动。" % KeyBindings.caption_for("link")))
     elif link_hint != "":
-        combo_label.text = link_hint
+        _set_text(combo_label, link_hint)
 
 func close_scroll_then(callback: Callable) -> void:
     if scroll_closing: return

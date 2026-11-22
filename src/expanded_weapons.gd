@@ -23,10 +23,10 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
     var events: Array = []
     var dt: float = maxf(0.0, delta) * maxf(0.0, float(stats.get("attack_speed", 1.0)))
     var data: Dictionary = Catalog.WEAPONS[key]
-    var level: int = clampi(int(item.get("level", 1)), 1, 5)
+    var level: int = clampi(int(item.get("level", 1)), 1, 10)
     var stage: int=Evolution.tier(level)
     state["evolution"]=stage
-    var damage: float = data["damage"] * (1.0 + (level - 1) * 0.35)
+    var damage: float = data["damage"] * Evolution.damage_multiplier(key, level) * float(stats.get("enchant_mults", {}).get(key, 1.0))
     var area: float = maxf(0.1, float(stats.get("area_multiplier", 1.0)))
     var bullet_speed: float = maxf(0.1, float(stats.get("bullet_speed", 1.0)))
     var mount: Vector2 = mount_point if mount_point.is_finite() else hero + MOUNTS[key]
@@ -81,6 +81,7 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                         shot["vfx_tier"] = int(stats.get("staff_tier", 0)) if rune_shot else 0
                         shot["fire_tier"] = int(stats.get("firepot_tier", 0)) if fire_shot else 0
                         shot["thunder_tier"] = int(stats.get("totem_tier", 0)) if thunder_shot else 0
+                        shot["thunder_red"] = thunder_shot and (bool(stats["bonebow_next_red"]) if stats.has("bonebow_next_red") else (randf() < Rules.red_lightning_chance(int(stats.get("totem_level", 1)))))
                         shot["link_kind"] = "rune_enchant" if rune_shot else ("fire_enchant" if fire_shot else "thunder_enchant")
                     state.arrows.append(shot)
             "firepot":
@@ -89,7 +90,7 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                     var offset: Vector2=Vector2(state.direction).orthogonal()*((pot-stage*0.5)*48.0)
                     var pot_damage: float = damage*(1.0 if stage==0 else (0.65 if stage==1 else 0.50))
                     var pot_radius: float = 56.0*area
-                    var pot_life: float = 2.4 if stage>=2 else 1.85
+                    var pot_life: float = 1.45 if stage>=2 else 1.15
                     if not mastery.is_empty():
                         pot_damage *= float(mastery.get("damage_multiplier", 1.0))
                         pot_radius *= float(mastery.get("area_multiplier", 1.0))
@@ -99,7 +100,7 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                 state["phase"] = "playing"
                 state["beat_count"] = 0
             "crystal":
-                state["mines"].append({"from": mount, "position": target["position"], "age": 0.0, "damage": damage, "speed": data["speed"] * bullet_speed, "trigger": 54.0 * area,"fragments":8 if stage>=1 else 6,"bursts_left":2 if stage>=2 else 1})
+                state["mines"].append({"from": mount, "position": target["position"], "age": 0.0, "damage": damage, "speed": data["speed"] * bullet_speed, "trigger": 78.0 * area,"fragments":10 if stage>=1 else 8,"bursts_left":2 if stage>=2 else 1})
     match key:
         "bonebow":
             advance_projectiles(state["arrows"], dt, targets, events, key)
@@ -117,7 +118,7 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
             view.position.y -= maxf(0.0, sin(state["age"] / 0.24 * TAU)) * 3.5 if state["phase"] == "playing" else 0.0
         "crystal":
             advance_projectiles(state["shards"], dt, targets, events, key)
-            advance_crystals(state, dt, targets)
+            advance_crystals(state, dt, targets, events)
             view.rotation = sin(state["age"] * 3.0) * 0.05
     state["position"] = view.position
     return events
@@ -143,8 +144,13 @@ static func advance_projectiles(projectiles: Array, dt: float, targets: Array, e
             if shot["hit_count"] >= int(shot.get("pierce_limit",3)):
                 break
             shot["hit_ids"].append(target["id"])
+            var dealt_damage: float = float(shot["damage"]) * pow(Rules.SECONDARY_HIT_DECAY, float(shot["hit_count"]))
             shot["hit_count"] += 1
-            events.append(hit(target, shot["damage"], key, shot["direction"]))
+            var ev: Dictionary = hit(target, dealt_damage, key, shot["direction"])
+            if bool(shot.get("thunder_enchanted", false)):
+                ev["thunder_enchanted"] = true
+                ev["thunder_red"] = bool(shot.get("thunder_red", false))
+            events.append(ev)
         shot["position"] = after
         shot["left"] -= distance
         if shot["left"] <= 0.0 or shot["hit_count"] >= int(shot.get("pierce_limit",3)):
@@ -160,8 +166,8 @@ static func advance_firepots(state: Dictionary, dt: float, targets: Array, event
             for target in targets:
                 if target["hp"] > 0.0 and fire["position"].distance_to(target["position"]) <= fire["radius"] + target["radius"]:
                     events.append(hit(target, fire["damage"], "firepot", (target["position"] - fire["position"]).normalized()))
-            fire["next_tick"] += 0.35
-        if fire["age"] > float(fire.get("life",1.85)):
+            fire["next_tick"] += 0.48
+        if fire["age"] > float(fire.get("life",1.15)):
             fires.remove_at(index)
     var pots: Array = state["pots"]
     for index in range(pots.size() - 1, -1, -1):
@@ -194,12 +200,12 @@ static func advance_drum(state: Dictionary, dt: float, hero: Vector2, targets: A
     if state["beat_count"] == beats and waves.is_empty():
         state["phase"] = "rest"
 
-static func advance_crystals(state: Dictionary, dt: float, targets: Array) -> void:
+static func advance_crystals(state: Dictionary, dt: float, targets: Array, events: Array = []) -> void:
     var mines: Array = state["mines"]
     for index in range(mines.size() - 1, -1, -1):
         var mine: Dictionary = mines[index]
         mine["age"] += dt
-        if mine["age"] < 0.60:
+        if mine["age"] < 0.36:
             continue
         var triggered: bool = bool(mine.get("charged",false))
         for target in targets:
@@ -207,17 +213,25 @@ static func advance_crystals(state: Dictionary, dt: float, targets: Array) -> vo
                 triggered = true
                 break
         if triggered:
-            # Sibling shards share the budget so their common origin is one hit.
+            # Guaranteed crystal shatter AoE burst right inside trigger zone + fast radial shards!
+            var blast_dmg: float = float(mine["damage"]) * 0.75
+            for target in targets:
+                if target["hp"] > 0.0 and mine["position"].distance_to(target["position"]) <= mine["trigger"] + target["radius"]:
+                    events.append(hit(target, blast_dmg, "crystal", (target["position"] - mine["position"]).normalized()))
             var shared_hits: Array = []
-            var fragments: int=int(mine.get("fragments",6))+(4 if mine.get("charged",false) else 0)
+            var is_charged: bool = bool(mine.get("charged", false))
+            var fragments: int=int(mine.get("fragments",8))+(4 if is_charged else 0)
             for shard in range(fragments):
                 var direction: Vector2 = Vector2.from_angle(TAU * shard / float(fragments))
-                state["shards"].append(projectile(mine["position"], direction, mine["damage"], mine["speed"], 160.0, shared_hits))
+                var shard_proj: Dictionary = projectile(mine["position"], direction, mine["damage"], mine["speed"], 220.0, shared_hits)
+                if is_charged:
+                    shard_proj["charged"] = true
+                state["shards"].append(shard_proj)
             mine["bursts_left"]=int(mine.get("bursts_left",1))-1
             if mine.bursts_left>0:
-                mine.age=0.15
+                mine.age=0.10
                 mine["charged"]=false
-                mine.damage*=0.55
+                mine.damage*=0.65
             else:
                 mines.remove_at(index)
         elif mine["age"] > 3.40:
@@ -233,18 +247,21 @@ static func draw(canvas: Node2D, key: String, state: Dictionary) -> void:
                 var shaft: Color = Color("#e5c794")
                 var tip: Color = Color("#f1dfb9")
                 if arrow.get("enchanted", false) or arrow.get("fire_enchanted", false) or arrow.get("thunder_enchanted", false):
+                    var is_red_arrow: bool = bool(arrow.get("thunder_red", false))
                     if bool(arrow.get("enchanted", false)):
                         shaft = BattleVisuals.staff_tint(int(arrow.get("vfx_tier", 0)))
                     elif bool(arrow.get("fire_enchanted", false)):
                         shaft = BattleVisuals.fire_tint(int(arrow.get("fire_tier", 0)))
                     else:
-                        shaft = BattleVisuals.thunder_tint(int(arrow.get("thunder_tier", 0)))
-                    tip = shaft.lightened(0.18)
-                    canvas.draw_line(point - direction * 31.0, point + direction * 11.0, Color(shaft, 0.42), 11.0, true)
-                    if bool(arrow.get("fire_enchanted", false)):
+                        shaft = Color("#ff3a2e") if is_red_arrow else BattleVisuals.thunder_tint(int(arrow.get("thunder_tier", 0)))
+                    tip = shaft.lightened(0.22)
+                    canvas.draw_line(point - direction * 31.0, point + direction * 11.0, Color(shaft, 0.45), 11.0, true)
+                    if bool(arrow.get("enchanted", false)):
+                        BattleVisuals.draw_staff_aura(canvas, point, 11.0, float(arrow.get("age", 0.0)), int(arrow.get("vfx_tier", 0)))
+                    elif bool(arrow.get("fire_enchanted", false)):
                         BattleVisuals.draw_fire_wrap(canvas, point, direction, 18.0, float(arrow.get("age", 0.0)), int(arrow.get("fire_tier", 0)))
                     elif bool(arrow.get("thunder_enchanted", false)):
-                        BattleVisuals.draw_thunder_wrap(canvas, point, 14.0, float(arrow.get("age", 0.0)), int(arrow.get("thunder_tier", 0)))
+                        BattleVisuals.draw_thunder_wrap(canvas, point, 14.0, float(arrow.get("age", 0.0)), int(arrow.get("thunder_tier", 0)), is_red_arrow)
                 canvas.draw_line(point - direction * 29.0, point + direction * 9.0, INK, 7.0, true)
                 canvas.draw_line(point - direction * 29.0, point + direction * 9.0, shaft, 3.5, true)
                 outlined_polygon(canvas, PackedVector2Array([point + direction * 19.0, point + direction * 4.0 + side * 7.0, point + direction * 6.0, point + direction * 4.0 - side * 7.0]), tip)
@@ -283,14 +300,18 @@ static func draw(canvas: Node2D, key: String, state: Dictionary) -> void:
                 else:
                     var ready: bool = mine["age"] >= 0.60
                     CombatArt.draw(canvas,"crystal",point+Vector2(0,5),27.0,fmod(float(mine.age)*0.7,1.0),Vector2.RIGHT,0.38 if ready else 0.18)
-                outlined_polygon(canvas, PackedVector2Array([point + Vector2(-15, 5), point + Vector2(-19, -10), point + Vector2(-10, -18), point + Vector2(-4, -9), point + Vector2(0, -29), point + Vector2(10, -16), point + Vector2(9, -3), point + Vector2(19, -13), point + Vector2(17, 8), point + Vector2(0, 12)]), Color("#b8a2d8"))
-                canvas.draw_line(point + Vector2(0, -21), point + Vector2(1, 5), Color("#e8d9fa"), 3.0, true)
+                var is_charged_mine: bool = bool(mine.get("charged", false))
+                if is_charged_mine:
+                    BattleVisuals.draw_thunder_wrap(canvas, point + Vector2(0, -6), 24.0, float(mine.get("age", 0.0)) * 2.0, 2, false)
+                outlined_polygon(canvas, PackedVector2Array([point + Vector2(-15, 5), point + Vector2(-19, -10), point + Vector2(-10, -18), point + Vector2(-4, -9), point + Vector2(0, -29), point + Vector2(10, -16), point + Vector2(9, -3), point + Vector2(19, -13), point + Vector2(17, 8), point + Vector2(0, 12)]), Color("#e2eeff") if is_charged_mine else Color("#b8a2d8"))
+                canvas.draw_line(point + Vector2(0, -21), point + Vector2(1, 5), Color("#ffffff") if is_charged_mine else Color("#e8d9fa"), 3.0, true)
             for shard in state["shards"]:
                 var point: Vector2 = shard["position"]
                 var direction: Vector2 = shard["direction"]
                 var side: Vector2 = direction.orthogonal()
-                outlined_polygon(canvas, PackedVector2Array([point + direction * 13, point + side * 5, point - direction * 9, point - side * 5]), Color("#baa7e1"), 2.5)
-                canvas.draw_line(point - direction * 4, point + direction * 8, Color("#f0e4ff"), 2.0, true)
+                var charged_shard: bool = bool(shard.get("charged", false))
+                outlined_polygon(canvas, PackedVector2Array([point + direction * 13, point + side * 5, point - direction * 9, point - side * 5]), Color("#dceeff") if charged_shard else Color("#baa7e1"), 2.5)
+                canvas.draw_line(point - direction * 4, point + direction * 8, Color("#ffffff") if charged_shard else Color("#f0e4ff"), 2.4 if charged_shard else 2.0, true)
 
 static func outlined_polygon(canvas: Node2D, points: PackedVector2Array, color: Color, width: float = 3.0) -> void:
     canvas.draw_colored_polygon(points, color)

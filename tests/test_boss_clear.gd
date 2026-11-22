@@ -83,7 +83,7 @@ func check_living_boss_does_not_advance() -> void:
     advance_live(world, 31.0)
     expect(world.wave == 5 and world.boss_round and not world.boss_defeated and not world.shop_open and not world.wave_closing, "a living Boss does not end the wave after thirty-plus seconds")
     expect(world.wave_elapsed > 30.0, "Boss fight time can exceed a normal wave clock")
-    expect(world.hud.timer_label.text.contains("Boss不限时"), "the HUD keeps the untimed Boss label while the Boss lives")
+    expect(world.hud.timer_label.text.contains("Boss "), "the HUD shows the 3-minute Boss countdown while the Boss lives")
     world.queue_free()
 
 func check_death_keeps_combat_open() -> void:
@@ -98,7 +98,7 @@ func check_death_keeps_combat_open() -> void:
     expect(not world.wave_closing and not world.shop_open and world.running and not world.player_frozen, "the death frame and a short simulate do not start settlement")
     expect(world.boss_clear_left > 29.0, "cleanup time is almost fully remaining immediately after death")
     world.update_hud()
-    expect(not world.hud.timer_label.text.contains("Boss不限时") and world.hud.timer_label.text.contains("00:"), "cleanup uses a normal countdown instead of the untimed Boss label")
+    expect(not world.hud.timer_label.text.contains("Boss ") and world.hud.timer_label.text.contains("00:"), "cleanup uses a normal countdown instead of the Boss timer label")
     expect(not world.hud.boss_bar.visible, "the Boss bar hides once the Boss is dead")
     world.queue_free()
 

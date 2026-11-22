@@ -1,6 +1,7 @@
 extends RefCounted
 
 const Paper = preload("res://src/ui_paper.gd")
+const PageTransition = preload("res://src/ui_transition.gd")
 const Catalog = preload("res://src/catalog.gd")
 const Growth = preload("res://src/growth.gd")
 const ActorView = preload("res://src/actor_view.gd")
@@ -73,15 +74,17 @@ static func paper(h, rect: Rect2, animate: bool = true, mode: String = "fold"):
     if animate and h.can_animate():
         var tween: Tween = h.create_tween()
         if mode == "compose":
-            h.lock_ui(0.46)
-            sheet.position.y += 24
-            sheet.modulate.a = 0
-            sheet.pivot_offset = sheet.size * 0.5
-            sheet.scale = Vector2.ONE * 0.985
-            tween.set_parallel(true)
-            tween.tween_property(sheet, "position", rect.position, 0.46).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-            tween.tween_property(sheet, "modulate:a", 1.0, 0.24).set_delay(0.06)
-            tween.tween_property(sheet, "scale", Vector2.ONE, 0.46).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+            h.lock_ui(0.54)
+            sheet.modulate.a = 0.0
+            tween.tween_property(sheet, "modulate:a", 1.0, 0.18).set_delay(0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+            var shard_fx := PageTransition.new()
+            shard_fx.name = "ShardAssembleFx"
+            shard_fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+            shard_fx.size = h.root.size if h.root != null and h.root.size.x > 4.0 else Vector2(1280.0, 800.0)
+            shard_fx.z_index = 14
+            h.overlay.add_child(shard_fx)
+            shard_fx.play_shards(null, rect, "shard_assemble")
+            shard_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
         else:
             sheet.reveal = 0.035
             h.lock_ui(0.34)
@@ -100,7 +103,9 @@ static func nav_arrow(h, parent: Node, key: String, direction: int, rect: Rect2)
 
 static func flat_background(h) -> void:
     h.present_backdrop("arena")
-    h.overlay.color = Color(0.025, 0.06, 0.12, 0.88)
+    if ResourceLoader.exists("res://assets/ui/title_empty_v09.png"):
+        h.backdrop.texture = load("res://assets/ui/title_empty_v09.png")
+    h.overlay.color = Color(0.025, 0.055, 0.10, 0.72)
 
 static func portrait(h, parent: Node, at: Vector2, scale_value: float = 3.4, character_id: String = "caveman") -> void:
     var actor = ActorView.new()
@@ -144,8 +149,8 @@ static func title(h) -> void:
     resume.disabled = not h.save_available
     resume.tooltip_text = h.save_note if h.save_available else "尚无可继续的旅程"
     h.save_note_label = label(h, h.overlay, "可继续上次旅程" if h.save_available else "准备好，开始一段新旅程", Rect2(46, 642, 350, 32), 16, Color("#d1c7b4"))
-    home_button(h, "HelpGameplay", "玩法说明", Rect2(36, 712, 174, 44), func(): h.show_help("gameplay", false), false, 18, "help")
-    home_button(h, "Settings", "设置", Rect2(220, 712, 136, 44), func(): h.show_settings(false), false, 18, "settings")
+    home_button(h, "HelpGameplay", "玩法说明", Rect2(36, 712, 188, 44), func(): h.show_help("gameplay", false), false, 18, "help")
+    home_button(h, "Settings", "设置", Rect2(232, 712, 146, 44), func(): h.show_settings(false), false, 18, "settings")
 
 static func home_button(h, key: String, text: String, rect: Rect2, callback: Callable, primary: bool, font_size: int, icon_key: String) -> Button:
     var result := HomeAction.new()
@@ -191,7 +196,11 @@ static func cast(h) -> void:
     cast_title.name = "CastTitle"
     line(h.overlay, Vector2(50, 107), 278, RED)
     button(h, h.overlay, "Settings", "设置", Rect2(1100, 35, 128, 48), func(): h.show_settings(false), false, 19)
-    var sheet = paper(h, Rect2(52, 134, 1176, 520), true, "compose")
+    var flip_dir: int = int(h.cast_flip_direction) if h.get("cast_flip_direction") != null else 0
+    var keep_static: bool = bool(h.cast_keep_static) if h.get("cast_keep_static") != null else false
+    var animate_sheet: bool = flip_dir == 0 and not keep_static
+    var sheet_rect := Rect2(52, 134, 1176, 520)
+    var sheet = paper(h, sheet_rect, animate_sheet, "compose")
     var body: Control = sheet.content
     line(body, Vector2(572, 40), 2, Color(INK, 0.3))
     var divider := ColorRect.new()
@@ -236,7 +245,7 @@ static func cast(h) -> void:
         label(h, body, str(skill.get("name", "")), Rect2(626, y, 470, 28), 22, INK, true)
         label(h, body, str(skill.get("description", "")), Rect2(626, y + 28, 470, 28), 16, Color("#506071"))
         y += 62
-    KeyBindings.attach_to_button(button(h, h.overlay, "Back", "← 返回首页", Rect2(52, 705, 258, 52), func(): h.show_title(), false, 21), "cancel")
+    KeyBindings.attach_to_button(button(h, h.overlay, "Back", "← 返回首页", Rect2(52, 705, 258, 52), func(): h.close_cast_to_title(), false, 21), "cancel")
     var progress: Dictionary = h.character_best_wave if h.get("character_best_wave") != null else {}
     var unlocked: bool = Catalog.is_character_unlocked(shown, progress)
     var note: String = ""
@@ -264,22 +273,36 @@ static func cast(h) -> void:
         if id == shown and not Catalog.can_start_character(id, progress):
             confirm.disabled = true
             confirm.tooltip_text = Catalog.unlock_requirement_text(id)
-    h.stage_panel(body)
+    if flip_dir != 0 and h.can_animate():
+        h.lock_ui(0.48)
+        var flip_fx := PageTransition.new()
+        flip_fx.name = "CastPageFlip"
+        flip_fx.position = Vector2(62, 144)
+        flip_fx.size = Vector2(1156, 500)
+        flip_fx.z_index = 12
+        h.overlay.add_child(flip_fx)
+        flip_fx.play(h.cast_sheet_snapshot, "book_flip_next" if flip_dir > 0 else "book_flip_prev")
+        flip_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    h.cast_flip_direction = 0
+    h.cast_sheet_snapshot = null
+    h.cast_keep_static = false
 
 static func modal(h, rect: Rect2):
     h.present_backdrop("arena")
     h.overlay.color = Color(0.04, 0.09, 0.17, 0.64)
     if h.modal_snapshot != null:
         var bg := TextureRect.new()
-        bg.texture = h.modal_snapshot
-        bg.size = Vector2(1280, 800)
         bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        bg.stretch_mode = TextureRect.STRETCH_SCALE
+        bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+        bg.texture = h.modal_snapshot
+        bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.overlay.add_child(bg)
         var dim := ColorRect.new()
-        dim.size = Vector2(1280, 800)
-        dim.color = Color(0.025, 0.06, 0.13, 0.66)
+        dim.name = "ModalDim"
+        dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        dim.color = Color(0.02, 0.045, 0.09, 0.46)
         dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.overlay.add_child(dim)
     return paper(h, rect)
@@ -346,14 +369,14 @@ static func settings(h, in_run: bool) -> void:
     sfx_value.name = "SfxVolumeValue"
     sfx_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
     line(body,Vector2(48,344),674,Color(INK,0.35))
-    label(h, body, "伤害数字", Rect2(48, 354, 400, 42), 25, INK, true)
+    label(h, body, "伤害数字", Rect2(48, 354, 140, 42), 23, INK, true)
     var numbers := PaperToggle.new()
     numbers.name = "DamageNumbers"
-    numbers.position = Vector2(552, 348)
-    numbers.size = Vector2(168, 50)
+    numbers.position = Vector2(204, 348)
+    numbers.size = Vector2(140, 48)
     numbers.button_pressed = h.damage_numbers_enabled
     numbers.text = "开启" if h.damage_numbers_enabled else "关闭"
-    numbers.add_theme_font_size_override("font_size",21)
+    numbers.add_theme_font_size_override("font_size",20)
     numbers.add_theme_stylebox_override("normal",action_style(IVORY,Color(INK,0.6)))
     numbers.add_theme_stylebox_override("pressed",action_style(RED,IVORY))
     numbers.toggled.connect(func(value: bool):
@@ -366,6 +389,37 @@ static func settings(h, in_run: bool) -> void:
         h.damage_numbers_changed.emit(value))
     body.add_child(numbers)
     h.press_motion(numbers)
+    label(h, body, "战斗特效", Rect2(410, 354, 140, 42), 23, INK, true)
+    var vfx_btn := Button.new()
+    vfx_btn.name = "VfxToggle"
+    vfx_btn.position = Vector2(580, 348)
+    vfx_btn.size = Vector2(140, 48)
+    vfx_btn.pivot_offset = vfx_btn.size * 0.5
+    vfx_btn.focus_mode = Control.FOCUS_NONE
+    vfx_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+    vfx_btn.add_theme_font_size_override("font_size", 20)
+    var _paint_vfx_btn := func(m: String) -> void:
+        vfx_btn.text = h.vfx_mode_label(m)
+        var bg: Color = RED if m == "full" else (Color("#dfa84c") if m == "minimal" else IVORY)
+        var fg: Color = IVORY if m == "full" else INK
+        var bd: Color = IVORY if m == "full" else Color(INK, 0.65)
+        vfx_btn.add_theme_stylebox_override("normal", action_style(bg, bd))
+        vfx_btn.add_theme_stylebox_override("hover", action_style(bg.lightened(0.08), INK))
+        vfx_btn.add_theme_stylebox_override("pressed", action_style(bg.darkened(0.08), INK))
+        vfx_btn.add_theme_color_override("font_color", fg)
+        vfx_btn.add_theme_color_override("font_hover_color", fg)
+        vfx_btn.add_theme_color_override("font_pressed_color", fg)
+    _paint_vfx_btn.call(h.vfx_mode)
+    vfx_btn.pressed.connect(func():
+        if h.ui_busy():
+            return
+        var next_mode: String = "minimal" if h.vfx_mode == "full" else ("off" if h.vfx_mode == "minimal" else "full")
+        h.vfx_mode = next_mode
+        _paint_vfx_btn.call(next_mode)
+        h.play_ui("button_press")
+        h.vfx_mode_changed.emit(next_mode))
+    body.add_child(vfx_btn)
+    h.press_motion(vfx_btn)
     label(h, body, "全屏显示", Rect2(48, 404, 400, 42), 25, INK, true)
     var mode := PaperToggle.new()
     mode.name = "FullscreenMode"
@@ -410,11 +464,19 @@ static func settings(h, in_run: bool) -> void:
     h.press_motion(toggle)
     label(h,body,"结算、购买与返回首页时自动保存",Rect2(48,514,674,24),17,Color("#5c625e"))
     line(body,Vector2(48,548),674,Color(INK,0.35))
-    h.save_note_label = label(h,body,h.save_note,Rect2(48,558,674,44),16,Color("#586e55"))
+    button(h,body,"OpenTrainingCamp","训练营模式",Rect2(48,558,200,50),func():
+        if h.ui_busy(): return
+        h.play_ui("button_press")
+        h.training_requested.emit(),false,21)
+    label(h,body,"自由配装、选Buff、刷怪测试（不计正式存档）",Rect2(262,570,460,30),17,Color("#5c625e"))
+    h.save_note_label = label(h,body,h.save_note,Rect2(48,610,674,22),14,Color("#586e55"))
     h.save_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    label(h,body,"也可按取消键关闭",Rect2(48,640,190,32),16)
-    button(h,body,"OpenKeyBindings","改按键",Rect2(250,632,200,54),func():h.show_key_bindings(in_run),false,22)
-    button(h,body,"Back","完成",Rect2(540,632,180,54),func():h.close_front_modal(),true,25)
+    button(h,body,"QuitGame","退出游戏",Rect2(48,640,176,54),func():
+        if h.ui_busy(): return
+        h.play_ui("button_press")
+        h.get_tree().quit(),false,22)
+    button(h,body,"OpenKeyBindings","改按键",Rect2(246,640,180,54),func():h.show_key_bindings(in_run),false,22)
+    button(h,body,"Back","完成",Rect2(540,640,180,54),func():h.close_front_modal(),true,25)
 
 static func continued(h) -> void:
     var sheet = modal(h, Rect2(230, 91, 820, 618))
@@ -482,8 +544,19 @@ static func help_page(h, page: String, in_run: bool) -> void:
         text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒（不可改）\n← / → 翻页预览角色，点击画像确认选择\n%s 确认出发 · %s 返回 / 暂停\n%s 角色属性 · %s 手动保存 · %s 隐藏或显示界面\n%s 散射 / 集火切换 · %s 打开武器背包 · %s 切换瞄准目标\n%s / %s / %s 选择成长 · 商店按栏位键直接购买 · 结算页按 %s 再出发" % [KeyBindings.caption_for("confirm"), KeyBindings.caption_for("cancel"), KeyBindings.caption_for("stats"), KeyBindings.caption_for("save"), KeyBindings.caption_for("hide_ui"), KeyBindings.caption_for("scatter"), KeyBindings.caption_for("link"), KeyBindings.caption_for("aim"), KeyBindings.caption_for("shop_1"), KeyBindings.caption_for("shop_2"), KeyBindings.caption_for("shop_3"), KeyBindings.caption_for("confirm")]
     elif page == "links":
         text = "集齐配对武器后，按 %s 打开武器背包。把可以搭配的两件武器拖到一起即可联动，再叠到已连上的那一件上，或拖开，即可断开。不能搭配的拖到一起会提示「这两件武器不能联动」。第一次获得有配方的武器时会弹出说明，写出两件武器、联动名称、优点和缺点。商店和升级卡片也会标明「可联动」或还差哪一件。\n\n火药筒 + 木棒 / 石斧 / 骨刃 → 锁链武器。\n锁链从火药筒炮口弹出并弹射往返；被联动的近战不再环绕，火药筒不再发普通炮弹。\n火药筒 + 魔法杖 → 魔法炮。炮弹化为符能爆炸并留下灼烧，但魔法杖停止独立发射。\n火种壶、魔法杖、雷鸣图腾都可以同时给多件武器附魔，例如火药筒、弹弓、石槌、石斧、骨刃，以及木棒、骨弩、骨矛、回旋骨镖。同一件武器只能接受一种附魔，新的会顶掉旧的，被顶掉的触媒仍可去附别的武器。\n火种壶 + 战鼓、骨弩 + 图腾、图腾 + 晶簇也有各自配方。\n\n多组配方可以一起生效。火药筒的锁链弹射与普通炮弹、魔法炮或导雷火炮不能同时进行。每一种联动都有代价，默认不会自动启用。之后可按 %s 打开背包，继续拖拽启用或断开。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("link")]
-    var copy: Label = label(h, body, text, Rect2(44, 118, 894, 378), 20)
+    var copy_scroll := ScrollContainer.new()
+    copy_scroll.position = Vector2(44, 112)
+    copy_scroll.size = Vector2(900, 382)
+    copy_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    body.add_child(copy_scroll)
+    var copy: Label = h.make_label(text, 18, INK)
+    copy.custom_minimum_size = Vector2(882, 0)
+    copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    copy.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+    copy.vertical_alignment = VERTICAL_ALIGNMENT_TOP
     copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    copy_scroll.add_child(copy)
+    line(body, Vector2(40, 498), 904, Color(INK, 0.25))
     button(h, body, "HelpGameplay", "玩法", Rect2(40, 508, 110, 43), func(): h.show_help("gameplay", in_run), false, 18)
     button(h, body, "HelpKeys", "按键操作", Rect2(160, 508, 150, 43), func(): h.show_help("keys", in_run), false, 18)
     button(h, body, "HelpLinks", "武器联动", Rect2(320, 508, 150, 43), func(): h.show_help("links", in_run), false, 18)

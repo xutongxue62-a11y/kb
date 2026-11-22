@@ -6,6 +6,7 @@ const Growth = preload("res://src/growth.gd")
 const PaperUI = preload("res://src/ui_paper.gd")
 const KeyBindings = preload("res://src/key_bindings.gd")
 const GameFonts = preload("res://src/game_fonts.gd")
+const TornCard = preload("res://src/ui_torn_card.gd")
 
 const ERROR_INCOMPATIBLE := "这两件武器不能联动"
 const CARD_SIZE := Vector2(176, 210)
@@ -20,6 +21,9 @@ const PACK_WRAP := TextServer.AUTOWRAP_ARBITRARY
 const EDGE_ZONE := 28.0
 const RESULT_SIZE := Vector2(128, 38)
 const KNOT_LIFT := 44.0
+const MIN_BOARD_ZOOM := 0.65
+const MAX_BOARD_ZOOM := 1.35
+const ZOOM_STEP := 0.10
 const RESULT_GAP := 18.0
 const ROW_BOTTOM_PAD := 10.0
 
@@ -40,13 +44,28 @@ var placeholder: Control
 var insert_marker: Control
 var tooltip: Control
 var tooltip_link_id: String = ""
+var weapon_tooltip: Control
+var weapon_tooltip_id: String = ""
 var dragging_id: String = ""
 var dragging_result_id: String = ""
 var result_positions: Dictionary = {}
+var custom_card_positions: Dictionary = {}
 var drag_offset: Vector2 = Vector2.ZERO
 var drag_home: Vector2 = Vector2.ZERO
 var body_font: Font
 var _reflowing: bool = false
+var board_viewport: Control
+var board_zoom: float = 1.0
+var selection_box_view: Control
+var box_selecting: bool = false
+var box_start: Vector2 = Vector2.ZERO
+var box_current: Vector2 = Vector2.ZERO
+var selected_ids: Array[String] = []
+var selected_result_ids: Array[String] = []
+var group_dragging: bool = false
+var group_drag_origin: Vector2 = Vector2.ZERO
+var group_drag_homes: Dictionary = {}
+var group_drag_result_homes: Dictionary = {}
 
 func setup(ui, world) -> void:
 	hud = ui
@@ -197,9 +216,11 @@ func compatible_hint(weapon_id: String) -> String:
 				names.append(label)
 		if names.is_empty():
 			return ""
+		if names.size() > 2:
+			return "可与%s、%s等%d件搭配" % [names[0], names[1], names.size()]
 		return "可与%s搭配" % "、".join(names)
 	if names.size() > 2:
-		return "可与%s、%s等搭配" % [names[0], names[1]]
+		return "可与%s、%s等%d组联动" % [names[0], names[1], names.size()]
 	return "可与%s搭配" % "、".join(names)
 
 func try_drop(weapon_a: String, weapon_b: String) -> Dictionary:
@@ -326,6 +347,14 @@ func hide_result_tooltip() -> void:
 		tooltip.visible = false
 		tooltip.queue_free()
 		tooltip = null
+	hide_weapon_tooltip()
+
+func hide_weapon_tooltip() -> void:
+	weapon_tooltip_id = ""
+	if weapon_tooltip != null and is_instance_valid(weapon_tooltip):
+		weapon_tooltip.visible = false
+		weapon_tooltip.queue_free()
+		weapon_tooltip = null
 
 func tooltip_text() -> String:
 	if tooltip == null or not is_instance_valid(tooltip) or not tooltip.visible:
@@ -539,32 +568,44 @@ func _build() -> void:
 	sheet.size = Vector2(1232, 756)
 	sheet.set_meta("full_width", 1232)
 	add_child(sheet)
-	var title: Label = _label("武器背包", 34, Color("#17253a"), true)
-	title.position = Vector2(44, 14)
-	title.size = Vector2(860, 42)
+	var title: Label = _label("武器背包", 26, Color("#17253a"), false)
+	title.add_theme_constant_override("outline_size", 1)
+	title.add_theme_color_override("font_outline_color", Color(0.09, 0.14, 0.23, 0.35))
+	title.position = Vector2(44, 18)
+	title.size = Vector2(600, 34)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	sheet.content.add_child(title)
-	var hint: Label = _label("把能搭配的两件拖到卡面上，就会用绳子连上；再拖到已连上的那一件上，可以取消这一组。拖离绳子或底排也能断开，只断这一分支。同一件武器同时只接受一种附魔，新的会顶掉旧的；触媒仍可给多件武器附着。拖到侧边或空档可调换位置。把鼠标放到结果上，再看优点和缺点。", 16, Color("#66705e"), false)
+	var hint: Label = _label("把能搭配的两件拖到卡面上即可连上；再拖到已连上的那一件上可取消。鼠标左键在空白处拖拽可框选多张卡片整体移动，滚轮可缩放画布，悬停卡片可看详情。", 15, Color("#66705e"), false)
 	hint.position = Vector2(44, 54)
-	_prepare_pack_copy(hint, 1020, 52)
+	_prepare_pack_copy(hint, 946, 52)
 	sheet.content.add_child(hint)
 	var close_btn := Button.new()
 	close_btn.name = "CloseLinkPack"
 	close_btn.text = "关闭"
-	close_btn.position = Vector2(1070, 16)
-	close_btn.size = Vector2(110, 42)
+	close_btn.position = Vector2(1046, 36)
+	close_btn.size = Vector2(138, 44)
 	close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_style_button(close_btn)
 	close_btn.pressed.connect(request_close)
 	KeyBindings.attach_to_button(close_btn, "cancel")
 	sheet.content.add_child(close_btn)
+	board_viewport = Control.new()
+	board_viewport.name = "LinkPackViewport"
+	board_viewport.position = Vector2(40, 110)
+	board_viewport.size = BOARD_SIZE
+	board_viewport.mouse_filter = Control.MOUSE_FILTER_PASS
+	board_viewport.clip_contents = true
+	sheet.content.add_child(board_viewport)
 	board = Control.new()
 	board.name = "LinkPackBoard"
-	board.position = Vector2(40, 110)
+	board.position = Vector2.ZERO
 	board.size = BOARD_SIZE
+	board.pivot_offset = BOARD_SIZE * 0.5
+	board.scale = Vector2.ONE * board_zoom
 	board.mouse_filter = Control.MOUSE_FILTER_PASS
 	board.clip_contents = false
-	sheet.content.add_child(board)
+	board_viewport.add_child(board)
 	status_label = _label("", 16, Color("#66705e"), false)
 	status_label.name = "LinkPackStatus"
 	status_label.position = Vector2(44, 704)
@@ -586,16 +627,21 @@ func _label(text: String, size: int, color: Color, display: bool) -> Label:
 
 func _style_button(button: Button) -> void:
 	if hud != null and hud.has_method("make_button"):
-		var sample: Button = hud.make_button("关闭")
+		var sample: Button = hud.make_button("关闭", Color("#b4583e"))
 		for key in ["normal", "hover", "pressed", "disabled"]:
 			var box: StyleBox = sample.get_theme_stylebox(key)
 			if box != null:
 				button.add_theme_stylebox_override(key, box)
-		button.add_theme_color_override("font_color", Color("#17253a"))
-		button.add_theme_color_override("font_hover_color", Color("#17253a"))
-		button.add_theme_color_override("font_pressed_color", Color("#17253a"))
+		button.set_meta("ink_primary", true)
+		button.add_theme_color_override("font_color", Color("#f2e8d2"))
+		button.add_theme_color_override("font_hover_color", Color("#ffffff"))
+		button.add_theme_color_override("font_pressed_color", Color("#f2e8d2"))
 		button.add_theme_font_size_override("font_size", 18)
+		if hud.display_font != null:
+			button.add_theme_font_override("font", hud.display_font)
 		sample.queue_free()
+		if hud.has_method("press_motion"):
+			hud.press_motion(button)
 		return
 	button.add_theme_font_size_override("font_size", 18)
 
@@ -615,6 +661,11 @@ func _make_card(weapon_id: String) -> Panel:
 	else:
 		card.set_meta("unlink_id", "")
 	card.gui_input.connect(func(event): _on_card_input(weapon_id, card, event))
+	card.mouse_entered.connect(func(): _show_weapon_tooltip(weapon_id))
+	card.mouse_exited.connect(func():
+		if weapon_tooltip_id == weapon_id:
+			hide_weapon_tooltip()
+	)
 	_paint_card(card, weapon_id, "idle")
 	var info: Dictionary = node_info(weapon_id)
 	var text_width: float = CARD_SIZE.x - 16.0
@@ -671,6 +722,7 @@ func _make_card(weapon_id: String) -> Panel:
 	if needed_height > card.size.y:
 		card.size = Vector2(CARD_SIZE.x, needed_height)
 		card.custom_minimum_size = card.size
+	card.clip_contents = false
 	ports.queue_redraw()
 	return card
 
@@ -699,36 +751,31 @@ func _make_result_node(recipe: Dictionary) -> Panel:
 	node.mouse_default_cursor_shape = Control.CURSOR_MOVE
 	node.set_meta("link_id", link_id)
 	node.set_meta("recipe", recipe)
-	var box := StyleBoxFlat.new()
-	box.bg_color = Color("#5c3a24")
-	box.border_color = Color("#3a2416")
-	box.set_border_width_all(1)
-	box.set_corner_radius_all(6)
-	box.shadow_color = Color(0.12, 0.08, 0.05, 0.2)
-	box.shadow_size = 4
-	box.shadow_offset = Vector2(1, 2)
-	node.add_theme_stylebox_override("panel", box)
-	var caption: Label = _label("联动结果", 10, Color("#e8d3a8"), false)
+	TornCard.apply(node, Color("#5c3a24"), Color("#3a2416"), abs(link_id.hash()) % 89 + 11, 2.2, 1.3)
+	var caption: Label = _label("联动结果", 11, Color("#e8d3a8"), false)
 	caption.name = "ResultCaption"
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	caption.position = Vector2(4, 1)
-	_prepare_pack_copy(caption, RESULT_SIZE.x - 8.0, 14)
+	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_prepare_pack_copy(caption, RESULT_SIZE.x - 8.0, 16)
 	node.add_child(caption)
 	var name_copy: String = str(recipe.get("name", ""))
-	var name_label: Label = _label(name_copy, 15, Color("#f7ecd3"), true)
+	var name_label: Label = _label(name_copy, 16, Color("#f7ecd3"), true)
 	name_label.name = "ResultName"
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.position = Vector2(4, 14)
-	var name_width: float = maxf(RESULT_SIZE.x - 8.0, _wrapped_size(name_copy, 15, 220.0).x + 8.0)
-	var name_height: float = maxf(20.0, _wrapped_size(name_copy, 15, name_width).y + 2.0)
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var name_width: float = maxf(RESULT_SIZE.x - 12.0, _wrapped_size(name_copy, 16, 220.0).x + 8.0)
+	var name_height: float = maxf(22.0, _wrapped_size(name_copy, 16, name_width).y)
 	_prepare_pack_copy(name_label, name_width, name_height)
 	node.add_child(name_label)
-	var wanted_w: float = maxf(RESULT_SIZE.x, name_width + 8.0)
-	var wanted_h: float = maxf(RESULT_SIZE.y, name_label.position.y + name_height + 4.0)
+	var wanted_w: float = maxf(RESULT_SIZE.x, name_width + 16.0)
+	var block_h: float = 16.0 + 2.0 + name_height
+	var wanted_h: float = maxf(54.0, block_h + 16.0)
 	node.size = Vector2(wanted_w, wanted_h)
 	node.custom_minimum_size = node.size
-	name_label.position.x = (node.size.x - name_label.size.x) * 0.5
-	caption.size.x = node.size.x - 8.0
+	var top_y: float = (wanted_h - block_h) * 0.5
+	caption.position = Vector2(4.0, top_y)
+	caption.size = Vector2(wanted_w - 8.0, 16.0)
+	name_label.position = Vector2((wanted_w - name_label.size.x) * 0.5, top_y + 18.0)
 	node.mouse_entered.connect(func(): _show_result_tooltip(link_id))
 	node.mouse_exited.connect(func():
 		if tooltip_link_id == link_id:
@@ -802,19 +849,9 @@ func _draw_dashed_rect(canvas: Control, rect: Rect2, color: Color, dash: float, 
 func _draw_ropes(canvas: Control) -> void:
 	if canvas == null or not is_instance_valid(canvas):
 		return
+	# Only draw ropes for actually linked pairs — never draw unlinked preview/hover ropes!
 	for recipe in _active_recipes():
 		_draw_recipe_rope(canvas, recipe, Color("#4a2712"), Color("#e09a45"), Color("#f6e1a8"))
-	if dragging_id.is_empty():
-		return
-	var source: Control = cards.get(dragging_id, null)
-	if source == null or not is_instance_valid(source):
-		return
-	for other in valid_drop_targets(dragging_id):
-		var target: Control = cards.get(other, null)
-		if target == null or not is_instance_valid(target):
-			continue
-		var preview: Dictionary = {"weapons": [dragging_id, other], "id": "", "name": ""}
-		_draw_recipe_rope(canvas, preview, Color("#6a3f22", 0.45), Color("#d4a25a", 0.7), Color("#f0d9a8", 0.5), source, target)
 
 func _draw_recipe_rope(canvas: Control, recipe: Dictionary, ink: Color, rope: Color, highlight: Color, left_override: Control = null, right_override: Control = null) -> void:
 	var ports: Array = _recipe_ports(recipe, left_override, right_override)
@@ -914,11 +951,24 @@ func rope_ports_for(link_id: String) -> Array:
 			return _recipe_ports(recipe)
 	return []
 
+func _card_position_store() -> Dictionary:
+	var ids: Array = weapon_ids()
+	var sorted_ids: Array = ids.duplicate()
+	sorted_ids.sort()
+	var sig: String = ",".join(sorted_ids)
+	if host != null and "pack_card_positions" in host and "pack_card_weapon_sig" in host:
+		if str(host.pack_card_weapon_sig) != sig:
+			host.pack_card_positions.clear()
+			host.pack_card_weapon_sig = sig
+		return host.pack_card_positions
+	return custom_card_positions
+
 func _layout_pack_board() -> void:
 	if board == null or _reflowing:
 		return
 	_reflowing = true
 	var ids: Array = weapon_ids()
+	var card_store: Dictionary = _card_position_store()
 	var heights: Array = []
 	var card_height: float = CARD_SIZE.y
 	for weapon_id in ids:
@@ -939,14 +989,24 @@ func _layout_pack_board() -> void:
 	var start_x: float = maxf(BOARD_MARGIN, (BOARD_SIZE.x - row_width) * 0.5)
 	var row_y: float = BOARD_SIZE.y - card_height - ROW_BOTTOM_PAD
 	for index in range(count):
-		var card: Control = cards.get(ids[index], null)
+		var wid: String = str(ids[index])
+		var card: Control = cards.get(wid, null)
 		if card == null or not is_instance_valid(card):
 			continue
-		if dragging_id == str(ids[index]):
-			card.set_meta("home", Vector2(start_x + float(index) * (CARD_SIZE.x + CARD_GAP), row_y))
+		var default_pos := Vector2(start_x + float(index) * (CARD_SIZE.x + CARD_GAP), row_y)
+		var target_pos: Vector2 = default_pos
+		if card_store.has(wid):
+			var saved: Vector2 = card_store[wid]
+			var area: Rect2 = _visible_board_rect()
+			target_pos = Vector2(
+				clampf(saved.x, area.position.x + BOARD_MARGIN, maxf(area.position.x + BOARD_MARGIN, area.end.x - card.size.x - BOARD_MARGIN)),
+				clampf(saved.y, area.position.y + BOARD_MARGIN, maxf(area.position.y + BOARD_MARGIN, area.end.y - card.size.y - BOARD_MARGIN))
+			)
+		if dragging_id == wid:
+			card.set_meta("home", target_pos)
 			continue
-		card.position = Vector2(start_x + float(index) * (CARD_SIZE.x + CARD_GAP), row_y)
-		card.set_meta("home", card.position)
+		card.position = target_pos
+		card.set_meta("home", target_pos)
 		card.z_index = 2
 	if placeholder != null and is_instance_valid(placeholder):
 		placeholder.size = Vector2(CARD_SIZE.x, card_height)
@@ -1004,13 +1064,24 @@ func _remember_result_position(link_id: String, pos: Vector2) -> void:
 		return
 	_position_store()[link_id] = pos
 
+func _visible_board_rect() -> Rect2:
+	var z: float = maxf(0.2, board_zoom)
+	var vw: float = BOARD_SIZE.x / z
+	var vh: float = BOARD_SIZE.y / z
+	var ctr: Vector2 = BOARD_SIZE * 0.5
+	return Rect2(ctr - Vector2(vw, vh) * 0.5, Vector2(vw, vh))
+
 func _clamp_result_pos(pos: Vector2, size: Vector2, row_y: float, free_board: bool) -> Vector2:
-	var max_y: float = BOARD_SIZE.y - size.y - BOARD_MARGIN
+	var area: Rect2 = _visible_board_rect()
+	var min_x: float = area.position.x + BOARD_MARGIN
+	var max_x: float = maxf(min_x, area.end.x - size.x - BOARD_MARGIN)
+	var min_y: float = area.position.y + BOARD_MARGIN
+	var max_y: float = maxf(min_y, area.end.y - size.y - BOARD_MARGIN)
 	if not free_board:
-		max_y = minf(max_y, maxf(BOARD_MARGIN, row_y - size.y - 36.0))
+		max_y = minf(max_y, maxf(min_y, row_y - size.y - 36.0))
 	return Vector2(
-		clampf(pos.x, BOARD_MARGIN, BOARD_SIZE.x - size.x - BOARD_MARGIN),
-		clampf(pos.y, BOARD_MARGIN, max_y)
+		clampf(pos.x, min_x, max_x),
+		clampf(pos.y, min_y, max_y)
 	)
 
 func _card_row_y() -> float:
@@ -1128,17 +1199,30 @@ func _on_result_input(event: InputEvent, link_id: String, node: Control) -> void
 		if event.pressed:
 			if not dragging_id.is_empty():
 				return
+			if (selected_ids.size() + selected_result_ids.size()) >= 2 and selected_result_ids.has(link_id):
+				_begin_group_drag()
+				node.accept_event()
+				return
+			if not selected_ids.is_empty() or not selected_result_ids.is_empty():
+				_clear_selection()
 			_begin_result_drag(link_id, node, event.position)
+			node.accept_event()
+		elif group_dragging:
+			_finish_group_drag()
 			node.accept_event()
 		elif dragging_result_id == link_id:
 			_finish_result_drag()
 			node.accept_event()
-	elif event is InputEventMouseMotion and dragging_result_id == link_id:
-		node.global_position += event.relative
-		_sync_result_node(node, link_id, true)
-		if ropes != null and is_instance_valid(ropes):
-			ropes.queue_redraw()
-		node.accept_event()
+	elif event is InputEventMouseMotion:
+		if group_dragging:
+			_update_group_drag()
+			node.accept_event()
+		elif dragging_result_id == link_id:
+			node.global_position += event.relative
+			_sync_result_node(node, link_id, true)
+			if ropes != null and is_instance_valid(ropes):
+				ropes.queue_redraw()
+			node.accept_event()
 
 func _begin_result_drag(link_id: String, node: Control, local_pos: Vector2) -> void:
 	hide_result_tooltip()
@@ -1159,6 +1243,96 @@ func _finish_result_drag() -> void:
 	if ropes != null and is_instance_valid(ropes):
 		ropes.queue_redraw()
 	_set_status(_status_copy())
+
+func _show_weapon_tooltip(weapon_id: String) -> void:
+	if weapon_id.is_empty() or not Catalog.WEAPONS.has(weapon_id) or not dragging_id.is_empty() or not dragging_result_id.is_empty():
+		return
+	hide_weapon_tooltip()
+	weapon_tooltip = _make_weapon_tooltip(weapon_id)
+	weapon_tooltip.name = "WeaponTooltip"
+	weapon_tooltip.z_index = 32
+	weapon_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	board.add_child(weapon_tooltip)
+	weapon_tooltip_id = weapon_id
+	weapon_tooltip.visible = true
+	_place_weapon_tooltip(weapon_id)
+
+func _place_weapon_tooltip(weapon_id: String) -> void:
+	if weapon_tooltip == null or not is_instance_valid(weapon_tooltip):
+		return
+	var anchor: Control = cards.get(weapon_id, null)
+	var pos := Vector2(BOARD_MARGIN, BOARD_MARGIN)
+	if anchor != null and is_instance_valid(anchor):
+		pos = Vector2(anchor.position.x + (anchor.size.x - weapon_tooltip.size.x) * 0.5, anchor.position.y - weapon_tooltip.size.y - 12.0)
+		if pos.y < BOARD_MARGIN:
+			pos.y = anchor.position.y + anchor.size.y + 10.0
+		pos.x = clampf(pos.x, BOARD_MARGIN, maxf(BOARD_MARGIN, BOARD_SIZE.x - weapon_tooltip.size.x - BOARD_MARGIN))
+		pos.y = clampf(pos.y, BOARD_MARGIN, maxf(BOARD_MARGIN, BOARD_SIZE.y - weapon_tooltip.size.y - BOARD_MARGIN))
+	weapon_tooltip.position = pos
+
+func _make_weapon_tooltip(weapon_id: String) -> Control:
+	var panel := PanelContainer.new()
+	panel.clip_contents = false
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	TornCard.apply(panel, Color("#f4e8cd"), Color("#7d4f2e"), abs(weapon_id.hash()) % 89 + 31, 3.0, 1.6, Vector4(14, 10, 14, 12), true)
+	var width: float = 356.0
+	var inner_w: float = width - 24.0
+	var vbox := VBoxContainer.new()
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_theme_constant_override("separation", 5)
+	vbox.custom_minimum_size = Vector2(inner_w, 0)
+	panel.add_child(vbox)
+	var lvl: int = _owned_level(weapon_id)
+	var stage_label: String = "觉醒" if lvl >= 5 else ("进阶" if lvl >= 3 else "基础")
+	var data: Dictionary = Catalog.WEAPONS[weapon_id]
+	var _add_line := func(text: String, sz: int, col: Color, bold: bool) -> void:
+		var l: Label = _label(text, sz, col, bold)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(inner_w, 0)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		l.clip_text = false
+		vbox.add_child(l)
+	_add_line.call("%s · Lv.%d（%s）" % [Catalog.weapon_name(weapon_id), lvl, stage_label], 15, Color("#3a2414"), true)
+	_add_line.call(Details.attack_type(weapon_id), 12, Color("#7c4b27"), false)
+	var dmg: float = float(data["damage"]) * (1.0 + float(lvl - 1) * 0.35)
+	var divisor: float = 1.0
+	if Catalog.EXPANDED_IDS.has(weapon_id):
+		divisor = 1.0 + float(lvl - 1) * 0.08
+	elif not Catalog.NEW_IDS.has(weapon_id):
+		divisor = 1.0 + float(lvl - 1) * 0.12
+	var reload_mult: float = 1.0
+	var haste: float = 1.0
+	if host != null:
+		reload_mult = float(host.weapon_reload_penalty(weapon_id))
+		haste = maxf(0.25, float(host.stats.get("attack_speed", 1.0)))
+	var eff_haste: float = Rules.effective_attack_speed(weapon_id, haste)
+	var eff_cd: float = float(data["cooldown"]) / divisor * reload_mult / eff_haste
+	var stat_str: String = "当前伤害 %.1f · 攻击间隔 %.2f秒" % [dmg, eff_cd]
+	if data.has("range"):
+		stat_str += " · 射程 %d" % int(roundi(float(data["range"])))
+	var spd_scale: float = Rules.attack_speed_scale(weapon_id)
+	if spd_scale < 0.99:
+		stat_str += "（攻速收益 %d%%）" % int(roundi(spd_scale * 100.0))
+	_add_line.call(stat_str, 12, Color("#2f2418"), true)
+	_add_line.call(Details.attack(weapon_id, lvl).replace("\n", ""), 12, Color("#4b3c2c"), false)
+	var abil_text: String = Details.abilities(weapon_id, lvl, lvl)
+	var totem_lvl: int = _owned_level("totem") if host != null and host.weapon_level("totem") > 0 else 0
+	var has_thunder: bool = weapon_id == "totem" or (host != null and Rules.host_is_thunder_enchanted(host.active_links, weapon_id))
+	if has_thunder and totem_lvl >= 3:
+		var rc: int = int(roundi(Rules.red_lightning_chance(totem_lvl) * 100.0))
+		var rm: float = Rules.red_lightning_multiplier(totem_lvl)
+		abil_text += "\n赤雷特效 · %d%% 概率劈出红色雷电（%.2f×伤害）" % [rc, rm]
+	_add_line.call(abil_text, 12, Color("#6b3c1e"), false)
+	var recipes: Array = _recipes_for_weapon(weapon_id)
+	if not recipes.is_empty():
+		var link_lines: PackedStringArray = PackedStringArray()
+		for r in recipes:
+			link_lines.append("当前联动【%s】：%s" % [str(r.get("name", "")), Catalog.benefit_text(r)])
+		_add_line.call("\n".join(link_lines), 12, Color("#245f5c"), true)
+	panel.custom_minimum_size = Vector2(width, 0)
+	panel.reset_size()
+	panel.size = Vector2(width, maxf(panel.get_combined_minimum_size().y, panel.size.y))
+	return panel
 
 func _show_result_tooltip(link_id: String) -> void:
 	if link_id.is_empty() or not Catalog.LINKS.has(link_id) or link_id == "none":
@@ -1357,47 +1531,218 @@ func _wrapped_size(text: String, font_size: int, width: float) -> Vector2:
 		return Vector2(width, float(font_size + 8))
 	return font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, maxf(1.0, width), font_size, -1, TextServer.BREAK_MANDATORY | TextServer.BREAK_GRAPHEME_BOUND)
 
-func _paint_card(card: Panel, _weapon_id: String, mode: String) -> void:
-	var box := StyleBoxFlat.new()
-	box.bg_color = Color("#f4e0b4")
-	box.border_color = Color("#7a4a22")
-	box.set_border_width_all(2)
-	box.set_corner_radius_all(3)
-	box.shadow_color = Color(0.12, 0.08, 0.05, 0.22)
-	box.shadow_size = 6
-	box.shadow_offset = Vector2(2, 3)
+func _paint_card(card: Panel, weapon_id: String, mode: String) -> void:
+	var bg_col: Color = Color("#f4e4bf")
+	var border_col: Color = Color("#7a5430")
+	var border_w: float = 1.6
 	card.modulate = Color.WHITE
 	match mode:
 		"valid":
-			box.bg_color = Color("#f3d59a")
-			box.border_color = Color("#b4583e")
-			box.set_border_width_all(3)
+			bg_col = Color("#f3d59a")
+			border_col = Color("#b4583e")
+			border_w = 2.4
 		"invalid":
-			box.bg_color = Color("#e4d8c0")
-			box.border_color = Color("#9d9380")
+			bg_col = Color("#e4d8c0")
+			border_col = Color("#9d9380")
 			card.modulate = Color(0.78, 0.74, 0.68, 0.92)
 		"drag":
-			box.bg_color = Color("#f7e7c0")
-			box.border_color = Color("#3a2a1c")
-			box.shadow_size = 10
+			bg_col = Color("#faf0d4")
+			border_col = Color("#3a2a1c")
+			border_w = 2.2
 		"linked":
-			box.border_color = Color("#b4583e")
-	if mode == "idle" and bool(card.get_meta("in_cluster", false)):
-		box.border_color = Color("#b4583e")
-	card.add_theme_stylebox_override("panel", box)
+			border_col = Color("#b4583e")
+			border_w = 2.1
+		"selected":
+			bg_col = Color("#d4efe8")
+			border_col = Color("#1e7a6d")
+			border_w = 3.4
+	if mode == "idle" and selected_ids.has(weapon_id):
+		bg_col = Color("#d4efe8")
+		border_col = Color("#1e7a6d")
+		border_w = 3.4
+	elif mode == "idle" and bool(card.get_meta("in_cluster", false)):
+		border_col = Color("#b4583e")
+		border_w = 2.0
+	TornCard.apply(card, bg_col, border_col, abs(weapon_id.hash()) % 89 + 19, 3.2, border_w, Vector4.ZERO, true)
+
+func _paint_result_node(node: Control, link_id: String, selected: bool) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if selected:
+		TornCard.apply(node, Color("#236b62"), Color("#ffe299"), abs(link_id.hash()) % 89 + 11, 2.2, 2.8)
+	else:
+		TornCard.apply(node, Color("#5c3a24"), Color("#3a2416"), abs(link_id.hash()) % 89 + 11, 2.2, 1.3)
+
+func _clear_selection() -> void:
+	selected_ids.clear()
+	selected_result_ids.clear()
+	_repaint_selection_highlights()
+
+func _selection_rect() -> Rect2:
+	var tl := Vector2(minf(box_start.x, box_current.x), minf(box_start.y, box_current.y))
+	var sz := Vector2(absf(box_current.x - box_start.x), absf(box_current.y - box_start.y))
+	return Rect2(tl, sz)
+
+func _ensure_selection_box_view() -> void:
+	if board == null or not is_instance_valid(board):
+		return
+	if selection_box_view == null or not is_instance_valid(selection_box_view):
+		selection_box_view = Control.new()
+		selection_box_view.name = "SelectionBoxView"
+		selection_box_view.position = Vector2.ZERO
+		selection_box_view.size = BOARD_SIZE
+		selection_box_view.clip_contents = false
+		selection_box_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		selection_box_view.z_index = 45
+		selection_box_view.draw.connect(_draw_selection_box)
+		board.add_child(selection_box_view)
+
+func _draw_selection_box() -> void:
+	if not box_selecting or selection_box_view == null:
+		return
+	var r: Rect2 = _selection_rect()
+	if r.size.x < 3.0 and r.size.y < 3.0:
+		return
+	selection_box_view.draw_rect(r, Color(0.16, 0.56, 0.50, 0.18), true)
+	_draw_dashed_rect(selection_box_view, r, Color(0.10, 0.46, 0.42, 0.92), 8.0, 5.0)
+
+func _repaint_selection_highlights() -> void:
+	for wid in cards:
+		var c: Control = cards[wid]
+		if c != null and is_instance_valid(c):
+			_paint_card(c, wid, "selected" if selected_ids.has(wid) else "idle")
+	for lid in results:
+		var rn: Control = results[lid]
+		if rn != null and is_instance_valid(rn):
+			_paint_result_node(rn, lid, selected_result_ids.has(lid))
+
+func _begin_group_drag() -> void:
+	hide_result_tooltip()
+	hide_weapon_tooltip()
+	group_dragging = true
+	group_drag_origin = board.get_local_mouse_position()
+	group_drag_homes.clear()
+	group_drag_result_homes.clear()
+	for wid in selected_ids:
+		var c: Control = cards.get(wid, null)
+		if c != null and is_instance_valid(c):
+			group_drag_homes[wid] = c.position
+			c.z_index = 20
+			_paint_card(c, wid, "selected")
+	for lid in selected_result_ids:
+		var rn: Control = results.get(lid, null)
+		if rn != null and is_instance_valid(rn):
+			group_drag_result_homes[lid] = rn.position
+			rn.z_index = 22
+			_paint_result_node(rn, lid, true)
+	var total: int = group_drag_homes.size() + group_drag_result_homes.size()
+	_set_status("正在整体移动 %d 个元素，松开左键落位。" % total)
+
+func _update_group_drag() -> void:
+	if not group_dragging or (group_drag_homes.is_empty() and group_drag_result_homes.is_empty()):
+		return
+	var area: Rect2 = _visible_board_rect()
+	var delta_local: Vector2 = board.get_local_mouse_position() - group_drag_origin
+	var min_dx: float = -INF
+	var max_dx: float = INF
+	var min_dy: float = -INF
+	var max_dy: float = INF
+	for wid in group_drag_homes:
+		var c: Control = cards.get(wid, null)
+		if c == null or not is_instance_valid(c):
+			continue
+		var hpos: Vector2 = group_drag_homes[wid]
+		min_dx = maxf(min_dx, (area.position.x + BOARD_MARGIN) - hpos.x)
+		max_dx = minf(max_dx, (area.end.x - c.size.x - BOARD_MARGIN) - hpos.x)
+		min_dy = maxf(min_dy, (area.position.y + BOARD_MARGIN) - hpos.y)
+		max_dy = minf(max_dy, (area.end.y - c.size.y - BOARD_MARGIN) - hpos.y)
+	for lid in group_drag_result_homes:
+		var rn: Control = results.get(lid, null)
+		if rn == null or not is_instance_valid(rn):
+			continue
+		var rpos: Vector2 = group_drag_result_homes[lid]
+		min_dx = maxf(min_dx, (area.position.x + BOARD_MARGIN) - rpos.x)
+		max_dx = minf(max_dx, (area.end.x - rn.size.x - BOARD_MARGIN) - rpos.x)
+		min_dy = maxf(min_dy, (area.position.y + BOARD_MARGIN) - rpos.y)
+		max_dy = minf(max_dy, (area.end.y - rn.size.y - BOARD_MARGIN) - rpos.y)
+	if min_dx <= max_dx:
+		delta_local.x = clampf(delta_local.x, min_dx, max_dx)
+	if min_dy <= max_dy:
+		delta_local.y = clampf(delta_local.y, min_dy, max_dy)
+	for wid in group_drag_homes:
+		var c: Control = cards.get(wid, null)
+		if c != null and is_instance_valid(c):
+			c.position = group_drag_homes[wid] + delta_local
+	for lid in group_drag_result_homes:
+		var rn: Control = results.get(lid, null)
+		if rn != null and is_instance_valid(rn):
+			rn.position = group_drag_result_homes[lid] + delta_local
+			rn.set_meta("rope_knot", _result_anchor(rn))
+	if ropes != null and is_instance_valid(ropes):
+		ropes.queue_redraw()
+
+func _finish_group_drag() -> void:
+	if not group_dragging:
+		return
+	group_dragging = false
+	var area: Rect2 = _visible_board_rect()
+	var store: Dictionary = _card_position_store()
+	for wid in group_drag_homes:
+		var c: Control = cards.get(wid, null)
+		if c != null and is_instance_valid(c):
+			c.z_index = 0
+			store[wid] = Vector2(
+				clampf(c.position.x, area.position.x + BOARD_MARGIN, maxf(area.position.x + BOARD_MARGIN, area.end.x - c.size.x - BOARD_MARGIN)),
+				clampf(c.position.y, area.position.y + BOARD_MARGIN, maxf(area.position.y + BOARD_MARGIN, area.end.y - c.size.y - BOARD_MARGIN))
+			)
+	for lid in group_drag_result_homes:
+		var rn: Control = results.get(lid, null)
+		if rn != null and is_instance_valid(rn):
+			rn.z_index = 6
+			_sync_result_node(rn, lid, true)
+	group_drag_homes.clear()
+	group_drag_result_homes.clear()
+	refresh()
+	_repaint_selection_highlights()
+	var total: int = selected_ids.size() + selected_result_ids.size()
+	_set_status("已整体移动 %d 个元素；点击空白处可取消框选。" % total)
+
+func _apply_board_zoom(delta_zoom: float) -> void:
+	if board == null or not is_instance_valid(board):
+		return
+	var next_z: float = clampf(board_zoom + delta_zoom, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM)
+	if is_equal_approx(next_z, board_zoom):
+		return
+	board_zoom = next_z
+	board.pivot_offset = BOARD_SIZE * 0.5
+	board.scale = Vector2.ONE * board_zoom
+	_set_status("画布缩放：%d%%（范围 65%%~135%%，滚轮调节）" % int(round(board_zoom * 100.0)))
 
 func _on_card_input(weapon_id: String, card: Control, event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			if (selected_ids.size() + selected_result_ids.size()) >= 2 and selected_ids.has(weapon_id):
+				_begin_group_drag()
+				card.accept_event()
+				return
+			if not selected_ids.is_empty() or not selected_result_ids.is_empty():
+				_clear_selection()
 			_begin_drag(weapon_id, card, event.position)
+			card.accept_event()
+		elif group_dragging:
+			_finish_group_drag()
 			card.accept_event()
 		elif dragging_id == weapon_id:
 			_finish_drag(card.get_global_mouse_position())
 			card.accept_event()
-	elif event is InputEventMouseMotion and dragging_id == weapon_id:
-		card.global_position += event.relative
-		_on_drag_moved()
-		card.accept_event()
+	elif event is InputEventMouseMotion:
+		if group_dragging:
+			_update_group_drag()
+			card.accept_event()
+		elif dragging_id == weapon_id:
+			card.global_position += event.relative
+			_on_drag_moved()
+			card.accept_event()
 
 func _begin_drag(weapon_id: String, card: Control, local_pos: Vector2) -> void:
 	hide_result_tooltip()
@@ -1410,7 +1755,7 @@ func _begin_drag(weapon_id: String, card: Control, local_pos: Vector2) -> void:
 	last_error = ""
 	_apply_drag_highlights()
 	_on_drag_moved()
-	_set_status("拖到可搭配的卡面上即可联动；再叠到已连上的那一件上可取消这一组；拖离绳子或底排也能断开；拖到侧边或空档可调换位置。")
+	_set_status("拖到可搭配的卡面上即可联动；再次拖到已连上的那一件上可取消联动；拖到空白处可自由挪动摆放。")
 
 func _on_drag_moved() -> void:
 	_apply_drag_highlights()
@@ -1466,6 +1811,7 @@ func _apply_pointer_drop(source_id: String, global_pos: Vector2) -> Dictionary:
 		result["kind"] = "link"
 		return result
 	if kind == "reorder":
+		_card_position_store().erase(source_id)
 		var result: Dictionary = try_reorder(source_id, int(intent.get("index", 0)))
 		result["kind"] = "reorder"
 		return result
@@ -1482,6 +1828,13 @@ func _apply_pointer_drop(source_id: String, global_pos: Vector2) -> Dictionary:
 		var result: Dictionary = try_unlink(source_id, unlink_id)
 		result["kind"] = "unlink"
 		return result
+	var src_card: Control = cards.get(source_id, null)
+	if src_card != null and is_instance_valid(src_card) and src_card.position.distance_to(drag_home) >= 16.0:
+		var area: Rect2 = _visible_board_rect()
+		_card_position_store()[source_id] = Vector2(
+			clampf(src_card.position.x, area.position.x + BOARD_MARGIN, maxf(area.position.x + BOARD_MARGIN, area.end.x - src_card.size.x - BOARD_MARGIN)),
+			clampf(src_card.position.y, area.position.y + BOARD_MARGIN, maxf(area.position.y + BOARD_MARGIN, area.end.y - src_card.size.y - BOARD_MARGIN))
+		)
 	refresh()
 	return {"ok": true, "kind": "cancel", "unchanged": true}
 
@@ -1493,24 +1846,10 @@ func _intent_at(global_pos: Vector2, source_id: String) -> Dictionary:
 	var result_hit: Dictionary = _hit_result_node(global_pos, source_id)
 	if not result_hit.is_empty():
 		return result_hit
-	var above_row: bool = _pointer_above_row(global_pos)
-	if above_row and not _recipes_for_weapon(source_id).is_empty():
-		return {"kind": "unlink", "link_id": _branch_to_unlink(source_id, global_pos)}
 	var row: Dictionary = _hit_row_gap(global_pos, source_id, ids)
 	if not row.is_empty():
 		return row
-	var source_card: Control = cards.get(source_id, null)
-	if source_card != null and is_instance_valid(source_card) and not _recipes_for_weapon(source_id).is_empty():
-		var home: Vector2 = source_card.get_meta("home", drag_home)
-		var origin: Vector2 = source_card.global_position - source_card.position
-		var home_center: Vector2 = origin + home + source_card.size * 0.5
-		var home_rect := Rect2(origin + home, source_card.size).grow(-8.0)
-		if home_rect.has_point(global_pos):
-			return {"kind": "cancel"}
-		var moved: bool = source_card.position.distance_to(home) >= UNLINK_DISTANCE
-		var pointer_away: bool = global_pos.distance_to(home_center) >= UNLINK_DISTANCE
-		if moved or pointer_away:
-			return {"kind": "unlink", "link_id": _branch_to_unlink(source_id, global_pos)}
+	# Dragging a card into empty board space freely repositions it without cancelling any active links!
 	return {"kind": "cancel"}
 
 func _hit_result_node(global_pos: Vector2, source_id: String) -> Dictionary:
@@ -1653,10 +1992,56 @@ func _collect_text(node: Node, parts: PackedStringArray) -> void:
 		_collect_text(child, parts)
 
 func _input(event: InputEvent) -> void:
+	if not is_open():
+		return
+	# Mouse-wheel canvas zoom (clamped to 65% ~ 135%)
+	if event is InputEventMouseButton and event.pressed and (event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN):
+		if board_viewport != null and is_instance_valid(board_viewport) and board_viewport.get_global_rect().has_point(get_global_mouse_position()):
+			_apply_board_zoom(ZOOM_STEP if event.button_index == MOUSE_BUTTON_WHEEL_UP else -ZOOM_STEP)
+			get_viewport().set_input_as_handled()
+			return
+	# Active group drag of box-selected cards
+	if group_dragging:
+		if event is InputEventMouseMotion:
+			_update_group_drag()
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			_finish_group_drag()
+			get_viewport().set_input_as_handled()
+		return
+	# Active box-selection drag on empty canvas space
+	if box_selecting:
+		if event is InputEventMouseMotion:
+			box_current = board.get_local_mouse_position()
+			var r: Rect2 = _selection_rect()
+			selected_ids.clear()
+			selected_result_ids.clear()
+			for wid in cards:
+				var c: Control = cards[wid]
+				if c != null and is_instance_valid(c) and r.intersects(Rect2(c.position, c.size)):
+					selected_ids.append(wid)
+			for lid in results:
+				var rn: Control = results[lid]
+				if rn != null and is_instance_valid(rn) and r.intersects(Rect2(rn.position, rn.size)):
+					selected_result_ids.append(lid)
+			_repaint_selection_highlights()
+			if selection_box_view != null and is_instance_valid(selection_box_view):
+				selection_box_view.queue_redraw()
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			box_selecting = false
+			var total_sel: int = selected_ids.size() + selected_result_ids.size()
+			if _selection_rect().size.length() < 8.0 or total_sel < 2:
+				_clear_selection()
+			else:
+				_repaint_selection_highlights()
+				_set_status("已框选 %d 个元素：按住其中任意卡片或联动结果即可整体移动，点击空白处取消。" % total_sel)
+			if selection_box_view != null and is_instance_valid(selection_box_view):
+				selection_box_view.queue_redraw()
+			get_viewport().set_input_as_handled()
+		return
 	if not dragging_result_id.is_empty():
 		var node: Control = results.get(dragging_result_id, null)
 		if event is InputEventMouseMotion and node != null and is_instance_valid(node):
-			node.global_position = get_global_mouse_position() - drag_offset
+			node.global_position = get_global_mouse_position() - drag_offset * board_zoom
 			_sync_result_node(node, dragging_result_id, true)
 			if ropes != null and is_instance_valid(ropes):
 				ropes.queue_redraw()
@@ -1664,13 +2049,39 @@ func _input(event: InputEvent) -> void:
 			_finish_result_drag()
 			get_viewport().set_input_as_handled()
 		return
-	if dragging_id.is_empty():
+	if not dragging_id.is_empty():
+		if event is InputEventMouseMotion:
+			var card: Control = cards.get(dragging_id, null)
+			if card != null and is_instance_valid(card):
+				card.global_position = card.get_global_mouse_position() - drag_offset * board_zoom
+				_on_drag_moved()
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			_finish_drag(get_global_mouse_position())
+			get_viewport().set_input_as_handled()
 		return
-	if event is InputEventMouseMotion:
-		var card: Control = cards.get(dragging_id, null)
-		if card != null and is_instance_valid(card):
-			card.global_position = card.get_global_mouse_position() - drag_offset
-			_on_drag_moved()
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-		_finish_drag(get_global_mouse_position())
-		get_viewport().set_input_as_handled()
+	# Start box-selection when left-pressing empty canvas space inside board_viewport
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		var gpos: Vector2 = get_global_mouse_position()
+		if board_viewport != null and is_instance_valid(board_viewport) and board_viewport.get_global_rect().has_point(gpos):
+			var hit_item: bool = false
+			for wid in cards:
+				var c: Control = cards[wid]
+				if c != null and is_instance_valid(c) and c.get_global_rect().has_point(gpos):
+					hit_item = true
+					break
+			if not hit_item:
+				for lid in results:
+					var rn: Control = results[lid]
+					if rn != null and is_instance_valid(rn) and rn.get_global_rect().has_point(gpos):
+						hit_item = true
+						break
+			if not hit_item:
+				hide_result_tooltip()
+				hide_weapon_tooltip()
+				_ensure_selection_box_view()
+				box_selecting = true
+				box_start = board.get_local_mouse_position()
+				box_current = box_start
+				_clear_selection()
+				if selection_box_view != null and is_instance_valid(selection_box_view):
+					selection_box_view.queue_redraw()

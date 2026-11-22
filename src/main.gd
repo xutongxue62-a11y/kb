@@ -10,6 +10,7 @@ const Effects = preload("res://src/effects.gd")
 const Hud = preload("res://src/hud.gd")
 const AudioPool = preload("res://src/audio_pool.gd")
 const Growth = preload("res://src/growth.gd")
+const TrainingPanelScript = preload("res://src/ui_training_panel.gd")
 const Companions = preload("res://src/companions.gd")
 const Progression = preload("res://src/progression.gd")
 const Economy = preload("res://src/economy.gd")
@@ -31,6 +32,7 @@ const FIELD: Rect2 = Rect2(42, 147, 1196, 514)
 const WAVE_SECONDS: float = 30.0
 const WAVE_BUFFER: float = 0.9
 const BOSS_CLEAR_SECONDS: float = 30.0
+const BOSS_WAVE_LIMIT_SECONDS: float = 180.0
 const CHARGE_SPEED: float = 560.0
 const CHARGE_DURATION: float = 0.4
 const DODGE_DURATION: float = 0.20
@@ -79,6 +81,13 @@ var shop_open: bool = false
 var shop_stock: Array = []
 var shop_rerolls: int = 0
 var wave_closing: bool = false
+var closing_absorb_left: float = 0.0
+var training_mode: bool = false
+var training_godmode: bool = true
+var training_enemy_wave: int = 10
+var training_enemy_immortal: bool = false
+var training_panel_open: bool = false
+var training_panel: Control = null
 var wave_buffer: float = 0.0
 var departure_left: float = 0.0
 var stats_home_return: String = "title"
@@ -115,6 +124,24 @@ var replace_pending: Dictionary = {}
 var chest_queue: int = 0
 var chest_marks: Array = []
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _draw_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var ground_marks_layer: Node2D
+var _had_burning_fields: bool = false
+var _ground_marks_accum: float = 0.0
+var _pickup_sync_accum: float = 0.0
+var _last_pickup_count: int = -1
+var _sep_parity: int = 0
+var _cached_stone_targets: Array = []
+var _cached_stone_pos: Vector2 = Vector2(INF, INF)
+var _cached_stone_biome: String = ""
+var _stones_dirty: bool = true
+
+class GroundMarksLayer:
+    extends Node2D
+    var owner_world
+    func _draw() -> void:
+        if owner_world != null:
+            owner_world.draw_burning_fields(self)
 var player_position: Vector2 = Vector2(640, 401)
 var player_hp: float = 8.0
 var invulnerable: float = 0.0
@@ -133,7 +160,10 @@ var enemy_serial: int = 0
 var elite_budget: int = 0
 var spawn_clock: float = 0.0
 var ward_ready: Dictionary = {}
+var _hud_accum: float = 0.0
 var pack_result_positions: Dictionary = {}
+var pack_card_positions: Dictionary = {}
+var pack_card_weapon_sig: String = ""
 var running: bool = false
 var paused: bool = false
 var touch_input: Vector2 = Vector2.ZERO
@@ -174,11 +204,15 @@ func _ready() -> void:
         audio.set_volume(sfx_volume)
     add_child(music)
     apply_display_mode(bool(settings.get("fullscreen", false)))
-    _fit_playable_window()
     map_view = WorldMap.new()
     map_view.z_index = -50
     add_child(map_view)
     map_view.set_view(player_position,wave)
+    ground_marks_layer = GroundMarksLayer.new()
+    ground_marks_layer.owner_world = self
+    ground_marks_layer.z_as_relative = false
+    ground_marks_layer.z_index = -20
+    add_child(ground_marks_layer)
     rng.seed = 2180411
     library = AssetLibrary.new()
     active_link = Catalog.LINKS["none"].duplicate(true)
@@ -200,8 +234,8 @@ func _ready() -> void:
     weapons_layer = Node2D.new()
     weapons_layer.z_index = 0
     add_child(weapons_layer)
-    pickup_renderer=PickupRenderer.new()
-    pickup_renderer.z_index=-2
+    pickup_renderer = PickupRenderer.new()
+    pickup_renderer.z_index = 1
     add_child(pickup_renderer)
     effects = Effects.new()
     if DisplayServer.get_name()!="headless": Effects.CombatArt.warm()
@@ -220,6 +254,7 @@ func _ready() -> void:
     add_child(armory)
     hud = Hud.new()
     hud.configure_volumes(music_volume, sfx_volume)
+
     add_child(hud)
     hud.setup(library)
     hud.start_requested.connect(begin_departure)
@@ -245,6 +280,8 @@ func _ready() -> void:
         hud.link_discovery_closed.connect(_on_link_discovery_closed)
     if hud.has_signal("link_pack_closed"):
         hud.link_pack_closed.connect(close_link_pack)
+    if hud.has_signal("training_requested"):
+        hud.training_requested.connect(start_training_camp)
     hud.next_round_requested.connect(leave_shop)
     hud.save_requested.connect(save_game)
     hud.continue_requested.connect(begin_continue)
@@ -253,11 +290,14 @@ func _ready() -> void:
     hud.music_changed.connect(set_music)
     hud.volume_changed.connect(set_volume)
     hud.damage_numbers_changed.connect(set_damage_numbers)
+    hud.vfx_mode_changed.connect(set_vfx_mode)
     hud.display_mode_changed.connect(set_fullscreen)
     hud.key_bindings_changed.connect(set_key_bindings)
     hud.configure_music(bool(settings.get("music_enabled",true)))
     hud.configure_volumes(music_volume, sfx_volume)
-    hud.configure_display(bool(settings.get("damage_numbers", true)), bool(settings.get("fullscreen", false)))
+    var init_vfx_mode: String = current_vfx_mode()
+    effects.set_vfx_mode(init_vfx_mode)
+    hud.configure_display(bool(settings.get("damage_numbers", true)), bool(settings.get("fullscreen", false)), init_vfx_mode)
     refresh_save_status()
     demo_font = GameFonts.create_system(PackedStringArray(["Microsoft YaHei", "Arial"]))
     demo_font.font_names = PackedStringArray(["Microsoft YaHei", "Arial"])
@@ -308,10 +348,15 @@ func _fit_playable_window() -> void:
     var scale: float = minf(float(usable.size.x) / 1280.0, float(usable.size.y) / 800.0)
     if scale < 0.999:
         target = Vector2i(maxi(640, int(1280.0 * scale)), maxi(400, int(800.0 * scale)))
+    DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
     DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_RESIZE_DISABLED, false)
     DisplayServer.window_set_size(target)
+    var centered: Vector2i = usable.position + (usable.size - target) / 2
+    DisplayServer.window_set_position(centered)
 
 func start_run(trial: bool = false, preset: String = "") -> void:
+    close_training_panel()
+    training_mode = false
     if hud != null:
         hud.debug_cheats = debug_cheats
         hud.refresh_debug_controls()
@@ -337,6 +382,13 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     armory.reset()
     _combat_targets_ready = false
     _simulating = false
+    _stones_dirty = true
+    _cached_stone_targets.clear()
+    _had_burning_fields = false
+    _ground_marks_accum = 0.0
+    _pickup_sync_accum = 0.0
+    _last_pickup_count = -1
+    _sep_parity = 0
     coins = 0
     wave_elapsed = 0.0
     boss_round = false
@@ -384,6 +436,8 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     combo_cooldowns.clear()
     ward_ready.clear()
     pack_result_positions.clear()
+    pack_card_positions.clear()
+    pack_card_weapon_sig = ""
     upgrade_choices.clear()
     upgrade_offer_levels.clear()
     replace_pending.clear()
@@ -423,6 +477,13 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     hero.phase = 0.0
     hero.amplitude = 0.0
     hero.position = player_position
+    if world_camera != null:
+        world_camera.position = player_position
+        world_camera.force_update_scroll()
+    if map_view != null:
+        map_view.set_view(player_position, wave)
+    effects.hero_anchor = player_position
+    effects._has_hero_anchor = true
     apply_character_view()
     if trial:
         var trial_ids: Array = Catalog.EXPANDED_IDS+["sling","totem"] if trial_preset=="expanded" else (Catalog.NEW_IDS + ["club","staff"] if trial_preset == "new" else Catalog.TRIAL_IDS)
@@ -511,7 +572,7 @@ func begin_continue() -> void:
     if not shop_open:
         departure_left = 2.4
         hud.show_departure(departure_left)
-        hud.page_turn(previous, "page")
+    hud.page_turn(previous, "burn")
 
 
 func save_game(finished: bool = false) -> bool:
@@ -531,7 +592,7 @@ func save_game(finished: bool = false) -> bool:
     return result.get("ok",false)
 
 func auto_save() -> void:
-    if settings.get("autosave",true) and not restoring and running and not trial_mode and not demo and not animation_demo:
+    if settings.get("autosave",true) and not restoring and running and not trial_mode and not training_mode and not demo and not animation_demo:
         save_game()
 
 func continue_game() -> bool:
@@ -549,6 +610,9 @@ func continue_game() -> bool:
         map_view.set_view(player_position,wave)
         player_position = map_view.move_body(player_position,player_position,18.0)
         hero.position = player_position
+        if effects != null:
+            effects.hero_anchor = player_position
+            effects._has_hero_anchor = true
         for enemy in enemies:
             enemy["position"] = map_view.move_body(enemy["position"],enemy["position"],enemy["radius"])
             enemy["view"].position = enemy["position"]
@@ -567,8 +631,10 @@ func set_autosave(enabled: bool) -> void:
     refresh_save_status("自动存档已" + ("开启" if enabled else "关闭") if result.get("ok",false) else "设置保存失败")
 
 func go_home() -> void:
-    if running and settings.get("autosave",true) and not trial_mode and not demo and not save_game():
+    close_training_panel()
+    if running and settings.get("autosave",true) and not trial_mode and not training_mode and not demo and not save_game():
         return
+    training_mode = false
     departure_left = 0.0
     running = false
     paused = false
@@ -582,6 +648,7 @@ func go_home() -> void:
     close_link_pack()
     clear_run_for_title()
     audio.stop_all()
+    hud.suppress_next_transition = false
     hud.show_menu("start",kills)
     update_hud()
     refresh_save_status()
@@ -593,6 +660,8 @@ func set_run_world_visible(value: bool) -> void:
         hero.visible = value
     if map_view != null:
         map_view.visible = value
+    if ground_marks_layer != null:
+        ground_marks_layer.visible = value
     if pickup_renderer != null:
         pickup_renderer.visible = value
     if effects != null:
@@ -625,6 +694,8 @@ func clear_run_for_title() -> void:
     position = Vector2.ZERO
     if world_camera != null:
         world_camera.offset = Vector2.ZERO
+    if ground_marks_layer != null:
+        ground_marks_layer.queue_redraw()
     queue_redraw()
 
 func _notification(what: int) -> void:
@@ -741,7 +812,7 @@ func bind_weapon_view(key: String) -> void:
     if not Catalog.WEAPONS.has(key):
         return
     if not weapon_views.has(key):
-        var view: Sprite2D = library.make_weapon(key, Catalog.WEAPONS[key]["size"] * (1.0 if key == "sling" else 1.12))
+        var view: Sprite2D = library.make_weapon(key, Catalog.WEAPONS[key]["size"] * (1.24 if key == "sling" else 1.12))
         view.set_meta("base_scale", view.scale)
         weapons_layer.add_child(view)
         weapon_views[key] = view
@@ -749,7 +820,7 @@ func bind_weapon_view(key: String) -> void:
     var visual: Sprite2D = weapon_views[key]
     visual.texture = library.weapon_texture(key, weapon_level(key))
     var extent: float = float(visual.texture.get_meta("display_extent", maxf(visual.texture.get_width(), visual.texture.get_height())))
-    visual.scale = Vector2.ONE * Catalog.WEAPONS[key].size * (1.0 if key == "sling" else 1.12) / extent
+    visual.scale = Vector2.ONE * Catalog.WEAPONS[key].size * (1.24 if key == "sling" else 1.12) / extent
     visual.set_meta("base_scale", visual.scale)
 
 func unbind_weapon_view(key: String) -> void:
@@ -899,7 +970,7 @@ func announce_link_ready() -> void:
         names.append(str(recipe.get("name", "")))
     if names.is_empty():
         return
-    combo_message = "已可启用「%s」。不会自动开启，按 %s 打开背包拖拽，或在说明中选择启用。" % [" / ".join(names), KeyBindings.caption_for("link")]
+    combo_message = "可联动「%s」· 按 %s 拖拽启用" % [" / ".join(names), KeyBindings.caption_for("link")]
     combo_message_time = 3.2
 
 func _seen_link_ids() -> Array:
@@ -1093,6 +1164,22 @@ func toggle_pause() -> void:
     update_hud()
 
 func finish_run(won: bool) -> void:
+    if training_mode and not won:
+        # Training Camp death never enters normal Game Over: revive full HP & return directly to Training Camp!
+        player_hp = float(stats.get("max_hp", 20.0))
+        invulnerable = 1.2
+        projectiles = projectiles.filter(func(p): return str(p.get("kind", "")) != "hostile")
+        for enemy in enemies:
+            var away: Vector2 = Vector2(enemy["position"]) - player_position
+            if away.length() < 160.0:
+                enemy["position"] = player_position + (away.normalized() if away.length() > 1.0 else Vector2.RIGHT) * 180.0
+        if audio != null:
+            audio.play("ui_open", -6.0)
+        open_training_panel()
+        if training_panel != null and training_panel.has_method("set_notice"):
+            training_panel.set_notice("在训练营中已倒下，已自动满血复活！可开启「玩家无敌」或调整配装后继续测试")
+        update_hud()
+        return
     running = false
     paused = false
     upgrade_pending = false
@@ -1263,7 +1350,8 @@ func update_hud() -> void:
             break
     var hud_is_boss: bool = boss_round and not boss_defeated
     var hud_stage_time: float = (WAVE_SECONDS - boss_clear_left) if (boss_round and boss_defeated) else wave_elapsed
-    hud.update_round(wave,hud_stage_time,hud_is_boss,coins,boss.get("hp",0.0),boss.get("max_hp",0.0), BiomeEncounters.boss_name(str(boss["form"])) if boss.has("form") else "")
+    var hud_wave_num: int = -1 if training_mode else wave
+    hud.update_round(hud_wave_num,hud_stage_time,hud_is_boss,coins,boss.get("hp",0.0),boss.get("max_hp",0.0), BiomeEncounters.boss_name(str(boss["form"])) if boss.has("form") else "")
     hud.update_world_status(WorldMap.BIOMES[WorldMap.biome_for_wave(wave)],dodge_cooldown,DODGE_COOLDOWN,available_links,link_hint_text())
     if combo_message_time > 0.0:
         hud.notice_label.text = combo_message
@@ -1288,6 +1376,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
     if code == KEY_R:
         if _cheats_allowed() or trial_mode:
             start_run(trial_mode, trial_preset)
+        return
+    if code == KEY_T and training_mode and running:
+        toggle_training_panel()
         return
     if code == KEY_SHIFT:
         request_dodge(read_movement())
@@ -1314,6 +1405,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
         request_trial_growth()
         return
     if KeyBindings.matches_code(code, "cancel"):
+        if training_panel_open:
+            close_training_panel()
+            return
         if hud != null and hud.screen == "replace_confirm" and hud.has_method("cancel_replace_confirm"):
             hud.cancel_replace_confirm()
         elif not replace_pending.is_empty():
@@ -1422,19 +1516,25 @@ func simulate(delta: float, movement: Vector2) -> void:
     if animation_demo:
         animate_showcase(delta)
         return
-    if not running or paused or upgrade_pending or shop_open or link_notice_open or link_pack_open:
+    if not running or paused or upgrade_pending or shop_open or link_notice_open or link_pack_open or training_panel_open:
         return
     if player_frozen:
         movement = Vector2.ZERO
     if wave_closing:
-        absorb_round_resources(delta)
+        var still_absorbing: bool = absorb_round_resources(delta)
         wave_buffer=maxf(0,wave_buffer-delta)
+        closing_absorb_left=maxf(0.0, closing_absorb_left - delta)
         effects.advance(delta)
-        if wave_buffer<=0.000001: _finish_wave_closing()
+        if wave_buffer<=0.000001 and (not still_absorbing or closing_absorb_left <= 0.000001): _finish_wave_closing()
         queue_redraw()
         return
     elapsed += delta
     wave_elapsed += delta
+    if boss_round and not boss_defeated and wave_elapsed >= BOSS_WAVE_LIMIT_SECONDS:
+        finish_run(false)
+        update_hud()
+        queue_redraw()
+        return
     if boss_round and boss_defeated:
         boss_clear_left = maxf(0.0, boss_clear_left - delta)
     _simulating = true
@@ -1458,6 +1558,13 @@ func simulate(delta: float, movement: Vector2) -> void:
     else:
         player_position = map_view.move_body(player_position, player_position + velocity * delta, 18.0)
     hero.position = player_position
+    if world_camera != null:
+        world_camera.position = player_position
+        world_camera.force_update_scroll()
+    if map_view != null:
+        map_view.set_view(player_position, wave)
+    effects.hero_anchor = player_position
+    effects._has_hero_anchor = true
     var previous_step: int = int(hero.phase / PI)
     hero.animate(velocity, old_position.distance_to(player_position), delta)
     audio.advance(delta)
@@ -1477,6 +1584,8 @@ func simulate(delta: float, movement: Vector2) -> void:
         update_hud()
         _simulating = false
         return
+    _ground_marks_accum += delta
+    _pickup_sync_accum += delta
     update_enemies(delta)
     if not running:
         update_hud()
@@ -1502,10 +1611,19 @@ func simulate(delta: float, movement: Vector2) -> void:
     enemies = living
     update_pickups(delta)
     update_chests(delta)
-    if (boss_round and boss_defeated and boss_clear_left <= 0.000001) or (not boss_round and wave_elapsed >= WAVE_SECONDS - 0.000001):
+    if not training_mode and ((boss_round and boss_defeated and boss_clear_left <= 0.000001) or (not boss_round and wave_elapsed >= WAVE_SECONDS - 0.000001)):
         start_wave_closing()
         apply_weapon_glows(delta)
         update_hud()
+        queue_redraw()
+        _simulating = false
+        return
+    if training_mode:
+        apply_weapon_glows(delta)
+        _hud_accum += delta
+        if _hud_accum >= 0.10:
+            _hud_accum = 0.0
+            update_hud()
         queue_redraw()
         _simulating = false
         return
@@ -1515,7 +1633,7 @@ func simulate(delta: float, movement: Vector2) -> void:
     # window stays live and keeps the same normal-stage pipeline.
     var alive_cap: int = enemy_limit()
     if spawn_clock <= 0.0 and enemies.size() < alive_cap:
-        var spawn_interval: float = Rules.spawn_interval_for(wave, boss_round, boss_defeated)
+        var spawn_interval: float = Rules.spawn_interval_for(wave, boss_round, boss_defeated, enemies.size())
         spawn_clock = spawn_interval
         if boss_pending:
             spawn_enemy("boss",offscreen_point(1)+Vector2(48,0),false,"enter")
@@ -1536,7 +1654,10 @@ func simulate(delta: float, movement: Vector2) -> void:
             present_upgrade()
     try_present_chest()
     apply_weapon_glows(delta)
-    update_hud()
+    _hud_accum += delta
+    if _hud_accum >= 0.10 or DisplayServer.get_name() == "headless":
+        _hud_accum = 0.0
+        update_hud()
     queue_redraw()
     _simulating = false
 
@@ -1687,12 +1808,20 @@ func start_wave_closing() -> void:
         world_camera.offset = Vector2.ZERO
     wave_closing = true
     wave_buffer = WAVE_BUFFER
+    var magnet_r2: float = pickup_magnet_radius() * pickup_magnet_radius()
+    var has_in_range: bool = false
+    for stone in pickups:
+        if Vector2(stone["position"]).distance_squared_to(player_position) <= magnet_r2:
+            stone["closing_pull"] = true
+            has_in_range = true
+    closing_absorb_left = 1.6 if has_in_range else 0.0
     audio.stop_all()
     audio.set_paused(true)
     auto_save()
 
 func _finish_wave_closing() -> void:
     wave_buffer = 0.0
+    closing_absorb_left = 0.0
     player_frozen = true
     discard_remaining_drops()
     if demo:
@@ -1700,10 +1829,30 @@ func _finish_wave_closing() -> void:
     else:
         continue_round_rewards()
 
-func absorb_round_resources(_delta: float) -> void:
-    # Leftover gems and ground chests stay put during the finish pause and are
-    # discarded when it ends. Only rewards already picked up in combat are kept.
+func absorb_round_resources(delta: float) -> bool:
+    # Only pickups ALREADY inside pickup magnet range when the wave ended finish flying into the player.
+    var remaining: int = 0
+    var pulling_count: int = 0
+    for index in range(pickups.size()):
+        var stone: Dictionary = pickups[index]
+        if bool(stone.get("closing_pull", false)):
+            stone["position"] = Vector2(stone["position"]).move_toward(player_position, 460.0 * maxf(0.0, delta))
+            if Vector2(stone["position"]).distance_squared_to(player_position) < 484.0:
+                var kind: String = str(stone.get("kind", "xp"))
+                if kind == "coin":
+                    coins += int(stone["value"])
+                elif kind == "blood":
+                    var healed: float = minf(stats["max_hp"] - player_hp, float(stone.get("value", LootRules.BLOOD_PACK_HEAL)))
+                    player_hp += maxf(0.0, healed)
+                else:
+                    xp += LootDrops.experience_value(stone) * stats["xp_multiplier"]
+                continue
+            pulling_count += 1
+        pickups[remaining] = stone
+        remaining += 1
+    pickups.resize(remaining)
     update_hud()
+    return pulling_count > 0
 
 func continue_round_rewards() -> void:
     if upgrade_pending or not running or shop_open:
@@ -1776,7 +1925,7 @@ func link_hint_text() -> String:
             if str(recipe.get("id", "none")) != "none":
                 names.append(str(recipe.get("name", "")))
         var current: String = str(link_hud_view().get("name", "不联动"))
-        return "已可联动：按 %s 打开背包，把武器拖到一起即可启用（当前：%s）。火种壶、魔法杖、雷鸣图腾可同时给多件武器附魔，但同一件武器只接受一种附魔。锁链从火药筒炮口弹出。" % [KeyBindings.caption_for("link"), current]
+        return "按 %s 打开背包拖拽联动（当前：%s）· 同武器限一种附魔" % [KeyBindings.caption_for("link"), current]
     for link_id in Catalog.LINK_ORDER:
         if link_id == "none":
             continue
@@ -1894,20 +2043,13 @@ func update_pickups(delta: float) -> void:
     var remaining: int = 0
     var bursts: int = 0
     var radius_squared: float = pickup_magnet_radius() * pickup_magnet_radius()
-    # Hoisted out of the per-pickup loop (same math as pickup_visible_point).
-    var view_area: Rect2 = visible_world_rect()
-    var reveal_floor_y: float = view_area.position.y + PICKUP_TOP_HUD_PAD
     for index in range(pickups.size()):
         var stone: Dictionary = pickups[index]
-        var revealed: Vector2 = stone["position"]
-        if revealed.y < reveal_floor_y and revealed.y >= view_area.position.y - 12.0 and revealed.x >= view_area.position.x - 8.0 and revealed.x <= view_area.end.x + 8.0:
-            revealed.y = reveal_floor_y
-        if revealed.y > stone["position"].y:
-            stone["position"] = stone["position"].move_toward(revealed, maxf(260.0 * delta, 1.0))
-        if stone["position"].distance_squared_to(player_position) <= radius_squared:
+        var kind: String = str(stone.get("kind", "xp"))
+        # Only coins and XP gems respond to pickup magnet; blood packs and chests must be walked onto directly.
+        if kind != "blood" and stone["position"].distance_squared_to(player_position) <= radius_squared:
             stone["position"] = stone["position"].move_toward(player_position, 330.0 * delta)
         if stone["position"].distance_squared_to(player_position) < 484.0:
-            var kind: String = str(stone.get("kind","xp"))
             if kind == "coin":
                 coins += int(stone["value"])
                 if audio != null:
@@ -1932,6 +2074,27 @@ func update_pickups(delta: float) -> void:
             pickups[remaining] = stone
             remaining += 1
     pickups.resize(remaining)
+    if pickups.size() > 140:
+        var keep: Array = []
+        var far_buckets: Dictionary = {}
+        var far_sq: float = 380.0 * 380.0
+        for item in pickups:
+            var ikind: String = str(item.get("kind", "xp"))
+            if ikind == "blood" or item["position"].distance_squared_to(player_position) <= far_sq:
+                keep.append(item)
+            elif not far_buckets.has(ikind):
+                if ikind == "xp" and item.has("legacy_fraction"):
+                    item["value"] = LootDrops.experience_value(item)
+                    item.erase("legacy_fraction")
+                far_buckets[ikind] = item
+                keep.append(item)
+            else:
+                var bucket: Dictionary = far_buckets[ikind]
+                if ikind == "coin":
+                    bucket["value"] = int(bucket.get("value", 1)) + int(item.get("value", 1))
+                else:
+                    bucket["value"] = float(bucket.get("value", 1.0)) + LootDrops.experience_value(item)
+        pickups = keep
 
 func update_companions(delta: float) -> void:
     for attack in companions.advance(delta, player_position, combat_targets(), buff_levels, stats, prefer_elite):
@@ -2027,7 +2190,7 @@ func hatch_enemy(enemy: Dictionary, fx: bool = true) -> void:
         effects.burst(enemy["position"], Color("#d7b17a"), 10.0, "hit")
 
 func enemy_limit() -> int:
-    return Rules.enemy_limit_for(wave)
+    return Rules.enemy_limit_for(wave, boss_round)
 
 func spawn_enemy(kind: String, point: Vector2 = Vector2(INF, INF), wave_spawn: bool = false, arrival: String = "") -> void:
     map_view.set_view(player_position,wave)
@@ -2074,16 +2237,22 @@ func spawn_enemy(kind: String, point: Vector2 = Vector2(INF, INF), wave_spawn: b
 
 func update_enemies(delta: float) -> void:
     recycle_distant_enemies()
-    # Frame snapshots for the separation pass: reading live dictionaries inside
-    # the O(n^2) loop was a late-game hotspot. Positions are the frame-start
-    # ones for every enemy, which also makes the pass order-independent.
+    _sep_parity += 1
+    var compute_sep: bool = (_sep_parity % 2) == 1
+    # Frame snapshots + spatial hash grid for the separation pass (refreshed on alternate frames for high FPS).
     var sep_positions := PackedVector2Array()
-    var sep_alive := PackedByteArray()
-    sep_positions.resize(enemies.size())
-    sep_alive.resize(enemies.size())
-    for sep_index in range(enemies.size()):
-        sep_positions[sep_index] = enemies[sep_index]["position"]
-        sep_alive[sep_index] = 1 if float(enemies[sep_index]["hp"]) > 0.0 else 0
+    var sep_grid: Dictionary = {}
+    if compute_sep:
+        sep_positions.resize(enemies.size())
+        for sep_index in range(enemies.size()):
+            var pos: Vector2 = enemies[sep_index]["position"]
+            sep_positions[sep_index] = pos
+            if float(enemies[sep_index]["hp"]) > 0.0:
+                var cell := Vector2i(floori(pos.x / 48.0), floori(pos.y / 48.0))
+                if sep_grid.has(cell):
+                    sep_grid[cell].append(sep_index)
+                else:
+                    sep_grid[cell] = [sep_index]
     var view_rect: Rect2 = visible_world_rect().grow(160.0)
     for enemy_index in range(enemies.size()):
         var enemy: Dictionary = enemies[enemy_index]
@@ -2192,16 +2361,25 @@ func update_enemies(delta: float) -> void:
                 enemy["timer"] = 0.4
         velocity *= enemy["speed_multiplier"]
         if enemy["state"] == "walk":
-            var separation: Vector2 = Vector2.ZERO
-            var self_position: Vector2 = enemy["position"]
-            for other_index in range(sep_positions.size()):
-                if other_index == enemy_index or sep_alive[other_index] == 0:
-                    continue
-                var offset: Vector2 = self_position - sep_positions[other_index]
-                var offset_length_squared: float = offset.length_squared()
-                if offset_length_squared < 1500.0 and offset_length_squared > 0.01:
-                    separation += offset.normalized() * 28.0
-            velocity += separation.limit_length(48)
+            if compute_sep:
+                var separation: Vector2 = Vector2.ZERO
+                var self_position: Vector2 = enemy["position"]
+                var cx: int = floori(self_position.x / 48.0)
+                var cy: int = floori(self_position.y / 48.0)
+                for dy in range(-1, 2):
+                    for dx in range(-1, 2):
+                        var bucket = sep_grid.get(Vector2i(cx + dx, cy + dy))
+                        if bucket == null:
+                            continue
+                        for other_index in bucket:
+                            if other_index == enemy_index:
+                                continue
+                            var offset: Vector2 = self_position - sep_positions[other_index]
+                            var offset_length_squared: float = offset.length_squared()
+                            if offset_length_squared < 1500.0 and offset_length_squared > 0.01:
+                                separation += offset * (28.0 / sqrt(offset_length_squared))
+                enemy["_sep"] = separation.limit_length(48)
+            velocity += Vector2(enemy.get("_sep", Vector2.ZERO))
         if not encounter or enemy["state"] == "walk":
             velocity += enemy["knock"]
         velocity = _ward_velocity(enemy, velocity, delta)
@@ -2229,7 +2407,8 @@ func update_enemies(delta: float) -> void:
             BiomeEncounters.strike_travel(self, enemy, before_move)
             if not running:
                 break
-        if (not encounter or enemy["state"] == "walk") and enemy["position"].distance_to(player_position) < enemy["radius"] + 18.0:
+        var contact_r: float = float(enemy["radius"]) + 18.0
+        if (not encounter or enemy["state"] == "walk") and enemy["position"].distance_squared_to(player_position) < contact_r * contact_r:
             hurt_player((player_position - enemy["position"]).normalized(), enemy["damage"], enemy["kind"] == "boss")
             if not running:
                 break
@@ -2246,6 +2425,10 @@ func _ward_velocity(enemy: Dictionary, velocity: Vector2, delta: float) -> Vecto
         enemy["ward_moving"] = false
         enemy["knock"] = Vector2.ZERO
         return Vector2.ZERO
+    var slow_left: float = float(enemy.get("slow_left", 0.0))
+    if slow_left > 0.0:
+        enemy["slow_left"] = maxf(0.0, slow_left - delta)
+        velocity *= 0.70
     var left: float = float(enemy.get("ward_left", 0.0))
     if left <= 0.0:
         enemy["ward_moving"] = false
@@ -2275,11 +2458,18 @@ func try_apply_ward(enemy: Dictionary, source: String, origin: Vector2 = Vector2
     if duration <= 0.001:
         return false
     if str(enemy.get("kind", "")) == "boss":
-        duration = Rules.PARALYZE_BOSS_DURATION
-    if bool(enemy.get("paralyzed_once", false)):
+        return false
+    if bool(enemy.get("paralyzed_once", false)) or bool(enemy.get("cc_once", false)):
+        return false
+    if str(enemy.get("kind", "")) in ["tank", "charger", "cindertusk", "magmashell", "stonehorn"] or bool(enemy.get("elite", false)):
+        # Heavy / bruiser / charger / elite monsters resist paralysis: brief 30% slow only (once per life)!
+        enemy["cc_once"] = true
+        enemy["paralyzed_once"] = true
+        enemy["slow_left"] = 0.65
         return false
     if elapsed < float(ward_ready.get(source, -1000.0)):
         return false
+    enemy["cc_once"] = true
     enemy["paralyzed_once"] = true
     ward_ready[source] = elapsed + float(profile.get("interval", Rules.PARALYZE_INTERVAL))
     enemy["ward_kind"] = "paralyze"
@@ -2363,6 +2553,9 @@ func refresh_weapon_draw_order() -> void:
         else:
             view.z_index = 11 if view.position.y >= player_position.y else 9
 
+func enchant_damage_multiplier(weapon_id: String) -> float:
+    return Rules.enchant_damage_bonus(active_links, weapon_id, Evolution.tier(weapon_level("firepot")), Evolution.tier(weapon_level("staff")), Evolution.tier(weapon_level("totem")))
+
 func update_armory(delta: float) -> void:
     var options: Dictionary=stats.duplicate()
     options["link_kind"]=active_link.get("kind","none") if active_links.size()<=1 else "multi"
@@ -2378,24 +2571,86 @@ func update_armory(delta: float) -> void:
     options["staff_tier"]=Evolution.tier(weapon_level("staff"))
     options["firepot_tier"]=Evolution.tier(weapon_level("firepot"))
     options["totem_tier"]=Evolution.tier(weapon_level("totem"))
+    options["totem_level"]=weapon_level("totem")
+    options["totem_next_red"]=_peek_thunder_red("totem")
+    options["bonebow_next_red"]=_peek_thunder_red("bonebow") if Rules.host_is_thunder_enchanted(active_links, "bonebow") else false
+    options["hammer_thunder"]=Rules.host_is_thunder_enchanted(active_links, "hammer")
+    options["enchant_mults"]={
+        "spear": enchant_damage_multiplier("spear"),
+        "hammer": enchant_damage_multiplier("hammer"),
+        "boomerang": enchant_damage_multiplier("boomerang"),
+        "bonebow": enchant_damage_multiplier("bonebow")
+    }
     for command in armory.advance(delta,player_position,combat_targets(),inventory,options,prefer_elite,weapon_views,current_weapon_mounts()):
         match command.get("type",""):
             "motion":
-                effects.weapon_motion(command["position"], command["direction"], command["weapon_id"])
+                var mwid: String = str(command["weapon_id"])
+                var mtint: Color = _weapon_charge_color(mwid) if _host_is_enchanted(mwid) else Color.TRANSPARENT
+                effects.weapon_motion(command["position"], command["direction"], mwid, mtint)
             "flash":
-                flash_weapon(command.get("weapon_id", ""))
+                var fwid: String = str(command.get("weapon_id", ""))
+                flash_weapon(fwid)
+                if fwid == "totem" or (fwid == "bonebow" and Rules.host_is_thunder_enchanted(active_links, "bonebow")):
+                    _consume_thunder_red(fwid)
             "hit":
                 var before_hp: float=float(command.enemy.hp)
                 var was_living_monster: bool = Rules.is_living_monster(command.enemy)
-                hurt_enemy(command["enemy"],command["damage"],command["weapon_id"],false,command["direction"])
-                apply_weapon_link_hit(command.enemy.position, str(command.get("weapon_id", "")), str(command.enemy.get("id", "")), float(command.get("damage", 0.0)))
+                var cmd_wid: String = str(command.get("weapon_id", ""))
+                var cmd_force_red: int = -1
+                if bool(command.get("thunder_enchanted", false)):
+                    cmd_force_red = 1 if bool(command.get("thunder_red", false)) else 0
+                elif cmd_wid in ["spear", "boomerang"] and Rules.host_is_thunder_enchanted(active_links, cmd_wid):
+                    cmd_force_red = 1 if _consume_thunder_red(cmd_wid) else 0
+                hurt_enemy(command["enemy"],command["damage"],command["weapon_id"],false,command["direction"],cmd_force_red)
+                apply_weapon_link_hit(command.enemy.position, cmd_wid, str(command.enemy.get("id", "")), float(command.get("damage", 0.0)), cmd_force_red)
                 flash_weapon(command["weapon_id"])
             "area":
-                damage_area(command["position"],command["radius"]*stats["area_multiplier"],command["damage"],command["weapon_id"],true,Color("#e8c783"), "quake")
-                audio.play("stone_hit", 0.0, 0.72)
-                flash_weapon(command.get("weapon_id", "hammer"))
-                if str(command.get("weapon_id", "")) == "hammer" and float(command.get("radius", 0.0)) <= 80.0:
-                    apply_weapon_link_hit(command["position"], "hammer")
+                var area_weapon: String = str(command.get("weapon_id", ""))
+                var is_primary: bool = bool(command.get("primary", float(command.get("radius", 0.0)) <= 86.0))
+                if area_weapon == "hammer" and bool(options["hammer_thunder"]):
+                    # ONE massive sky lightning bolt hitting the whole AoE pack + ground Lichtenberg electric vein pattern (synced with pre-fire glow!)
+                    var totem_lvl: int = weapon_level("totem")
+                    var is_red: bool = _consume_thunder_red("hammer")
+                    var red_mult: float = Rules.red_lightning_multiplier(totem_lvl) if is_red else 1.0
+                    var bolt_color: Color = Color("#ff3a2e") if is_red else BattleVisuals.thunder_tint(int(options["totem_tier"]))
+                    var strike_pt: Vector2 = Vector2(command["position"])
+                    var strike_r: float = minf(maxf(116.0, float(command["radius"]) * 1.12) * stats["area_multiplier"], 205.0)
+                    effects.sky_lightning(strike_pt + Vector2(rng.randf_range(-24.0, 24.0), -380.0), strike_pt, bolt_color, false, 1.55 if is_red else 1.48, is_red)
+                    trigger_lava_lightning_splash(strike_pt, 1.15)
+                    # Wrap up to 4 struck monsters BEFORE damage_area so even one-shot enemies visibly crackle!
+                    var wrapped: int = 0
+                    for enemy in combat_targets():
+                        if wrapped >= 4:
+                            break
+                        if float(enemy.get("hp", 0.0)) > 0.0 and Rules.is_living_monster(enemy):
+                            var reach_e: float = strike_r + float(enemy.get("radius", 0.0))
+                            if Vector2(enemy["position"]).distance_squared_to(strike_pt) <= reach_e * reach_e:
+                                effects.shock_wrap(enemy["position"], float(enemy.get("radius", 24.0)) + 8.0, bolt_color, is_red)
+                                wrapped += 1
+                    damage_area(strike_pt, strike_r, float(command["damage"]) * red_mult, "hammer", true, bolt_color, "thunder_blast", 1 if is_red else 0)
+                    # Ground electric Lichtenberg crack-vein pattern (capped radius so high area buff never floods screen)
+                    var has_recent_mark: bool = false
+                    for f in burning_fields:
+                        if str(f.get("residual", "")) == "thunder_mark" and float(f.get("age", 1.0)) < 0.30 and Vector2(f.get("position", Vector2.ZERO)).distance_squared_to(strike_pt) < 625.0:
+                            has_recent_mark = true
+                            break
+                    if not has_recent_mark:
+                        burning_fields.append({"position": strike_pt, "age": 0.0, "life": 1.85, "tick": 1.0, "radius": minf(strike_r * 0.72, 138.0), "damage": 0.0, "weapon_id": "totem", "from_link": true, "residual": "thunder_mark", "heavy": true, "crater": false, "red": is_red})
+                        if burning_fields.size() > 6:
+                            burning_fields.pop_front()
+                    audio.play("magic_hit", 0.0, 0.66 if is_red else 0.72)
+                    flash_weapon("hammer")
+                    if is_primary:
+                        apply_weapon_link_hit(strike_pt, "hammer", "", -1.0, 1 if is_red else 0)
+                else:
+                    var has_elem_crater: bool = area_weapon == "hammer" and (Rules.host_is_fire_enchanted(active_links, "hammer") or Rules.host_is_rune_enchanted(active_links, "hammer"))
+                    # Enchanted hammer uses its own elemental burst (skip beige ring/quake!); secondary shockwave uses ring.
+                    var area_burst: String = "" if has_elem_crater else ("quake" if is_primary else "ring")
+                    damage_area(command["position"], command["radius"] * stats["area_multiplier"], command["damage"], area_weapon, true, Color("#e8c783"), area_burst)
+                    audio.play("stone_hit", 0.0, 0.72)
+                    flash_weapon(command.get("weapon_id", "hammer"))
+                    if area_weapon == "hammer" and is_primary:
+                        apply_weapon_link_hit(command["position"], "hammer")
             "beam":
                 effects.lightning(command["start"],command["end"],command["color"])
                 audio.play("magic_hit", -2.0, 1.08)
@@ -2405,19 +2660,20 @@ func update_armory(delta: float) -> void:
                         if Vector2(mine.position).distance_to(command["end"])<=120.0:
                             mine["charged"]=true
             "fan_fire":
-                effects.burst(command.position,Color("#f5c66a"),command.radius,"ring")
+                effects.burst(command.position, BattleVisuals.fire_tint(int(options["firepot_tier"])), command.radius * 0.85, "fire_blast")
             "sky_lightning":
-                var bolt_color: Color = command.get("color", BattleVisuals.thunder_tint(2))
-                effects.sky_lightning(command["start"], command["end"], bolt_color)
-                damage_area(command["position"], float(command["radius"]) * stats["area_multiplier"], float(command["damage"]), "totem", true, bolt_color, "quake")
-                audio.play("magic_hit", 0.0, 0.72)
+                var is_red_sky: bool = bool(command.get("red", false))
+                var bolt_color: Color = command.get("color", Color("#ff3a2e") if is_red_sky else BattleVisuals.thunder_tint(2))
+                effects.sky_lightning(command["start"], command["end"], bolt_color, true, 1.25 if is_red_sky else 1.0, is_red_sky)
+                trigger_lava_lightning_splash(command["end"], 1.05)
+                damage_area(command["position"], float(command["radius"]) * stats["area_multiplier"], float(command["damage"]), "totem", true, bolt_color, "thunder_blast", 1 if is_red_sky else 0)
+                audio.play("magic_hit", 0.0, 0.66 if is_red_sky else 0.72)
                 flash_weapon("totem")
             "fire_pillar":
                 var pillar_tier: int = int(command.get("tier", 2))
                 var pillar_color: Color = BattleVisuals.fire_tint(pillar_tier)
-                effects.burst(command["position"], pillar_color, float(command["radius"]), "ring")
-                damage_area(command["position"], float(command["radius"]) * stats["area_multiplier"], float(command["damage"]), "firepot", true, pillar_color, "quake")
-                burning_fields.append({"position": command["position"], "age": 0.0, "life": 1.15, "tick": 0.18, "radius": float(command["radius"]) * stats["area_multiplier"], "damage": float(command["damage"]) * 0.28 * Rules.BURN_TICK_SCALE, "weapon_id": "firepot", "from_link": false, "residual": "fire"})
+                damage_area(command["position"], float(command["radius"]) * stats["area_multiplier"], float(command["damage"]), "firepot", true, pillar_color, "fire_blast")
+                burning_fields.append({"position": command["position"], "age": 0.0, "life": 1.15, "tick": 0.18, "radius": float(command["radius"]) * stats["area_multiplier"], "damage": float(command["damage"]) * 0.28 * Rules.BURN_TICK_SCALE, "weapon_id": "firepot", "from_link": false, "residual": "fire", "heavy": true, "crater": false})
                 audio.play("powder", -1.0, 0.82)
                 flash_weapon("firepot")
     refresh_weapon_enchant_tint()
@@ -2444,7 +2700,7 @@ func update_rune_nova(delta: float, allow_attacks: bool) -> void:
             break
     if not any:
         return
-    var damage: float = Catalog.WEAPONS["staff"]["damage"] * (1.0 + float(level - 1) * 0.35) * float(profile["damage_multiplier"])
+    var damage: float = Catalog.WEAPONS["staff"]["damage"] * Evolution.damage_multiplier("staff", level) * float(profile["damage_multiplier"])
     var tint: Color = BattleVisuals.staff_tint(Evolution.tier(level))
     damage_area(player_position, radius, damage, "staff", true, tint, "ring")
     effects.burst(player_position, tint, radius * 0.85, "ring")
@@ -2489,29 +2745,65 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
         view.rotation = (point - player_position).angle() + (PI / 2.0 if key == "axe" else PI / 4.0)
         view.offset = Vector2.ZERO
         if allow_attacks and elapsed >= runtime.get("trail_next", 0.0):
-            var tail: Vector2 = player_position + (point - player_position).rotated(-data["orbit_speed"] * 0.06)
-            effects.swing_trail(tail, point, player_position, key)
+            var tail_arc: float = -data["orbit_speed"] * (0.085 if key == "blade" else (0.065 if key == "axe" else 0.05))
+            var tail: Vector2 = player_position + (point - player_position).rotated(tail_arc)
+            var trail_tier: int = Evolution.tier(int(item["level"]))
+            var trail_enchant: String = ""
+            var trail_enchant_tier: int = 0
+            if Rules.host_is_fire_enchanted(active_links, key):
+                trail_enchant = "fire"
+                trail_enchant_tier = Evolution.tier(weapon_level("firepot"))
+            elif Rules.host_is_rune_enchanted(active_links, key):
+                trail_enchant = "rune"
+                trail_enchant_tier = Evolution.tier(weapon_level("staff"))
+            elif Rules.host_is_thunder_enchanted(active_links, key):
+                trail_enchant = "thunder"
+                trail_enchant_tier = Evolution.tier(weapon_level("totem"))
+            effects.swing_trail(tail, point, player_position, key, trail_tier, trail_enchant, trail_enchant_tier)
             runtime["trail_next"] = elapsed + 0.035
         var orbit_reach: float = Rules.orbit_radius_for(key, collapsed) + 13.0
-        var melee_near: Array = []
-        if allow_attacks:
-            for candidate in targets:
-                if float(candidate.get("hp", 0.0)) <= 0.0:
-                    continue
-                if player_position.distance_to(candidate["position"]) <= orbit_reach + float(candidate.get("radius", 0.0)):
-                    melee_near.append(candidate)
+        var seg_min_x: float = minf(previous.x, point.x) - 13.0
+        var seg_max_x: float = maxf(previous.x, point.x) + 13.0
+        var seg_min_y: float = minf(previous.y, point.y) - 13.0
+        var seg_max_y: float = maxf(previous.y, point.y) + 13.0
+        var near_checked: bool = false
+        var near_has_monster: bool = false
+        var near_has_egg: bool = false
+        var hit_times: Dictionary = runtime["hit_times"]
         for enemy in targets:
             if enemy["hp"] <= 0.0:
                 continue
-            if Rules.should_defer_target(enemy, melee_near):
+            var epos: Vector2 = enemy["position"]
+            var eradius: float = float(enemy["radius"])
+            if epos.x + eradius < seg_min_x or epos.x - eradius > seg_max_x or epos.y + eradius < seg_min_y or epos.y - eradius > seg_max_y:
                 continue
-            var closest: Vector2 = Geometry2D.get_closest_point_to_segment(enemy["position"], previous, point)
-            if closest.distance_to(enemy["position"]) > enemy["radius"] + 13.0 or float(runtime["hit_times"].get(enemy["id"], -INF)) > elapsed:
+            if float(hit_times.get(enemy["id"], -INF)) > elapsed:
                 continue
-            var melee_damage: float = data["damage"] * (1.0 + (item["level"] - 1) * 0.35)
-            runtime["hit_times"][enemy["id"]] = elapsed + data["cooldown"] * weapon_reload_penalty(key) / stats["attack_speed"]
-            hurt_enemy(enemy, melee_damage, key, false, (enemy["position"] - player_position).normalized())
-            apply_weapon_link_hit(enemy["position"], key, str(enemy.get("id", "")), melee_damage)
+            var closest: Vector2 = Geometry2D.get_closest_point_to_segment(epos, previous, point)
+            var hit_dist: float = eradius + 13.0
+            if closest.distance_squared_to(epos) > hit_dist * hit_dist:
+                continue
+            var is_egg_target: bool = Rules.is_egg(enemy)
+            var is_stone_target: bool = Rules.is_stone(enemy)
+            if is_egg_target or is_stone_target:
+                if not near_checked:
+                    near_checked = true
+                    for candidate in targets:
+                        if float(candidate.get("hp", 0.0)) <= 0.0:
+                            continue
+                        var reach: float = orbit_reach + float(candidate.get("radius", 0.0))
+                        if player_position.distance_squared_to(candidate["position"]) <= reach * reach:
+                            if Rules.is_living_monster(candidate):
+                                near_has_monster = true
+                                break
+                            elif Rules.is_egg(candidate):
+                                near_has_egg = true
+                if (is_egg_target and near_has_monster) or (is_stone_target and (near_has_monster or near_has_egg)):
+                    continue
+            var melee_damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item["level"])) * enchant_damage_multiplier(key)
+            hit_times[enemy["id"]] = elapsed + data["cooldown"] * weapon_reload_penalty(key) / Rules.effective_attack_speed(key, stats["attack_speed"])
+            hurt_enemy(enemy, melee_damage, key, false, (epos - player_position).normalized())
+            apply_weapon_link_hit(epos, key, str(enemy.get("id", "")), melee_damage)
             hero.recoil((point - player_position).normalized())
             audio.play("swing", -3.0 if key == "blade" else -1.0, 1.28 if key == "blade" else 0.88)
             flash_weapon(key)
@@ -2521,7 +2813,7 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
         var data: Dictionary = Catalog.WEAPONS[key]
         var point: Vector2 = mounts.get(key, player_position + Rules.ranged_mount(key))
         runtime["position"] = point
-        runtime["cooldown"] -= delta * stats["attack_speed"]
+        runtime["cooldown"] -= delta * Rules.effective_attack_speed(key, stats["attack_speed"])
         runtime["recoil"] = maxf(0.0, runtime["recoil"] - delta)
         var attack_range: float = Rules.scaled_range(data, stats)
         if key == "staff":
@@ -2572,7 +2864,7 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
                 continue
             launch_chain(linked, target["position"])
         else:
-            var damage: float = data["damage"] * (1.0 + (item["level"] - 1) * 0.35)
+            var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item["level"])) * enchant_damage_multiplier(key)
             # Shells always leave the visual muzzle, and while a target is
             # tracked the barrel is posed along the shot (see above), so the
             # shell's origin and heading both sit on the barrel line.
@@ -2637,16 +2929,22 @@ func apply_weapon_glows(delta: float) -> void:
         if not view.has_meta("base_scale"):
             view.set_meta("base_scale", view.scale)
         var glow: float = 0.0
+        var charge_scale: float = 0.0
         if weapon_runtime.has(key):
             weapon_runtime[key]["glow"] = maxf(0.0, float(weapon_runtime[key].get("glow", 0.0)) - delta)
             glow = float(weapon_runtime[key]["glow"])
+            if not is_weapon_suppressed(key) and key in ["powder", "sling", "staff"] and not enemies.is_empty():
+                var cd_left: float = float(weapon_runtime[key].get("cooldown", 1.0))
+                var win: float = 0.44 if key == "powder" else (0.30 if key == "staff" else 0.22)
+                if cd_left > 0.0 and cd_left < win:
+                    charge_scale = (1.0 - cd_left / win) * (0.09 if key == "powder" else 0.05)
         var t: float = clampf(glow / 0.2, 0.0, 1.0)
-        var color: Color = Catalog.WEAPONS[key]["color"]
+        var color: Color = _weapon_charge_color(key)
         var lit: Color = Color(minf(1.0, color.r * 1.45 + 0.28), minf(1.0, color.g * 1.3 + 0.22), minf(1.0, color.b * 1.15 + 0.18), 1.0)
         var suppressed: bool = is_weapon_suppressed(key)
         var rest: Color = Color(0.86, 0.98, 0.86) if suppressed else Color.WHITE
         view.modulate = rest.lerp(lit, t)
-        view.scale = view.get_meta("base_scale") * (1.0 + 0.10 * t)
+        view.scale = view.get_meta("base_scale") * (1.0 + 0.10 * t + charge_scale)
 
 func draw_chest(point: Vector2, age: float) -> void:
     var bob: float = sin(elapsed * 3.4 + point.x) * 2.0
@@ -2727,7 +3025,7 @@ func launch_chain(key: String, target: Vector2) -> void:
         runtime["chain_direction"] = Vector2.RIGHT
     runtime["chain_distance"] = 0.0
     runtime["chain_hit_ids"] = []
-    runtime["chain_damage"] = Catalog.WEAPONS[key]["damage"] * (1.0 + (weapon_level(key) - 1) * 0.35) + 1.6 * (1.0 + (weapon_level("powder") - 1) * 0.25)
+    runtime["chain_damage"] = Catalog.WEAPONS[key]["damage"] * Evolution.damage_multiplier(key, weapon_level(key)) + 1.6 * Evolution.damage_multiplier("powder", weapon_level("powder"))
     weapon_views[key].position = runtime["chain_position"]
     effects.burst(muzzle, Color("#d5b47c"), 12)
     audio.play("chain_out", -1.0)
@@ -2769,7 +3067,8 @@ func update_chain_weapon(item: Dictionary, delta: float) -> void:
             var chain_damage: float = runtime["chain_damage"] * (0.6 if returning else 1.0)
             hurt_enemy(enemy, chain_damage, key, true, (point - previous).normalized())
             apply_weapon_link_hit(enemy["position"], key, str(enemy.get("id", "")), chain_damage)
-            effects.burst(point, Color("#e2ceb0"), 17)
+            if not _host_is_enchanted(key):
+                effects.burst(point, Color("#e2ceb0"), 17)
             hit_target = true
     if not returning and (hit_target or runtime["chain_distance"] >= chain_range):
         runtime["chain_state"] = "back"
@@ -2833,85 +3132,152 @@ func fire_projectile(point: Vector2, direction: Vector2, key: String, damage: fl
     var vfx_tier: int = projectile_vfx_tier(key, enchanted)
     var fire_tier: int = projectile_fire_tier(key)
     var thunder_tier: int = projectile_thunder_tier(key)
-    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"], "homing": homing, "vfx_tier": vfx_tier, "fire_tier": fire_tier, "thunder_tier": thunder_tier, "fire_enchanted": fire_tier > 0 or Rules.host_is_fire_enchanted(active_links, key), "thunder_enchanted": thunder_tier > 0 or Rules.host_is_thunder_enchanted(active_links, key)})
+    var is_fire_ench: bool = fire_tier > 0 or Rules.host_is_fire_enchanted(active_links, key)
+    var is_thunder_ench: bool = thunder_tier > 0 or Rules.host_is_thunder_enchanted(active_links, key)
+    var is_thunder_red: bool = false
+    if is_thunder_ench:
+        if not from_combo:
+            is_thunder_red = _consume_thunder_red(key)
+        else:
+            is_thunder_red = rng.randf() < Rules.red_lightning_chance(weapon_level("totem"))
+    projectiles.append({"position": point, "velocity": aim * speed, "damage": damage, "kind": key, "weapon_id": key, "life": attack_range / speed, "radius": (9.0 if key == "powder" else 5.5) + stats["hit_radius"], "from_combo": from_combo, "enchanted": enchanted, "hit_ids": [], "pierce_left": 0 if key == "powder" else stats["pierce"], "bounces_left": 0 if key == "powder" else stats["ricochet"], "homing": homing, "vfx_tier": vfx_tier, "fire_tier": fire_tier, "thunder_tier": thunder_tier, "fire_enchanted": is_fire_ench, "thunder_enchanted": is_thunder_ench, "thunder_red": is_thunder_red})
+    if projectiles.size() > 48:
+        for evict_i in range(projectiles.size() - 1):
+            if str(projectiles[evict_i].get("kind", "")) != "hostile":
+                projectiles.remove_at(evict_i)
+                break
     if not from_combo and weapon_level(key)>=5:
         if key=="sling": projectiles.back().bounces_left+=1
         if key=="staff": projectiles.back().pierce_left+=1
-    effects.muzzle(point,aim,key,enchanted,vfx_tier,fire_tier,thunder_tier)
+    effects.muzzle(point,aim,key,enchanted,vfx_tier,fire_tier,thunder_tier,is_fire_ench,is_thunder_ench,is_thunder_red)
+
+func _find_nearest_unhit_target(origin: Vector2, max_range: float, targets: Array, hit_ids: Array) -> Dictionary:
+    var max_sq: float = max_range * max_range
+    var best_tier: int = -1
+    var best_elite: bool = false
+    var best_sq: float = INF
+    var best: Dictionary = {}
+    var has_hits: bool = not hit_ids.is_empty()
+    for enemy in targets:
+        if float(enemy.get("hp", 0.0)) <= 0.0:
+            continue
+        if has_hits and hit_ids.has(enemy["id"]):
+            continue
+        var d_sq: float = origin.distance_squared_to(enemy["position"])
+        if d_sq > max_sq:
+            continue
+        var tier: int = 3 if str(enemy.get("kind", "")) == "boss" else (2 if Rules.is_living_monster(enemy) else (1 if Rules.is_egg(enemy) else 0))
+        if tier < best_tier:
+            continue
+        var is_elite: bool = prefer_elite and bool(enemy.get("elite", false))
+        if tier > best_tier or (is_elite and not best_elite) or (is_elite == best_elite and d_sq < best_sq):
+            best_tier = tier
+            best_elite = is_elite
+            best_sq = d_sq
+            best = enemy
+    return best
 
 func update_projectiles(delta: float) -> void:
     var remaining: Array = []
     var targets: Array = combat_targets()
+    var proj_count: int = projectiles.size()
+    var allow_trails: bool = current_vfx_mode() == "full" and enemies.size() <= 40
+    var trail_interval: float = 0.045 if proj_count <= 16 else (0.095 if proj_count <= 32 else 0.16)
     for projectile in projectiles:
-        # Cached once per projectile: the lambda filters below used to call
-        # projectile.get("hit_ids", []) again for every candidate.
         var hit_ids: Array = projectile.get("hit_ids", [])
+        var is_hostile: bool = projectile["kind"] == "hostile"
         var homing: float = float(stats.get("homing", 0.0)) + float(projectile.get("homing", 0.0))
-        if projectile["kind"] != "hostile" and homing > 0.0:
-            var candidates: Array = []
-            for enemy in targets:
-                if not hit_ids.has(enemy["id"]):
-                    candidates.append(enemy)
-            var target: Dictionary = Rules.choose_target(projectile["position"], 220.0, candidates, prefer_elite)
+        if not is_hostile and homing > 0.0:
+            var target: Dictionary = _find_nearest_unhit_target(projectile["position"], 220.0, targets, hit_ids)
             if not target.is_empty():
                 var speed: float = projectile["velocity"].length()
                 var desired: Vector2 = (target["position"] - projectile["position"]).normalized()
                 projectile["velocity"] = projectile["velocity"].normalized().lerp(desired, clampf(delta * homing, 0.0, 1.0)).normalized() * speed
         var previous: Vector2 = projectile["position"]
-        # A distant dinosaur must not make a reachable egg or rock immune.
-        # Keep passing through secondary targets when a living target is reachable.
-        var remaining_reach: float = projectile["velocity"].length() * maxf(0.0, float(projectile["life"])) + float(projectile["radius"])
-        var priority_targets: Array = []
-        for candidate in targets:
-            if hit_ids.has(candidate["id"]):
-                continue
-            var reach: float = remaining_reach + float(candidate.get("radius", 0.0))
-            if previous.distance_squared_to(candidate["position"]) <= reach * reach:
-                priority_targets.append(candidate)
-        projectile["position"] += projectile["velocity"] * delta
-        projectile["life"] -= delta
-        if projectile["kind"] in ["staff", "powder","sling"]:
+        var life_before: float = float(projectile["life"])
+        var next_pos: Vector2 = previous + projectile["velocity"] * delta
+        projectile["position"] = next_pos
+        projectile["life"] = life_before - delta
+        if allow_trails and projectile["kind"] in ["staff", "powder", "sling"]:
             projectile["trail_clock"] = float(projectile.get("trail_clock", 0.0)) - delta
             if projectile["trail_clock"] <= 0.0:
-                effects.flight_trail(previous, projectile["position"], projectile["kind"] == "staff" or projectile.get("enchanted", false),projectile["kind"], int(projectile.get("vfx_tier", 0)))
-                projectile["trail_clock"] = 0.04
+                effects.flight_trail(previous, next_pos, projectile["kind"] == "staff" or projectile.get("enchanted", false), projectile["kind"], int(projectile.get("vfx_tier", 0)), bool(projectile.get("fire_enchanted", false)), int(projectile.get("fire_tier", 0)), bool(projectile.get("thunder_enchanted", false)), int(projectile.get("thunder_tier", 0)), bool(projectile.get("thunder_red", false)))
+                projectile["trail_clock"] = trail_interval
         var consumed: bool = false
-        if projectile["kind"] == "hostile":
-            if Geometry2D.get_closest_point_to_segment(player_position, previous, projectile["position"]).distance_to(player_position) < projectile["radius"] + 19.0:
+        var pradius: float = float(projectile["radius"])
+        if is_hostile:
+            var hr: float = pradius + 19.0
+            if Geometry2D.get_closest_point_to_segment(player_position, previous, next_pos).distance_squared_to(player_position) < hr * hr:
                 hurt_player(projectile["velocity"].normalized(), projectile["damage"], bool(projectile.get("boss", false)))
                 consumed = true
         else:
+            var seg_min_x: float = minf(previous.x, next_pos.x) - pradius
+            var seg_max_x: float = maxf(previous.x, next_pos.x) + pradius
+            var seg_min_y: float = minf(previous.y, next_pos.y) - pradius
+            var seg_max_y: float = maxf(previous.y, next_pos.y) + pradius
+            var priority_checked: bool = false
+            var has_priority_monster: bool = false
+            var has_priority_egg: bool = false
             for enemy in targets:
-                if enemy["hp"] <= 0.0 or hit_ids.has(enemy["id"]):
+                if enemy["hp"] <= 0.0:
                     continue
-                if Rules.should_defer_target(enemy, priority_targets):
+                var epos: Vector2 = enemy["position"]
+                var eradius: float = float(enemy["radius"])
+                if epos.x + eradius < seg_min_x or epos.x - eradius > seg_max_x or epos.y + eradius < seg_min_y or epos.y - eradius > seg_max_y:
                     continue
-                if Geometry2D.get_closest_point_to_segment(enemy["position"], previous, projectile["position"]).distance_to(enemy["position"]) > enemy["radius"] + projectile["radius"]:
+                if not hit_ids.is_empty() and hit_ids.has(enemy["id"]):
                     continue
+                var hit_dist: float = eradius + pradius
+                if Geometry2D.get_closest_point_to_segment(epos, previous, next_pos).distance_squared_to(epos) > hit_dist * hit_dist:
+                    continue
+                var is_egg_target: bool = Rules.is_egg(enemy)
+                var is_stone_target: bool = Rules.is_stone(enemy)
+                if is_egg_target or is_stone_target:
+                    if not priority_checked:
+                        priority_checked = true
+                        var remaining_reach: float = projectile["velocity"].length() * maxf(0.0, life_before) + pradius
+                        for candidate in targets:
+                            if float(candidate.get("hp", 0.0)) <= 0.0:
+                                continue
+                            if not hit_ids.is_empty() and hit_ids.has(candidate["id"]):
+                                continue
+                            var reach: float = remaining_reach + float(candidate.get("radius", 0.0))
+                            if previous.distance_squared_to(candidate["position"]) <= reach * reach:
+                                if Rules.is_living_monster(candidate):
+                                    has_priority_monster = true
+                                    break
+                                elif Rules.is_egg(candidate):
+                                    has_priority_egg = true
+                    if (is_egg_target and has_priority_monster) or (is_stone_target and (has_priority_monster or has_priority_egg)):
+                        continue
                 if projectile["kind"] == "powder":
                     explode_powder(projectile)
                 else:
                     if not projectile.has("hit_ids"):
                         projectile["hit_ids"] = []
-                    projectile["hit_ids"].append(enemy["id"])
-                    hurt_enemy(enemy, projectile["damage"], projectile["weapon_id"], projectile["from_combo"], projectile["velocity"].normalized())
+                        hit_ids = projectile["hit_ids"]
+                    hit_ids.append(enemy["id"])
+                    var proj_force_red: int = (1 if bool(projectile.get("thunder_red", false)) else 0) if bool(projectile.get("thunder_enchanted", false)) else -1
+                    hurt_enemy(enemy, projectile["damage"], projectile["weapon_id"], projectile["from_combo"], projectile["velocity"].normalized(), proj_force_red)
                     if not projectile.get("from_combo", false):
-                        apply_weapon_link_hit(enemy["position"], str(projectile.get("weapon_id", projectile["kind"])), str(enemy.get("id", "")), float(projectile.get("damage", 0.0)))
+                        apply_weapon_link_hit(epos, str(projectile.get("weapon_id", projectile["kind"])), str(enemy.get("id", "")), float(projectile.get("damage", 0.0)), proj_force_red)
                     if projectile["kind"] == "staff":
                         audio.play("magic_hit", -5.0)
-                        effects.burst(enemy["position"], Color("#67effa"), 24, "ring")
                     if int(projectile.get("bounces_left", 0)) > 0:
-                        var candidates: Array = targets.filter(func(other): return not projectile["hit_ids"].has(other["id"]))
-                        var next_target: Dictionary = Rules.choose_target(enemy["position"], 230.0, candidates, prefer_elite)
+                        var next_target: Dictionary = _find_nearest_unhit_target(epos, 230.0, targets, hit_ids)
                         if not next_target.is_empty():
                             projectile["bounces_left"] -= 1
+                            projectile["damage"] = float(projectile["damage"]) * Rules.SECONDARY_HIT_DECAY
                             projectile["velocity"] = (next_target["position"] - projectile["position"]).normalized() * projectile["velocity"].length()
                             projectile["life"] = maxf(projectile["life"], 0.55)
-                            effects.beam(enemy["position"], enemy["position"] + projectile["velocity"].normalized() * 30, Color("#7ecddb"))
+                            if allow_trails and proj_count <= 30:
+                                effects.flight_trail(epos, epos + projectile["velocity"].normalized() * 34.0, projectile["kind"] == "staff" or bool(projectile.get("enchanted", false)), projectile["kind"], int(projectile.get("vfx_tier", 0)), bool(projectile.get("fire_enchanted", false)), int(projectile.get("fire_tier", 0)), bool(projectile.get("thunder_enchanted", false)), int(projectile.get("thunder_tier", 0)), bool(projectile.get("thunder_red", false)))
                             break
                     if int(projectile.get("pierce_left", 0)) > 0:
                         projectile["pierce_left"] -= 1
-                        effects.pierce_cue(enemy["position"], projectile["velocity"].normalized())
+                        projectile["damage"] = float(projectile["damage"]) * Rules.SECONDARY_HIT_DECAY
+                        if allow_trails and proj_count <= 26:
+                            effects.pierce_cue(epos, projectile["velocity"].normalized())
                         continue
                 consumed = true
                 break
@@ -2923,96 +3289,155 @@ func update_projectiles(delta: float) -> void:
 
 
 func _host_is_enchanted(weapon_id: String) -> bool:
-    return Rules.host_is_rune_enchanted(active_links, weapon_id) or Rules.host_is_fire_enchanted(active_links, weapon_id)
+    return Rules.host_is_rune_enchanted(active_links, weapon_id) or Rules.host_is_fire_enchanted(active_links, weapon_id) or Rules.host_is_thunder_enchanted(active_links, weapon_id)
 
-func apply_weapon_link_hit(point: Vector2, weapon_id: String, except_id: String = "", source_damage: float = -1.0) -> void:
+func apply_weapon_link_hit(point: Vector2, weapon_id: String, except_id: String = "", source_damage: float = -1.0, force_red: int = -1) -> void:
     if weapon_id.is_empty():
         return
     var kinds: Array = Rules.host_enchant_kinds(active_links, weapon_id)
     if kinds.has("fire_enchant"):
         _spawn_attachment_fire(point, weapon_id)
     if kinds.has("rune_enchant") or kinds.has("rune"):
-        _apply_rune_burst(point)
+        _apply_rune_burst(point, weapon_id == "hammer")
     if kinds.has("thunder_enchant"):
-        _apply_thunder_jump(point, except_id, source_damage)
+        _apply_thunder_jump(point, except_id, source_damage, 3 if weapon_id == "hammer" else 1, force_red)
 
 func _spawn_attachment_fire(point: Vector2, host_id: String) -> void:
     for field in burning_fields:
         if bool(field.get("from_link", false)) and float(field.get("age", 1.0)) <= 0.04 and Vector2(field.get("position", point)).distance_squared_to(point) <= 36.0:
             return
     var pot_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "firepot")
-    var radius: float = (56.0 if host_id == "powder" or host_id == "hammer" else 38.0) * float(stats.get("area_multiplier", 1.0)) * float(pot_bonus.get("area_multiplier", 1.0))
-    var life: float = (1.35 if host_id == "powder" or host_id == "hammer" else 1.05) * float(pot_bonus.get("life_multiplier", 1.0))
-    var damage: float = 0.55 * (1.0 + (weapon_level("firepot") - 1) * 0.25) * float(pot_bonus.get("damage_multiplier", 1.0)) * Rules.BURN_TICK_SCALE
-    burning_fields.append({"position": point, "age": 0.0, "life": life, "tick": 0.18, "radius": radius, "damage": damage, "weapon_id": "firepot", "from_link": true})
-    if burning_fields.size() > 12:
+    var fire_lvl: int = weapon_level("firepot")
+    var is_heavy: bool = host_id in ["hammer", "powder", "firepot"]
+    var is_crater: bool = host_id == "hammer"
+    var base_r: float = 80.0 if host_id == "hammer" else (58.0 if host_id == "powder" else 24.0)
+    var base_life: float = 1.45 if host_id == "hammer" else (0.95 if host_id == "powder" else 0.58)
+    var base_dmg_mult: float = 1.35 if host_id == "hammer" else 1.0
+    var radius: float = minf(base_r * float(stats.get("area_multiplier", 1.0)) * float(pot_bonus.get("area_multiplier", 1.0)), 138.0)
+    var life: float = base_life * float(pot_bonus.get("life_multiplier", 1.0))
+    var damage: float = 1.65 * base_dmg_mult * Evolution.damage_multiplier("firepot", fire_lvl) * float(pot_bonus.get("damage_multiplier", 1.0)) * Rules.BURN_TICK_SCALE
+    burning_fields.append({"position": point, "age": 0.0, "life": life, "tick": 0.35, "radius": radius, "damage": damage, "weapon_id": "firepot", "from_link": true, "residual": "fire", "heavy": is_heavy, "crater": is_crater, "green_fire": Evolution.tier(fire_lvl) >= 2})
+    if burning_fields.size() > 6:
         burning_fields.pop_front()
-    effects.burst(point, Color("#ffad40"), radius * 0.7, "blast")
+    if is_heavy:
+        effects.burst(point, BattleVisuals.fire_tint(Evolution.tier(fire_lvl)), radius * 0.62, "fire_blast")
+    else:
+        effects.burst(point, BattleVisuals.fire_tint(Evolution.tier(fire_lvl)), 26.0, "fire_splash")
 
-func _apply_rune_burst(point: Vector2) -> void:
+func _apply_rune_burst(point: Vector2, heavy: bool = false) -> void:
     var staff_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "staff")
-    var damage: float = 1.6 * (1.0 + (weapon_level("staff") - 1) * 0.25) * float(staff_bonus.get("damage_multiplier", 1.0))
-    var radius: float = 34.0 * float(stats.get("area_multiplier", 1.0))
-    var burst_color: Color = BattleVisuals.staff_tint(Evolution.tier(weapon_level("staff")))
-    damage_area(point, radius, damage, "staff", true, burst_color, "rune_blast")
-    audio.play("magic_hit", -6.0)
+    var staff_lvl: int = weapon_level("staff")
+    var purple_mult: float = 1.25 if Evolution.tier(staff_lvl) >= 2 else 1.0
+    var damage: float = 2.2 * (1.6 if heavy else 1.0) * Evolution.damage_multiplier("staff", staff_lvl) * purple_mult * float(staff_bonus.get("damage_multiplier", 1.0))
+    var radius: float = (72.0 if heavy else 34.0) * float(stats.get("area_multiplier", 1.0))
+    var burst_color: Color = BattleVisuals.staff_tint(Evolution.tier(staff_lvl))
+    var burst_kind: String = "rune_blast" if heavy else "rune_spark"
+    damage_area(point, radius, damage, "staff", true, burst_color, burst_kind)
+    if heavy:
+        var rune_damage: float = 1.85 * Evolution.damage_multiplier("staff", staff_lvl) * float(staff_bonus.get("damage_multiplier", 1.0)) * Rules.BURN_TICK_SCALE
+        burning_fields.append({"position": point, "age": 0.0, "life": 1.35, "tick": 0.35, "radius": minf(radius * 0.96, 138.0), "damage": rune_damage, "weapon_id": "staff", "from_link": true, "residual": "rune", "heavy": true, "crater": true})
+        if burning_fields.size() > 6:
+            burning_fields.pop_front()
 
-func _apply_thunder_jump(point: Vector2, except_id: String = "", source_damage: float = -1.0) -> void:
-    var others: Array = combat_targets().filter(func(enemy): return Rules.is_living_monster(enemy) and str(enemy.get("id", "")) != except_id)
-    var neighbor: Dictionary = Rules.choose_target(point, 130.0, others, false)
-    if neighbor.is_empty():
-        return
+func _apply_thunder_jump(point: Vector2, except_id: String = "", source_damage: float = -1.0, max_bolts: int = 1, force_red: int = -1) -> void:
+    var used_ids: Array = []
+    if not except_id.is_empty():
+        used_ids.append(except_id)
+    var totem_lvl: int = weapon_level("totem")
     var totem_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "totem")
-    var damage: float = source_damage * 0.45 if source_damage > 0.0 else Catalog.WEAPONS["totem"]["damage"] * (1.0 + float(weapon_level("totem") - 1) * 0.35) * 0.45
-    damage *= float(totem_bonus.get("damage_multiplier", 1.0))
-    effects.beam(point, neighbor["position"], Color("#f3d89b"))
-    hurt_enemy(neighbor, damage, "totem", true, (neighbor["position"] - point).normalized())
-    if has_link_kind("thunder_crystal") and armory.states.has("crystal"):
-        for mine in armory.states.crystal.mines:
-            if Vector2(mine.position).distance_to(neighbor.position) <= 120.0:
-                mine["charged"] = true
+    var is_red: bool = (force_red == 1) if force_red >= 0 else (rng.randf() < Rules.red_lightning_chance(totem_lvl))
+    var red_mult: float = Rules.red_lightning_multiplier(totem_lvl) if is_red else 1.0
+    var damage: float = source_damage * 0.58 if source_damage > 0.0 else Catalog.WEAPONS["totem"]["damage"] * Evolution.damage_multiplier("totem", totem_lvl) * 0.58
+    damage *= float(totem_bonus.get("damage_multiplier", 1.0)) * red_mult
+    var reach: float = 190.0 if max_bolts > 1 else 130.0
+    var reach_sq: float = reach * reach
+    for _bolt in range(max_bolts):
+        var neighbor: Dictionary = {}
+        var best_is_boss: bool = false
+        var best_sq: float = INF
+        for enemy in enemies:
+            if not Rules.is_living_monster(enemy):
+                continue
+            var eid: String = str(enemy.get("id", ""))
+            if used_ids.has(eid):
+                continue
+            var d_sq: float = point.distance_squared_to(enemy["position"])
+            if d_sq <= reach_sq:
+                var is_boss: bool = str(enemy.get("kind", "")) == "boss"
+                if (is_boss and not best_is_boss) or (is_boss == best_is_boss and d_sq < best_sq):
+                    best_is_boss = is_boss
+                    best_sq = d_sq
+                    neighbor = enemy
+        if neighbor.is_empty():
+            break
+        used_ids.append(str(neighbor.get("id", "")))
+        effects.beam(point, neighbor["position"], Color("#ff3a2e") if is_red else Color("#eef6ff"))
+        if elapsed >= float(neighbor.get("_vfx_cd", -1.0)):
+            neighbor["_vfx_cd"] = elapsed + 0.16
+            effects.shock_wrap(neighbor["position"], float(neighbor.get("radius", 24.0)) + 2.0, Color("#ff3a2e") if is_red else Color("#eef6ff"), is_red)
+        hurt_enemy(neighbor, damage, "totem", true, (neighbor["position"] - point).normalized(), 1 if is_red else 0)
+        if has_link_kind("thunder_crystal") and armory.states.has("crystal"):
+            for mine in armory.states.crystal.mines:
+                if Vector2(mine.position).distance_squared_to(neighbor["position"]) <= 14400.0:
+                    mine["charged"] = true
 
 func explode_powder(projectile: Dictionary) -> void:
     var enchanted: bool = bool(projectile.get("enchanted", false)) and Rules.host_is_rune_enchanted(active_links, "powder")
     var fire_cannon: bool = Rules.host_is_fire_enchanted(active_links, "powder") or bool(projectile.get("fire_enchanted", false))
+    var thunder_cannon: bool = Rules.host_is_thunder_enchanted(active_links, "powder") or bool(projectile.get("thunder_enchanted", false))
+    var thunder_is_red: bool = thunder_cannon and bool(projectile.get("thunder_red", false))
     var point: Vector2 = projectile["position"]
-    var burst_kind: String = "rune_blast" if enchanted else ("blast" if fire_cannon else "blast")
-    var burst_color: Color = BattleVisuals.staff_tint(Evolution.tier(weapon_level("staff"))) if enchanted else Color("#ffad40")
-    damage_area(point, (85.0 if enchanted else 63.0) * stats["area_multiplier"], projectile["damage"] * (1.2 if enchanted else 1.0), "powder", true, burst_color, burst_kind)
+    var staff_lvl: int = weapon_level("staff")
+    var fire_lvl: int = weapon_level("firepot")
+    var burst_kind: String = "rune_blast" if enchanted else ("fire_blast" if fire_cannon else ("thunder_blast" if thunder_cannon else "blast"))
+    var burst_color: Color = BattleVisuals.staff_tint(Evolution.tier(staff_lvl)) if enchanted else (BattleVisuals.fire_tint(Evolution.tier(fire_lvl)) if fire_cannon else ((Color("#ff3a2e") if thunder_is_red else Color("#eef6ff")) if thunder_cannon else Color("#ffad40")))
+    var dmg_mult: float = (1.30 if Evolution.tier(staff_lvl) >= 2 else 1.15) if enchanted else (Rules.red_lightning_multiplier(weapon_level("totem")) if thunder_is_red else 1.0)
+    damage_area(point, (85.0 if enchanted else 63.0) * stats["area_multiplier"], projectile["damage"] * dmg_mult, "powder", true, burst_color, burst_kind, 1 if thunder_is_red else (-1 if not thunder_cannon else 0))
     audio.play("blast", 0.0, 0.88)
     var stage: int=Evolution.tier(weapon_level("powder"))
-    if (stage>=1 and not enchanted and not fire_cannon) or fire_cannon:
-        var field_damage: float = projectile.damage*0.16*Rules.BURN_TICK_SCALE
+    if (stage>=1 and not enchanted and not fire_cannon and not thunder_cannon) or fire_cannon:
+        var field_damage: float = projectile.damage*0.36*Rules.BURN_TICK_SCALE
         var field_radius: float = 56.0*stats.area_multiplier
-        var field_life: float = 1.4
+        var field_life: float = 0.95
         var residual: String = "fire" if fire_cannon else "smoke"
         if fire_cannon:
             var pot_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "firepot")
             field_damage *= float(pot_bonus.get("damage_multiplier", 1.0))
             field_radius *= float(pot_bonus.get("area_multiplier", 1.0))
             field_life *= float(pot_bonus.get("life_multiplier", 1.0))
-        burning_fields.append({"position":point,"age":0.0,"life":field_life,"tick":0.18,"radius":field_radius,"damage":field_damage,"weapon_id":"powder" if not fire_cannon else "firepot","from_link":fire_cannon,"residual":residual})
-    elif not enchanted and not fire_cannon:
-        burning_fields.append({"position":point,"age":0.0,"life":0.55,"tick":1.0,"radius":42.0*stats.area_multiplier,"damage":0.0,"weapon_id":"powder","from_link":false,"residual":"smoke"})
-        effects.puff(point, Color("#cbb89a"), 28.0)
-        effects.puff(point + Vector2(8, -4), Color("#d9c6a3"), 18.0, 1)
+        burning_fields.append({"position":point,"age":0.0,"life":field_life,"tick":0.35,"radius":field_radius,"damage":field_damage,"weapon_id":"powder" if not fire_cannon else "firepot","from_link":fire_cannon,"residual":residual,"green_fire":fire_cannon and Evolution.tier(fire_lvl) >= 2})
+    elif not enchanted and not fire_cannon and not thunder_cannon:
+        burning_fields.append({"position":point,"age":0.0,"life":0.78,"tick":1.0,"radius":48.0*stats.area_multiplier,"damage":0.0,"weapon_id":"powder","from_link":false,"residual":"smoke"})
+        effects.puff(point + Vector2(-10, -4), Color("#c2b39c"), 30.0, 0)
+        effects.puff(point + Vector2(12, -8), Color("#d6c7ad"), 26.0, 1)
+        effects.puff(point + Vector2(0, -14), Color("#e6dbc5"), 22.0, 2)
     if stage>=2:
         for shard in range(4):
-            fire_projectile(point,Vector2.from_angle(TAU*shard/4.0),"sling",projectile.damage*0.25,190.0,true)
-            projectiles.back().weapon_id="powder"
-    if burning_fields.size()>12: burning_fields.pop_front()
+            fire_projectile(point,Vector2.from_angle(TAU*shard/4.0),"sling",projectile.damage*0.25,190.0,true,enchanted)
+            var sp: Dictionary = projectiles.back()
+            sp["weapon_id"] = "powder"
+            if fire_cannon:
+                sp["fire_enchanted"] = true
+                sp["fire_tier"] = Evolution.tier(fire_lvl)
+            if thunder_cannon:
+                sp["thunder_enchanted"] = true
+                sp["thunder_tier"] = Evolution.tier(weapon_level("totem"))
+                sp["thunder_red"] = thunder_is_red
+    if burning_fields.size() > 6:
+        burning_fields.pop_front()
     if enchanted:
         var staff_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "staff")
-        var rune_damage: float = 0.7 * (1.0 + (weapon_level("staff") - 1) * 0.25) * float(staff_bonus.get("damage_multiplier", 1.0)) * Rules.BURN_TICK_SCALE
-        burning_fields.append({"position": point, "age": 0.0, "life": 1.1, "tick": 0.18, "radius": 61.0 * stats["area_multiplier"], "damage": rune_damage, "weapon_id": "staff", "from_link": true, "residual": "rune"})
-        if burning_fields.size() > 12:
+        var rune_damage: float = 1.75 * Evolution.damage_multiplier("staff", staff_lvl) * float(staff_bonus.get("damage_multiplier", 1.0)) * Rules.BURN_TICK_SCALE
+        burning_fields.append({"position": point, "age": 0.0, "life": 1.50, "tick": 0.35, "radius": minf(70.0 * stats["area_multiplier"], 120.0), "damage": rune_damage, "weapon_id": "staff", "from_link": true, "residual": "rune", "heavy": true, "crater": false})
+        if burning_fields.size() > 6:
             burning_fields.pop_front()
-        effects.burst(point, BattleVisuals.staff_tint(Evolution.tier(weapon_level("staff"))), 45.0, "ring")
         audio.play("magic_hit", -5.0)
-    if fire_cannon:
-        effects.burst(point, Color("#ffad40"), 48.0, "blast")
-    if Rules.host_is_thunder_enchanted(active_links, "powder"):
-        _apply_thunder_jump(point, "", float(projectile.get("damage", 0.0)))
+    if thunder_cannon:
+        trigger_lava_lightning_splash(point, 1.0)
+        burning_fields.append({"position": point, "age": 0.0, "life": 1.65, "tick": 1.0, "radius": minf(68.0 * stats["area_multiplier"], 112.0), "damage": 0.0, "weapon_id": "totem", "from_link": true, "residual": "thunder_mark", "red": thunder_is_red})
+        if burning_fields.size() > 6:
+            burning_fields.pop_front()
+        _apply_thunder_jump(point, "", float(projectile.get("damage", 0.0)), 1, 1 if thunder_is_red else 0)
 
 func update_burning_fields(delta: float) -> void:
     var remaining: Array = []
@@ -3020,10 +3445,17 @@ func update_burning_fields(delta: float) -> void:
         field["age"] += delta
         field["tick"] -= delta
         if field["tick"] <= 0.0:
-            field["tick"] = 0.22
-            for enemy in combat_targets():
-                if enemy["hp"] > 0.0 and enemy["position"].distance_to(field["position"]) <= field["radius"] + enemy["radius"]:
-                    hurt_enemy(enemy, field["damage"], str(field.get("weapon_id","staff")), true, Vector2.ZERO)
+            field["tick"] = 0.42
+            var tick_dmg: float = float(field.get("damage", 0.0))
+            if tick_dmg > 0.0:
+                var fpos: Vector2 = field["position"]
+                var frad: float = float(field["radius"])
+                var fwid: String = str(field.get("weapon_id", "staff"))
+                for enemy in combat_targets():
+                    if float(enemy["hp"]) > 0.0:
+                        var reach: float = frad + float(enemy["radius"])
+                        if Vector2(enemy["position"]).distance_squared_to(fpos) <= reach * reach:
+                            hurt_enemy(enemy, tick_dmg, fwid, true, Vector2.ZERO)
         if field["age"] < field["life"]:
             remaining.append(field)
     burning_fields = remaining
@@ -3031,38 +3463,47 @@ func update_burning_fields(delta: float) -> void:
 func combat_targets() -> Array:
     if _simulating and _combat_targets_ready:
         return _combat_targets_cache
-    _combat_targets_cache = enemies + map_view.stone_targets(visible_world_rect().grow(80))
+    var cur_biome: String = map_view.biome if map_view != null else ""
+    if _stones_dirty or _cached_stone_biome != cur_biome or player_position.distance_squared_to(_cached_stone_pos) > 1024.0:
+        _cached_stone_targets = map_view.stone_targets(visible_world_rect().grow(80))
+        _cached_stone_pos = player_position
+        _cached_stone_biome = cur_biome
+        _stones_dirty = false
+    _combat_targets_cache = enemies + _cached_stone_targets
     _combat_targets_ready = _simulating
     return _combat_targets_cache
 
 const PICKUP_TOP_HUD_PAD: float = 150.0
 
 func pickup_visible_point(point: Vector2) -> Vector2:
-    var area: Rect2 = visible_world_rect()
-    var floor_y: float = area.position.y + PICKUP_TOP_HUD_PAD
-    if point.y < floor_y and point.y >= area.position.y - 12.0 and point.x >= area.position.x - 8.0 and point.x <= area.end.x + 8.0:
-        point.y = floor_y
     return point
 
-func reveal_recent_pickups(start_index: int) -> void:
-    for index in range(maxi(0, start_index), pickups.size()):
-        pickups[index]["position"] = pickup_visible_point(pickups[index]["position"])
+func reveal_recent_pickups(_start_index: int) -> void:
+    pass
 
-func spawn_loot(reward: Dictionary,at: Vector2) -> void:
-    var start_index: int = pickups.size()
+func spawn_loot(reward: Dictionary, at: Vector2) -> void:
     LootDrops.append_reward(pickups, reward, at)
-    reveal_recent_pickups(start_index)
+
+func trigger_lava_lightning_splash(strike_pt: Vector2, scale: float = 1.0) -> void:
+    if map_view == null or effects == null or not map_view.is_in_lava(strike_pt, 12.0):
+        return
+    effects.burst(strike_pt, Color("#ff6a22"), 90.0 * scale, "fire_blast")
+    effects.burst(strike_pt + Vector2(0.0, -10.0), Color("#ff9836"), 58.0 * scale, "fire_splash")
+    effects.puff(strike_pt, Color("#ff7e30"), 26.0 * scale, 0)
+    if audio != null:
+        audio.play("powder", -2.0, 0.78)
 
 func hurt_stone(target: Dictionary,damage: float) -> void:
     var result: Dictionary=map_view.damage_stone(target,damage*stats.damage_multiplier)
     if not result.hit: return
+    _stones_dirty = true
     effects.puff(target.position,Color("#bda78a"),20 if result.destroyed else 12,0)
     audio.play("stone_hit",-8.0,1.2)
     if result.destroyed:
         effects.burst(target.position,Color("#e3c995"),28,"hit")
         spawn_loot(LootRules.rock_reward(rng),target.position)
 
-func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo: bool, direction: Vector2) -> void:
+func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo: bool, direction: Vector2, force_red: int = -1) -> void:
     if enemy.get("stone",false):
         hurt_stone(enemy,damage)
         return
@@ -3077,27 +3518,55 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
     if not unavoidable and evade_chance > 0.0 and rng.randf() < evade_chance:
         effects.floating_text(enemy["position"], "敌闪避", Color("#f4a8d3"), 23)
         return
-    var critical: bool = not neutral and rng.randf() < stats["crit_chance"]
+    var critical: bool = not neutral and (force_red == 1 or rng.randf() < stats["crit_chance"])
     var amount: float = damage if neutral else damage * stats["damage_multiplier"] * (stats["crit_multiplier"] if critical else 1.0)
-    var slammed: bool = not neutral and float(stats.get("close_damage_bonus", 0.0)) > 0.0 and player_position.distance_to(enemy["position"]) <= float(stats.get("close_damage_range", 140.0))
+    var close_r: float = float(stats.get("close_damage_range", 140.0))
+    var slammed: bool = not neutral and float(stats.get("close_damage_bonus", 0.0)) > 0.0 and player_position.distance_squared_to(enemy["position"]) <= close_r * close_r
     if slammed:
         amount *= 1.0 + float(stats["close_damage_bonus"])
     if not neutral:
         amount *= Progression.outgoing_damage_scale(wave)
-    enemy["hp"] = maxf(0.0, enemy["hp"] - amount)
-    var push: float = 180.0 if weapon_id == "club" else (145.0 if weapon_id == "axe" else (85.0 if weapon_id == "blade" else 36.0))
-    if neutral or weapon_id == "staff":
+    var min_enemy_hp: float = 1.0 if (training_mode and training_enemy_immortal and not smashed_egg) else 0.0
+    enemy["hp"] = maxf(min_enemy_hp, enemy["hp"] - amount)
+    var is_thunder_hammer_hit: bool = weapon_id == "hammer" and Rules.host_is_thunder_enchanted(active_links, "hammer")
+    var push: float = 95.0 if weapon_id in ["hammer", "club"] else (65.0 if weapon_id == "axe" else (30.0 if weapon_id == "blade" else 16.0))
+    if neutral or weapon_id == "staff" or is_thunder_hammer_hit or str(enemy.get("kind", "")) == "boss":
         push = 0.0
-    enemy["knock"] += direction * push * (0.12 if enemy["kind"] == "boss" else 1.0)
+    elif bool(enemy.get("cc_once", false)):
+        push = 0.0
+    elif str(enemy.get("kind", "")) in ["tank", "charger", "cindertusk", "magmashell", "stonehorn"] or bool(enemy.get("elite", false)):
+        push *= 0.20
+    if push > 0.0:
+        enemy["knock"] += direction * push
+        enemy["cc_once"] = true
     if not neutral:
         if Rules.host_is_thunder_enchanted(active_links, weapon_id) or (weapon_id == "totem" and weapon_level("totem") >= 3):
-            try_apply_ward(enemy, "thunder", enemy["position"] - direction)
+            if rng.randf() < 0.35:
+                try_apply_ward(enemy, "thunder", enemy["position"] - direction)
     var feedback: bool = not neutral or elapsed >= float(enemy.get("lava_feedback_next",-INF)) or enemy["hp"]<=0
     if neutral: enemy["lava_feedback_sum"] = float(enemy.get("lava_feedback_sum",0.0)) + amount
     if feedback:
         enemy["view"].hit()
-        var impact_tier: int = Evolution.tier(weapon_level("staff" if weapon_id in ["staff", "drone"] else weapon_id))
-        effects.impact(enemy["position"], direction, weapon_id, impact_tier)
+        var allow_hit_vfx: bool = elapsed >= float(enemy.get("_vfx_cd", -1.0))
+        if allow_hit_vfx:
+            enemy["_vfx_cd"] = elapsed + (0.24 if enemies.size() > 26 else 0.18)
+            var ench_kinds: Array = [] if neutral else Rules.host_enchant_kinds(active_links, weapon_id)
+            if ench_kinds.is_empty():
+                if not (from_combo and weapon_id == "staff"):
+                    var impact_tier: int = Evolution.tier(weapon_level("staff" if weapon_id in ["staff", "drone"] else weapon_id))
+                    effects.impact(enemy["position"], direction, weapon_id, impact_tier)
+            else:
+                # Enchanted weapons replace (do not stack over) the original unenchanted weapon hit splash.
+                if ench_kinds.has("rune_enchant") or ench_kinds.has("rune"):
+                    if from_combo and weapon_id != "powder":
+                        effects.burst(enemy["position"], BattleVisuals.staff_tint(Evolution.tier(weapon_level("staff"))), 16.0, "rune_spark")
+                elif ench_kinds.has("fire_enchant"):
+                    if weapon_id not in ["powder", "hammer"]:
+                        effects.burst(enemy["position"], BattleVisuals.fire_tint(Evolution.tier(weapon_level("firepot"))), 17.0, "fire_splash")
+                elif ench_kinds.has("thunder_enchant"):
+                    if weapon_id != "powder":
+                        var is_red_hit: bool = (force_red == 1) if force_red >= 0 else (rng.randf() < Rules.red_lightning_chance(weapon_level("totem")))
+                        effects.shock_wrap(enemy["position"], float(enemy.get("radius", 24.0)), Color("#ff3a2e") if is_red_hit else BattleVisuals.thunder_tint(Evolution.tier(weapon_level("totem"))), is_red_hit)
         if slammed:
             effects.slam_cue(enemy["position"], direction)
         if bool(settings.get("damage_numbers", true)):
@@ -3107,15 +3576,13 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
             enemy["lava_feedback_next"] = elapsed+0.35
     enemy["view"].health_fraction = enemy["hp"] / enemy["max_hp"]
     if weapon_id == "club":
-        impact_strength = maxf(impact_strength, 4.0)
         audio.play("wood_hit", 0.0, 0.9)
     elif weapon_id == "axe":
-        impact_strength = maxf(impact_strength, 4.6)
         audio.play("stone_hit", 0.0, 0.96)
     elif weapon_id == "hammer":
-        impact_strength = maxf(impact_strength, 6.2)
+        audio.play("stone_hit", 1.0, 0.72)
     elif weapon_id == "blade":
-        impact_strength = maxf(impact_strength, 2.0)
+        audio.play("swing", -2.5, 1.35)
     elif weapon_id == "spear":
         audio.play("stone_hit", -1.0, 1.18)
     elif weapon_id == "sling":
@@ -3123,7 +3590,7 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
     elif weapon_id == "boomerang":
         audio.play("swing", -3.0, 1.15)
     if critical:
-        impact_strength = maxf(impact_strength, 3.2)
+        audio.play("magic_hit", -5.0, 1.42)
     if enemy["hp"] <= 0.0:
         kills += 1
         var boss: bool = enemy["kind"] == "boss"
@@ -3152,23 +3619,55 @@ func evolution_melee_hit(enemy: Dictionary,damage: float,key: String,direction: 
     var runtime: Dictionary=weapon_runtime[key]
     runtime["evolution_hits"]=int(runtime.get("evolution_hits",0))+1
     var count: int=runtime.evolution_hits
+    var evo_enchant: String = ""
+    var evo_enchant_tier: int = 0
+    var evo_color: Color = Color("#e5c28a") if key == "club" else (Color("#e5b87d") if key == "axe" else Color("#e4d4ad"))
+    if Rules.host_is_fire_enchanted(active_links, key):
+        evo_enchant = "fire"
+        evo_enchant_tier = Evolution.tier(weapon_level("firepot"))
+        evo_color = BattleVisuals.fire_tint(evo_enchant_tier)
+    elif Rules.host_is_rune_enchanted(active_links, key):
+        evo_enchant = "rune"
+        evo_enchant_tier = Evolution.tier(weapon_level("staff"))
+        evo_color = BattleVisuals.staff_tint(evo_enchant_tier)
+    elif Rules.host_is_thunder_enchanted(active_links, key):
+        evo_enchant = "thunder"
+        evo_enchant_tier = Evolution.tier(weapon_level("totem"))
+        evo_color = BattleVisuals.thunder_tint(evo_enchant_tier)
     if key=="club" and count%(2 if stage>=2 else 3)==0:
-        damage_area(enemy.position,84.0 if stage>=2 else 64.0,damage*0.45,key,true,Color("#e5c28a"),"quake")
+        damage_area(enemy.position,84.0 if stage>=2 else 64.0,damage*0.45,key,true,evo_color,"ring")
     elif key=="axe" and (enemy.hp<=0 or (stage>=2 and count%3==0)):
-        damage_area(enemy.position,96.0 if stage>=2 else 70.0,damage*0.40,key,true,Color("#e5b87d"),"cleave")
+        damage_area(enemy.position,96.0 if stage>=2 else 70.0,damage*0.40,key,true,evo_color,"ring" if not evo_enchant.is_empty() else "cleave")
     elif key=="blade" and count%(3 if stage>=2 else 4)==0:
         if stage>=2:
-            damage_area(enemy.position,60.0,damage*0.35,key,true,Color("#e4d4ad"),"cleave")
+            damage_area(enemy.position,60.0,damage*0.35,key,true,evo_color,"ring" if not evo_enchant.is_empty() else "cleave")
         elif enemy.hp>0:
             hurt_enemy(enemy,damage*0.35,key,true,direction)
-        effects.swing_trail(enemy.position-Vector2(18,18),enemy.position+Vector2(18,18),enemy.position,key)
+        effects.swing_trail(enemy.position-Vector2(18,18),enemy.position+Vector2(18,18),enemy.position,key,stage,evo_enchant,evo_enchant_tier)
 
-func damage_area(point: Vector2, radius: float, damage: float, weapon_id: String, from_combo: bool, color: Color, burst_kind: String = "blast") -> void:
-    effects.burst(point, color, radius, burst_kind)
-    impact_strength = maxf(impact_strength, 6.0 if weapon_id == "hammer" else 5.2)
+func damage_area(point: Vector2, radius: float, damage: float, weapon_id: String, from_combo: bool, color: Color, burst_kind: String = "blast", force_red: int = -1) -> void:
+    if not burst_kind.is_empty():
+        effects.burst(point, color, radius, burst_kind)
+    if audio != null:
+        if burst_kind == "rune_blast":
+            audio.play("magic_hit", -3.0, 0.95)
+        elif burst_kind == "rune_spark":
+            audio.play("magic_hit", -7.0, 1.18)
+        elif burst_kind == "thunder_blast":
+            audio.play("magic_hit", -2.0, 1.28)
+        elif burst_kind == "fire_blast":
+            audio.play("blast", -2.5, 1.02)
+        elif weapon_id == "hammer" or burst_kind == "quake":
+            audio.play("blast", -2.0, 0.76)
+        elif burst_kind == "cleave":
+            audio.play("stone_hit", -1.0, 0.88)
+        else:
+            audio.play("blast", -2.0, 0.95)
     for enemy in combat_targets():
-        if enemy["hp"] > 0.0 and enemy["position"].distance_to(point) < radius + enemy["radius"]:
-            hurt_enemy(enemy, damage, weapon_id, from_combo, (enemy["position"] - point).normalized())
+        if enemy["hp"] > 0.0:
+            var reach: float = radius + float(enemy["radius"])
+            if enemy["position"].distance_squared_to(point) < reach * reach:
+                hurt_enemy(enemy, damage, weapon_id, from_combo, (enemy["position"] - point).normalized(), force_red)
 
 
 
@@ -3178,6 +3677,8 @@ func update_terrain_damage(delta: float, player_exposure: float = -1.0) -> void:
     if delta <= 0.0 or not running or paused or shop_open or upgrade_pending or stats_open or player_frozen or link_notice_open or link_pack_open or wave_closing or departure_left > 0.0 or animation_demo:
         return
     var exposure: float = (delta if invulnerable <= 0.0 else 0.0) if player_exposure < 0.0 else player_exposure
+    if training_mode and training_godmode:
+        exposure = 0.0
     if exposure > 0.0 and not demo and player_hp > 0.0:
         var amount: float = map_view.lava_damage_at(player_position) * exposure
         if amount > 0.0:
@@ -3194,7 +3695,7 @@ func update_terrain_damage(delta: float, player_exposure: float = -1.0) -> void:
             hurt_enemy(enemy,amount,"terrain_lava",false,Vector2.ZERO)
 
 func hurt_player(direction: Vector2, damage: float = 1.0, from_boss: bool = false) -> void:
-    if not running or invulnerable > 0.0 or demo or animation_demo:
+    if not running or invulnerable > 0.0 or demo or animation_demo or (training_mode and training_godmode):
         return
     if rng.randf() < stats["dodge"]:
         invulnerable = 0.25
@@ -3204,7 +3705,7 @@ func hurt_player(direction: Vector2, damage: float = 1.0, from_boss: bool = fals
     # Cap every combat hit (contact, projectiles, quakes, elites, Boss).
     # Terrain DoT stays on update_terrain_damage and is intentionally uncapped.
     amount = minf(amount, Progression.HIT_CAP_RATIO * float(stats["max_hp"]))
-    player_hp = maxf(0.0, player_hp - amount)
+    player_hp = maxf(1.0 if (training_mode and training_godmode) else 0.0, player_hp - amount)
     invulnerable = 0.7
     hero.hurt()
     hurt_flash = maxf(hurt_flash, 0.42)
@@ -3242,6 +3743,13 @@ func animate_showcase(delta: float) -> void:
             effects.burst(player_position + Vector2(145, 0), Color("#d6b672"), 18.0)
     player_position = map_view.move_body(player_position, player_position + velocity * delta, 18.0)
     hero.position = player_position
+    if world_camera != null:
+        world_camera.position = player_position
+        world_camera.force_update_scroll()
+    if map_view != null:
+        map_view.set_view(player_position, wave)
+    effects.hero_anchor = player_position
+    effects._has_hero_anchor = true
     var previous_step: int = int(hero.phase / PI)
     hero.animate(velocity, velocity.length() * delta, delta)
     audio.advance(delta)
@@ -3263,13 +3771,21 @@ func draw_grass(at: Vector2, size: float) -> void:
 func _draw() -> void:
     if not running and not animation_demo:
         return
+    var has_fields: bool = not burning_fields.is_empty()
+    if ground_marks_layer != null:
+        if (has_fields and _ground_marks_accum >= 0.05) or (not has_fields and _had_burning_fields):
+            _ground_marks_accum = 0.0
+            ground_marks_layer.queue_redraw()
+    _had_burning_fields = has_fields
     if animation_demo:
         draw_string(demo_font, Vector2(64, 67), "原始人 · 动作预览", HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color("#543b2c"))
         draw_string(demo_font, Vector2(360, 185), demo_caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color("#64513a"))
         draw_string(demo_font, Vector2(325, 715), "同一角色的身体、双手、双脚独立运动", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color("#766449"))
     draw_link_shapes()
-    var pickup_bounds: Rect2 = visible_world_rect().grow(40.0)
-    if pickup_renderer!=null: pickup_renderer.sync(pickups,pickup_bounds,elapsed)
+    if pickup_renderer != null and (_pickup_sync_accum >= 0.05 or pickups.size() != _last_pickup_count):
+        _pickup_sync_accum = 0.0
+        _last_pickup_count = pickups.size()
+        pickup_renderer.sync(pickups, visible_world_rect().grow(40.0), elapsed)
     for chest in chest_marks:
         chest["age"] = float(chest.get("age", 0.0))
         draw_chest(chest["position"], chest["age"])
@@ -3290,16 +3806,247 @@ func _draw() -> void:
             draw_polyline(outline, Color(0.76, 0.36, 0.25, 0.62), 2.0, true)
         elif enemy["state"] == "spit":
             draw_arc(enemy["position"] + (player_position - enemy["position"]).normalized() * 28.0, 12.0, 0.0, TAU, 24, Color("#b82f83"), 3.0, true)
+    var vfx_full: bool = current_vfx_mode() == "full"
+    var draw_proj_count: int = projectiles.size()
+    var proj_idx: int = 0
     for projectile in projectiles:
-        BattleVisuals.draw_projectile(self,projectile,elapsed)
+        proj_idx += 1
+        var ppos: Vector2 = projectile["position"]
+        if absf(ppos.x - player_position.x) > 760.0 or absf(ppos.y - player_position.y) > 520.0:
+            continue
+        BattleVisuals.draw_projectile(self, projectile, elapsed)
+        if not vfx_full or enemies.size() >= 20 or draw_proj_count > 10:
+            continue
+        var allow_wrap: bool = (proj_idx % 2 == 0)
+        if not allow_wrap:
+            continue
         if bool(projectile.get("fire_enchanted", false)):
             var vel: Vector2 = projectile.get("velocity", Vector2.RIGHT)
             var aim: Vector2 = vel.normalized() if vel.length_squared() > 0.01 else Vector2.RIGHT
-            BattleVisuals.draw_fire_wrap(self, projectile["position"], aim, 22.0, elapsed, int(projectile.get("fire_tier", 0)))
+            BattleVisuals.draw_fire_wrap(self, ppos, aim, 22.0, elapsed, int(projectile.get("fire_tier", 0)))
         if bool(projectile.get("thunder_enchanted", false)):
-            BattleVisuals.draw_thunder_wrap(self, projectile["position"], 16.0, elapsed, int(projectile.get("thunder_tier", 0)))
+            BattleVisuals.draw_thunder_wrap(self, ppos, 16.0, elapsed, int(projectile.get("thunder_tier", 0)), bool(projectile.get("thunder_red", false)))
+    # Clean permanent elemental particles hugging enchanted weapons (ALWAYS visible when VFX is full, never hidden by enemy count!)
+    if vfx_full:
+        _draw_enchanted_weapon_auras()
+    # Sync pre-attack progressive fill charge directly to each weapon sprite's shader
+    _sync_weapon_charge_cues()
     # No rotating wrap/aura rings on parked or orbiting weapons.
     # Attack-shot tints and projectile wraps stay on the projectiles themselves.
+
+func _draw_enchanted_weapon_auras() -> void:
+    if active_links.is_empty():
+        return
+    var glow: Texture2D = Effects.soft_glow_texture()
+    for item in inventory:
+        var key: String = str(item.get("id", ""))
+        if not weapon_views.has(key) or not is_instance_valid(weapon_views[key]) or not weapon_views[key].visible:
+            continue
+        var is_fire: bool = Rules.host_is_fire_enchanted(active_links, key)
+        var is_rune: bool = Rules.host_is_rune_enchanted(active_links, key)
+        var is_thunder: bool = Rules.host_is_thunder_enchanted(active_links, key)
+        if not is_fire and not is_rune and not is_thunder:
+            continue
+        var pos: Vector2 = weapon_views[key].position
+        var r_aura: float = float(Catalog.WEAPONS[key].get("size", 40.0)) * 0.56
+        var seed_k: float = float(key.hash() % 97) * 0.13
+        if is_fire:
+            # 常驻火焰附魔：柔和暖光 + 7 颗错落升腾飘散的炽热火星
+            var ft: int = Evolution.tier(weapon_level("firepot"))
+            var f_tint: Color = BattleVisuals.fire_tint(ft)
+            var f_core: Color = BattleVisuals.fire_core(ft)
+            draw_texture_rect(glow, Rect2(pos - Vector2.ONE * (r_aura * 1.15), Vector2.ONE * (r_aura * 2.3)), false, Color(f_tint.r, f_tint.g * 0.65, f_tint.b * 0.25, 0.26))
+            for i in range(7):
+                var cyc: float = fmod(elapsed * (1.25 + float(i % 3) * 0.22) + float(i) * 0.143 + seed_k, 1.0)
+                var drift_x: float = sin(elapsed * 4.4 + float(i) * 2.1 + seed_k) * r_aura * (0.45 + float(i % 2) * 0.28)
+                var p: Vector2 = pos + Vector2(drift_x, r_aura * 0.26 - cyc * (r_aura * 1.48))
+                var a: float = clampf(cyc / 0.16, 0.0, 1.0) * clampf((1.0 - cyc) / 0.34, 0.0, 1.0)
+                draw_circle(p, lerpf(2.8, 0.85, cyc), Color(f_tint.r, f_tint.g, f_tint.b, 0.90 * a))
+                draw_circle(p, lerpf(1.4, 0.4, cyc), Color(f_core.r, f_core.g, f_core.b, 0.96 * a))
+        elif is_rune:
+            # 常驻魔法附魔：柔光 + 8 颗轻盈向上飘升的奥术星尘粒子（夹杂 2 颗微星点缀，1-4级青 / 5级紫）
+            var staff_tier: int = Evolution.tier(weapon_level("staff"))
+            var r_col: Color = BattleVisuals.staff_tint(staff_tier)
+            var r_hi: Color = BattleVisuals.staff_highlight(staff_tier)
+            draw_texture_rect(glow, Rect2(pos - Vector2.ONE * (r_aura * 1.20), Vector2.ONE * (r_aura * 2.40)), false, Color(r_col.r, r_col.g, r_col.b, 0.28))
+            for i in range(8):
+                var cyc: float = fmod(elapsed * (0.95 + float(i % 3) * 0.18) + float(i) * 0.125 + seed_k, 1.0)
+                var sway_x: float = sin(elapsed * 3.4 + float(i) * 1.9 + seed_k) * r_aura * (0.48 + float(i % 2) * 0.28)
+                var p: Vector2 = pos + Vector2(sway_x, r_aura * 0.28 - cyc * (r_aura * 1.55))
+                var a: float = clampf(cyc / 0.18, 0.0, 1.0) * clampf((1.0 - cyc) / 0.36, 0.0, 1.0)
+                var pr: float = lerpf(2.5, 0.95, cyc)
+                draw_circle(p, pr * 1.8, Color(r_col.r, r_col.g, r_col.b, 0.42 * a))
+                if i % 4 == 0:
+                    var sz: float = pr * 1.35
+                    draw_colored_polygon(PackedVector2Array([
+                        p + Vector2(0, -sz), p + Vector2(sz * 0.35, -sz * 0.35),
+                        p + Vector2(sz, 0), p + Vector2(sz * 0.35, sz * 0.35),
+                        p + Vector2(0, sz), p + Vector2(-sz * 0.35, sz * 0.35),
+                        p + Vector2(-sz, 0), p + Vector2(-sz * 0.35, -sz * 0.35)
+                    ]), Color(r_hi.r, r_hi.g, r_hi.b, 0.95 * a))
+                else:
+                    draw_circle(p, pr, Color(r_col.r, r_col.g, r_col.b, 0.88 * a))
+                    draw_circle(p, pr * 0.52, Color(r_hi.r, r_hi.g, r_hi.b, 0.96 * a))
+        elif is_thunder:
+            # 常驻雷电附魔：贴身跳跃的细巧多段电弧 + 微电火花（同步赤雷概率）
+            var t_lvl: int = weapon_level("totem")
+            var t_tint: Color = BattleVisuals.thunder_tint(Evolution.tier(t_lvl))
+            var tick: int = int(floor(elapsed * 16.0))
+            var tr := _draw_rng
+            tr.seed = key.hash() + tick * 37
+            var show_red: bool = _peek_thunder_red(key)
+            var glow_c: Color = Color(1.0, 0.24, 0.16, 0.26) if show_red else Color(t_tint.r, t_tint.g, t_tint.b, 0.24)
+            var arc_out: Color = Color(1.0, 0.32, 0.22, 0.90) if show_red else Color(0.84, 0.93, 1.0, 0.88)
+            var arc_in: Color = Color(1.0, 0.94, 0.88, 0.98) if show_red else Color(1.0, 1.0, 0.99, 0.98)
+            draw_texture_rect(glow, Rect2(pos - Vector2.ONE * (r_aura * 1.1), Vector2.ONE * (r_aura * 2.2)), false, glow_c)
+            for _i in range(3):
+                var a0: float = tr.randf_range(0.0, TAU)
+                var a1: float = a0 + tr.randf_range(0.65, 1.35)
+                var p0: Vector2 = pos + Vector2.from_angle(a0) * (r_aura * tr.randf_range(0.45, 0.92))
+                var p2: Vector2 = pos + Vector2.from_angle(a1) * (r_aura * tr.randf_range(0.50, 0.98))
+                var mid: Vector2 = p0.lerp(p2, 0.5) + Vector2(tr.randf_range(-6.0, 6.0), tr.randf_range(-6.0, 6.0))
+                var pts := PackedVector2Array([p0, mid, p2])
+                draw_polyline(pts, arc_out, 2.2, true)
+                draw_polyline(pts, arc_in, 1.0, true)
+            for _s in range(2):
+                var sp: Vector2 = pos + Vector2.from_angle(tr.randf_range(0.0, TAU)) * (r_aura * tr.randf_range(0.70, 1.05))
+                draw_circle(sp, tr.randf_range(1.1, 1.9), arc_in)
+
+func _weapon_elem_style(key: String) -> int:
+    if Rules.host_is_fire_enchanted(active_links, key) or key == "firepot":
+        return 2
+    if Rules.host_is_rune_enchanted(active_links, key) or key == "staff":
+        return 1
+    if Rules.host_is_thunder_enchanted(active_links, key) or key == "totem":
+        return 3
+    return 0
+
+func _peek_thunder_red(key: String) -> bool:
+    var totem_lvl: int = weapon_level("totem")
+    var chance: float = Rules.red_lightning_chance(totem_lvl)
+    if chance <= 0.0:
+        if weapon_runtime.has(key):
+            weapon_runtime[key]["next_thunder_red"] = false
+        return false
+    if weapon_runtime.has(key):
+        if not weapon_runtime[key].has("next_thunder_red"):
+            weapon_runtime[key]["next_thunder_red"] = rng.randf() < chance
+        return bool(weapon_runtime[key]["next_thunder_red"])
+    return false
+
+func _consume_thunder_red(key: String) -> bool:
+    var totem_lvl: int = weapon_level("totem")
+    var chance: float = Rules.red_lightning_chance(totem_lvl)
+    if chance <= 0.0:
+        if weapon_runtime.has(key):
+            weapon_runtime[key]["next_thunder_red"] = false
+        return false
+    if weapon_runtime.has(key):
+        var current: bool = bool(weapon_runtime[key].get("next_thunder_red", rng.randf() < chance))
+        weapon_runtime[key]["next_thunder_red"] = rng.randf() < chance
+        return current
+    return rng.randf() < chance
+
+func _weapon_charge_color(key: String) -> Color:
+    if Rules.host_is_fire_enchanted(active_links, key) or key == "firepot":
+        return BattleVisuals.fire_tint(Evolution.tier(weapon_level("firepot")))
+    if Rules.host_is_rune_enchanted(active_links, key) or key == "staff":
+        return BattleVisuals.staff_tint(Evolution.tier(weapon_level("staff")))
+    if Rules.host_is_thunder_enchanted(active_links, key) or key == "totem":
+        if _peek_thunder_red(key):
+            return Color("#ff3a2e")
+        return BattleVisuals.thunder_tint(Evolution.tier(weapon_level("totem")))
+    if key == "powder":
+        return Color("#ffae42")
+    if key == "crystal":
+        return Color("#c2a8f0")
+    return Color(Catalog.WEAPONS.get(key, {}).get("color", Color("#f2d488")))
+
+func _sync_weapon_charge_cues() -> void:
+    var cues: Array = []
+    var allow_charge: bool = current_vfx_mode() == "full" and not enemies.is_empty()
+    var has_living: bool = false
+    if allow_charge:
+        for e in enemies:
+            if float(e.get("hp", 0.0)) > 0.0:
+                has_living = true
+                break
+    for key in weapon_views.keys():
+        var view: Sprite2D = weapon_views[key]
+        if view == null or not is_instance_valid(view):
+            continue
+        var mat: ShaderMaterial = view.material as ShaderMaterial
+        if mat == null:
+            continue
+        if is_weapon_suppressed(key) or not view.visible or current_vfx_mode() != "full":
+            mat.set_shader_parameter("charge_progress", 0.0)
+            continue
+        var charge_t: float = 0.0
+        if has_living and key not in ["club", "axe", "blade"]:
+            if key in ["powder", "sling", "staff"]:
+                if weapon_runtime.has(key):
+                    var cd: float = float(weapon_runtime[key].get("cooldown", 1.0))
+                    var win: float = 0.62 if key == "powder" else (0.36 if key == "staff" else 0.24)
+                    if cd > 0.0 and cd < win:
+                        charge_t = clampf(1.0 - cd / win, 0.0, 1.0)
+            elif armory != null and armory.states.has(key):
+                var st: Dictionary = armory.states[key]
+                var phase: String = str(st.get("phase", "rest"))
+                if key == "hammer":
+                    if phase == "windup":
+                        charge_t = clampf(float(st.get("age", 0.0)) / 0.22, 0.28, 1.0)
+                    elif phase == "rest":
+                        var cd_h: float = float(st.get("cooldown", 1.0))
+                        if cd_h > 0.0 and cd_h < 0.45:
+                            charge_t = clampf((1.0 - cd_h / 0.45) * 0.72, 0.0, 0.72)
+                elif phase == "rest":
+                    var cd2: float = float(st.get("cooldown", 1.0))
+                    var win2: float = 0.38 if key in ["totem", "firepot", "crystal", "wardrum"] else 0.28
+                    if cd2 > 0.0 and cd2 < win2:
+                        charge_t = clampf(1.0 - cd2 / win2, 0.0, 1.0)
+        var elem_s: int = _weapon_elem_style(key)
+        if elem_s == 0:
+            mat.set_shader_parameter("charge_progress", 0.0)
+            mat.set_shader_parameter("elem_style", 0)
+            if key == "powder" and charge_t > 0.25 and effects != null:
+                var next_steam: float = float(weapon_runtime["powder"].get("_steam_next", 0.0))
+                if elapsed >= next_steam:
+                    weapon_runtime["powder"]["_steam_next"] = elapsed + 0.16
+                    var steam_pt: Vector2 = weapon_muzzle_point("powder") + Vector2(rng.randf_range(-4.0, 4.0), -6.0)
+                    effects.puff(steam_pt, Color("#f2ebdc"), 9.0 + charge_t * 5.0, int(elapsed * 10.0))
+            continue
+        mat.set_shader_parameter("charge_progress", charge_t)
+        if charge_t > 0.02:
+            var col_c: Color = _weapon_charge_color(key)
+            mat.set_shader_parameter("charge_color", col_c)
+            mat.set_shader_parameter("flow_horizontal", 1.0 if key == "powder" else 0.0)
+            mat.set_shader_parameter("elem_style", elem_s)
+            if key in ["powder", "sling", "staff", "bonebow", "totem", "hammer"]:
+                var fwd: Vector2 = Vector2.from_angle(view.rotation if key == "powder" else view.rotation - PI * 0.5)
+                var shape_kind: String = "hammer" if key == "hammer" else "muzzle"
+                var p_end: Vector2
+                var p_start: Vector2
+                if key == "hammer":
+                    p_end = view.position + fwd * 14.0
+                    p_start = view.position - fwd * 16.0
+                elif key in ["powder", "sling", "staff"]:
+                    p_end = weapon_muzzle_point(key, fwd)
+                    p_start = p_end - fwd * (34.0 if key == "powder" else 24.0)
+                else:
+                    p_end = view.position + fwd * 16.0
+                    p_start = view.position - fwd * 14.0
+                cues.append({
+                    "start": p_start,
+                    "end": p_end,
+                    "color": col_c,
+                    "t": charge_t,
+                    "elem": elem_s,
+                    "shape": shape_kind,
+                    "heavy": key in ["powder", "hammer"],
+                    "clock": elapsed
+                })
+    if effects != null:
+        effects.set_charge_cues(cues)
 
 func draw_magic_shell(point: Vector2, direction: Vector2) -> void:
     var normal: Vector2 = direction.orthogonal()
@@ -3322,33 +4069,550 @@ func residual_kind_of(field: Dictionary) -> String:
         return "smoke"
     return "fire" if weapon_id == "firepot" else "smoke"
 
-func draw_link_shapes() -> void:
-    for field in burning_fields:
-        var alpha: float = 1.0 - field["age"] / maxf(0.001, field["life"])
-        var kind: String = residual_kind_of(field)
-        var center: Vector2 = field["position"]
-        var radius: float = float(field["radius"])
-        if kind == "rune":
-            var rune_tier: int = Evolution.tier(weapon_level("staff"))
-            var rune_tint: Color = BattleVisuals.staff_tint(rune_tier)
-            draw_circle(center, radius, Color(rune_tint, 0.12 * alpha))
-            draw_arc(center, radius, 0.0, TAU, 32, Color(rune_tint, 0.80 * alpha), 2.5, true)
-            for index in range(4):
-                var point: Vector2 = center + Vector2.from_angle(index * PI / 2.0 + 0.6) * radius * 0.45
-                var lift: float = sin(field["age"] * 15.0 + index) * 2.0
-                draw_colored_polygon(PackedVector2Array([point + Vector2(-4, 3), point + Vector2(0, -9 - lift), point + Vector2(4, 3)]), Color(rune_tint.lightened(0.25), 0.72 * alpha))
-        elif kind == "fire":
-            draw_circle(center, radius, Color(0.86, 0.32, 0.10, 0.16 * alpha))
-            draw_arc(center, radius, 0.0, TAU, 32, Color(0.95, 0.52, 0.16, 0.72 * alpha), 2.4, true)
-            for index in range(5):
-                var point: Vector2 = center + Vector2.from_angle(index * TAU / 5.0 + field["age"] * 2.0) * radius * 0.42
-                var lift: float = sin(field["age"] * 16.0 + index) * 3.0
-                draw_colored_polygon(PackedVector2Array([point + Vector2(-5, 4), point + Vector2(0, -11 - lift), point + Vector2(5, 4)]), Color(1.0, 0.62, 0.22, 0.80 * alpha))
-            Effects.CombatArt.draw(self, "fire", center, radius * 1.15, fmod(float(field["age"]) * 1.6, 1.0), Vector2.RIGHT, 0.72 * alpha)
+func _organic_ground_patch(center: Vector2, radius: float, seed_val: float, squash_y: float = 0.78, steps: int = 18) -> PackedVector2Array:
+    var pts := PackedVector2Array()
+    for i in range(steps):
+        var angle: float = TAU * float(i) / float(steps)
+        var rough: float = 1.0 + sin(angle * 3.0 + seed_val * 1.7) * 0.13 + cos(angle * 5.0 - seed_val * 2.3) * 0.08
+        pts.append(center + Vector2(cos(angle), sin(angle) * squash_y) * radius * rough)
+    return pts
+
+func _soft_flame_blob(base: Vector2, w: float, h: float, sway: float) -> PackedVector2Array:
+    # Rounded, chubby hand-drawn flame silhouette (no sharp polygonal triangles).
+    return PackedVector2Array([
+        base + Vector2(-w * 0.68, 2.0),
+        base + Vector2(-w * 0.92, -h * 0.26),
+        base + Vector2(-w * 0.56 + sway * 0.45, -h * 0.68),
+        base + Vector2(sway, -h),
+        base + Vector2(w * 0.56 + sway * 0.45, -h * 0.68),
+        base + Vector2(w * 0.92, -h * 0.26),
+        base + Vector2(w * 0.68, 2.0),
+        base + Vector2(0.0, 4.2)
+    ])
+
+func _clip_point_before_lava(from_pt: Vector2, to_pt: Vector2, pad: float = 4.0) -> Dictionary:
+    if map_view == null or not map_view.is_in_lava(to_pt, pad):
+        return {"hit": false, "point": to_pt}
+    var low: float = 0.0
+    var high: float = 1.0
+    for _step in range(5):
+        var mid: float = (low + high) * 0.5
+        if map_view.is_in_lava(from_pt.lerp(to_pt, mid), pad):
+            high = mid
         else:
-            draw_circle(center, radius * 0.85, Color(0.42, 0.34, 0.26, 0.16 * alpha))
-            var puff: float = 1.0 + 0.08 * sin(field["age"] * 6.0)
-            Effects.CombatArt.draw(self, "smoke", center + Vector2(0, -6.0 * field["age"]), radius * 1.05 * puff, clampf(field["age"] / maxf(0.2, field["life"]), 0.0, 1.0), Vector2.RIGHT, 0.80 * alpha)
+            low = mid
+    return {"hit": true, "point": from_pt.lerp(to_pt, low)}
+
+func draw_burning_fields(canvas: Node2D) -> void:
+    var vfx_m: String = current_vfx_mode()
+    if vfx_m == "off":
+        return
+    var glow: Texture2D = Effects.soft_glow_texture()
+    var view_cull: Rect2 = visible_world_rect().grow(180.0)
+    var light_detail: bool = vfx_m == "minimal" or burning_fields.size() >= 7 or enemies.size() >= 32
+    for field in burning_fields:
+        var center: Vector2 = field["position"]
+        if not view_cull.has_point(center):
+            continue
+        var age: float = float(field["age"])
+        var life: float = maxf(0.001, float(field["life"]))
+        var alpha: float = clampf(1.0 - pow(age / life, 1.4), 0.0, 1.0)
+        var kind: String = residual_kind_of(field)
+        var radius: float = float(field["radius"])
+        var seed_val: float = fmod(absf(center.x * 0.037 + center.y * 0.061), 100.0)
+        # Unified hammer slam crater cracks helper (drawn ON TOP of ground washes for both fire & rune so they match 100%!)
+        if kind == "rune":
+            # Aligned arcane crystal-cyan ground magic residue + rising magic motes (concentrated along cracks when crater!)
+            var pulse: float = 0.93 + 0.07 * sin(age * 4.5 + seed_val)
+            var is_crater: bool = bool(field.get("crater", false))
+            if is_crater and not field.has("_crater_cracks"):
+                var cseed: int = int(absf(center.x * 71.0 + center.y * 149.0)) + 29
+                field["_crater_cracks"] = Effects.make_radial_cracks(center, radius * 1.18, cseed, 3, 6, 0.74, false)
+            if not field.has("_rune_specks"):
+                var rseed: int = int(absf(center.x * 97.0 + center.y * 193.0)) + int(roundi(radius * 13.0))
+                var rr := RandomNumberGenerator.new()
+                rr.seed = rseed
+                var spine_pts: Array = []
+                if is_crater:
+                    for ck in field["_crater_cracks"]:
+                        var sp_arr: Array = ck.get("spine", [])
+                        for s_i in range(maxi(0, sp_arr.size() - 1)):
+                            var pa: Vector2 = sp_arr[s_i]
+                            var pb: Vector2 = sp_arr[s_i + 1]
+                            spine_pts.append(pa)
+                            spine_pts.append(pa.lerp(pb, 0.5))
+                var particle_r: float = radius * (0.82 if is_crater else 0.72)
+                var flecks: Array = []
+                for _f in range(3):
+                    var fpos: Vector2
+                    if is_crater and not spine_pts.is_empty() and rr.randf() < 0.75:
+                        fpos = Vector2(spine_pts[rr.randi_range(0, spine_pts.size() - 1)]) + Vector2(rr.randf_range(-5.0, 5.0), rr.randf_range(-4.0, 4.0))
+                    else:
+                        var fa: float = rr.randf_range(0.0, TAU)
+                        var fd: float = particle_r * sqrt(rr.randf()) * 0.75
+                        fpos = center + Vector2(cos(fa) * fd, sin(fa) * fd * 0.74)
+                    flecks.append({
+                        "pos": fpos,
+                        "r": rr.randf_range(3.0, 5.0),
+                        "phase": rr.randf_range(0.0, TAU)
+                    })
+                var specks: Array = []
+                for _i in range(6 if is_crater else 5):
+                    var spos: Vector2
+                    if is_crater and not spine_pts.is_empty() and rr.randf() < 0.78:
+                        spos = Vector2(spine_pts[rr.randi_range(0, spine_pts.size() - 1)]) + Vector2(rr.randf_range(-6.0, 6.0), rr.randf_range(-5.0, 5.0))
+                    else:
+                        var a: float = rr.randf_range(0.0, TAU)
+                        var d: float = particle_r * sqrt(rr.randf()) * 0.88
+                        spos = center + Vector2(cos(a) * d, sin(a) * d * 0.74)
+                    specks.append({
+                        "pos": spos,
+                        "r": rr.randf_range(1.7, 3.2),
+                        "phase": rr.randf_range(0.0, TAU),
+                        "speed": rr.randf_range(4.5, 9.5),
+                        "star": rr.randf() < 0.58
+                    })
+                var risers: Array = []
+                for _m in range(7 if is_crater else 6):
+                    var rbase: Vector2
+                    if is_crater and not spine_pts.is_empty() and rr.randf() < 0.82:
+                        rbase = Vector2(spine_pts[rr.randi_range(0, spine_pts.size() - 1)]) + Vector2(rr.randf_range(-4.0, 4.0), rr.randf_range(-3.0, 3.0))
+                    else:
+                        var ma: float = rr.randf_range(0.0, TAU)
+                        var md: float = particle_r * sqrt(rr.randf()) * 0.84
+                        rbase = center + Vector2(cos(ma) * md, sin(ma) * md * 0.74)
+                    risers.append({
+                        "base": rbase,
+                        "r": rr.randf_range(1.5, 3.0),
+                        "phase": rr.randf_range(0.0, 1.0),
+                        "speed": rr.randf_range(0.55, 1.15),
+                        "height": rr.randf_range(26.0, 52.0),
+                        "sway": rr.randf_range(1.8, 3.8),
+                        "star": rr.randf() < 0.38
+                    })
+                field["_rune_flecks"] = flecks
+                field["_rune_specks"] = specks
+                field["_rune_risers"] = risers
+            # 1) Centered ground magic wash — dynamically tracks staff tier (cyan-blue Lv.1-4, awakened violet-purple Lv.5+!)
+            var rune_tier: int = Evolution.tier(weapon_level("staff"))
+            var is_purple: bool = rune_tier >= 2
+            var wash_outer: Color = Color(0.44, 0.20, 0.74, (0.58 if is_crater else 0.68) * alpha) if is_purple else Color(0.16, 0.56, 0.78, (0.56 if is_crater else 0.68) * alpha)
+            var wash_inner: Color = Color(0.76, 0.44, 0.98, (0.50 if is_crater else 0.62) * alpha) if is_purple else Color(0.36, 0.88, 1.0, (0.48 if is_crater else 0.60) * alpha)
+            var mote_halo: Color = Color(0.74, 0.42, 0.98, 0.54) if is_purple else Color(0.34, 0.86, 0.98, 0.52)
+            var mote_core: Color = Color(0.96, 0.88, 1.0, 1.0) if is_purple else Color(0.90, 0.99, 1.0, 1.0)
+            var outer_wr: float = radius * (1.16 if is_crater else 1.14) * pulse
+            canvas.draw_texture_rect(glow, Rect2(center - Vector2(outer_wr, outer_wr * 0.74), Vector2(outer_wr * 2.0, outer_wr * 1.48)), false, wash_outer)
+            var core_r: float = radius * (0.76 if is_crater else 0.78) * pulse
+            canvas.draw_texture_rect(glow, Rect2(center - Vector2(core_r, core_r * 0.74), Vector2(core_r * 2.0, core_r * 1.48)), false, wash_inner)
+            if not is_crater:
+                # Soft breathing arcane core bloom (no 4 border arcs!)
+                var bloom_r: float = radius * 0.42 * (0.92 + 0.10 * sin(age * 6.5 + seed_val))
+                canvas.draw_texture_rect(glow, Rect2(center - Vector2(bloom_r, bloom_r * 0.74), Vector2(bloom_r * 2.0, bloom_r * 1.48)), false, Color(mote_core.r, mote_core.g, mote_core.b, 0.44 * alpha))
+            # 2) If hammer magic crater: draw unified 3-layer ground cracks ON TOP of the wash
+            if is_crater:
+                if not field.has("_crater_cracks"):
+                    var cseed: int = int(absf(center.x * 71.0 + center.y * 149.0)) + 29
+                    field["_crater_cracks"] = Effects.make_radial_cracks(center, radius * 1.18, cseed, 3, 6, 0.74, false)
+                var glow_pulse: float = 0.85 + 0.15 * sin(age * 9.0 + seed_val)
+                var crack_glow: Color = Color(0.84, 0.54, 1.0, 0.94 * alpha * glow_pulse) if is_purple else Color(0.52, 0.94, 1.0, 0.90 * alpha * glow_pulse)
+                Effects.draw_elemental_cracks(
+                    canvas, field["_crater_cracks"],
+                    Color(0.26, 0.19, 0.13, 0.88 * alpha),
+                    Color(0.14, 0.10, 0.08, 0.90 * alpha),
+                    crack_glow
+                )
+            # 3) Luminous ground residue traces / flecks (trimmed in crowded/minimal scenes for smooth FPS)
+            if not light_detail:
+                for fl in field["_rune_flecks"]:
+                    var fp: Vector2 = fl["pos"]
+                    var fr: float = float(fl["r"]) * (0.90 + 0.12 * sin(age * 5.0 + float(fl["phase"])))
+                    canvas.draw_texture_rect(glow, Rect2(fp - Vector2(fr * 1.8, fr * 1.3), Vector2(fr * 3.6, fr * 2.6)), false, Color(mote_halo.r, mote_halo.g, mote_halo.b, 0.52 * alpha))
+                    canvas.draw_circle(fp, fr * 0.44, Color(mote_core.r, mote_core.g, mote_core.b, 0.70 * alpha))
+            # 4) Twinkling ground magic starlight specks
+            for sp in field["_rune_specks"]:
+                var tw: float = 0.45 + 0.55 * sin(age * float(sp["speed"]) + float(sp["phase"]))
+                var p: Vector2 = sp["pos"]
+                var r_sz: float = float(sp["r"]) * (0.78 + 0.34 * tw)
+                var sa: float = alpha * (0.52 + 0.48 * tw)
+                if not light_detail:
+                    canvas.draw_texture_rect(glow, Rect2(p - Vector2.ONE * (r_sz * 2.5), Vector2.ONE * (r_sz * 5.0)), false, Color(mote_halo.r, mote_halo.g, mote_halo.b, 0.54 * sa))
+                if bool(sp["star"]):
+                    canvas.draw_colored_polygon(PackedVector2Array([p + Vector2(0, -r_sz * 1.45), p + Vector2(r_sz * 0.82, 0), p + Vector2(0, r_sz * 1.45), p + Vector2(-r_sz * 0.82, 0)]), Color(mote_core.r, mote_core.g, mote_core.b, 0.95 * sa))
+                else:
+                    canvas.draw_circle(p, r_sz * 0.85, Color(mote_core.r, mote_core.g, mote_core.b, 0.92 * sa))
+            # 5) Continuously rising upward-floating magic motes
+            for mr in field["_rune_risers"]:
+                var cyc: float = fmod(age * float(mr["speed"]) + float(mr["phase"]), 1.0)
+                var fade_in: float = clampf(cyc / 0.18, 0.0, 1.0)
+                var fade_out: float = clampf((1.0 - cyc) / 0.35, 0.0, 1.0)
+                var ma: float = alpha * fade_in * fade_out
+                if ma <= 0.02:
+                    continue
+                var mp: Vector2 = Vector2(mr["base"]) + Vector2(sin(cyc * TAU + float(mr["phase"]) * 6.28) * float(mr["sway"]), -cyc * float(mr["height"]))
+                var m_sz: float = float(mr["r"]) * lerpf(1.05, 0.48, cyc)
+                canvas.draw_texture_rect(glow, Rect2(mp - Vector2.ONE * (m_sz * 2.6), Vector2.ONE * (m_sz * 5.2)), false, Color(mote_halo.r, mote_halo.g, mote_halo.b, 0.56 * ma))
+                if bool(mr["star"]):
+                    canvas.draw_colored_polygon(PackedVector2Array([mp + Vector2(0, -m_sz * 1.4), mp + Vector2(m_sz * 0.78, 0), mp + Vector2(0, m_sz * 1.4), mp + Vector2(-m_sz * 0.78, 0)]), Color(mote_core.r, mote_core.g, mote_core.b, 0.96 * ma))
+                else:
+                    canvas.draw_circle(mp, m_sz * 0.88, Color(mote_core.r, mote_core.g, mote_core.b, 0.94 * ma))
+        elif kind == "fire":
+            var is_green_fire: bool = bool(field.get("green_fire", false)) or Evolution.tier(weapon_level("firepot")) >= 2
+            var gf_outer: Color = Color(0.14, 0.72, 0.36, 0.86 * alpha) if is_green_fire else Color(0.90, 0.34, 0.09, 0.86 * alpha)
+            var gf_inner: Color = Color(0.76, 1.0, 0.56, 0.90 * alpha) if is_green_fire else Color(1.0, 0.78, 0.26, 0.90 * alpha)
+            var gf_spark: Color = Color(0.72, 1.0, 0.54, 0.92 * alpha) if is_green_fire else Color(1.0, 0.70, 0.20, 0.90 * alpha)
+            if not bool(field.get("heavy", true)):
+                # Light weapon fire enchant (sling / bonebow / melee): small on-target flame & rising sparks (NO heavy ground pit!)
+                var sway: float = sin(age * 16.0 + seed_val) * 2.4
+                canvas.draw_texture_rect(glow, Rect2(center - Vector2(18.0, 14.0), Vector2(36.0, 28.0)), false, Color(0.16, 0.82, 0.44, 0.34 * alpha) if is_green_fire else Color(0.95, 0.42, 0.12, 0.34 * alpha))
+                var tongues: Array = [
+                    [Vector2(-5.0, 2.0), 5.5, 13.0, sway * 0.8],
+                    [Vector2(0.0, 3.0), 7.0, 17.0, sway],
+                    [Vector2(5.5, 2.5), 5.0, 11.5, -sway * 0.7]
+                ]
+                for tg in tongues:
+                    var base: Vector2 = center + Vector2(tg[0])
+                    var tw_w: float = float(tg[1]) * (0.85 + 0.18 * sin(age * 14.0 + float(tg[1])))
+                    var tw_h: float = float(tg[2]) * (0.88 + 0.16 * cos(age * 12.0 + seed_val))
+                    canvas.draw_colored_polygon(_soft_flame_blob(base, tw_w, tw_h, float(tg[3])), gf_outer)
+                    canvas.draw_colored_polygon(_soft_flame_blob(base + Vector2(0, -1.0), tw_w * 0.56, tw_h * 0.60, float(tg[3]) * 0.7), gf_inner)
+                for s_i in range(4):
+                    var cyc: float = fmod(age * 1.45 + float(s_i) * 0.25 + seed_val * 0.1, 1.0)
+                    var sp: Vector2 = center + Vector2(sin(cyc * 5.0 + float(s_i) * 2.1) * 7.5, -4.0 - cyc * 22.0)
+                    canvas.draw_circle(sp, lerpf(2.2, 0.8, cyc), Color(gf_spark.r, gf_spark.g, gf_spark.b, (1.0 - cyc) * 0.90 * alpha))
+            elif not bool(field.get("crater", false)):
+                # Heavy cannon / firepot molten magma residue (NO cracks, NO red ring — denser near center without stacking, strictly inside the scorch wash!)
+                var flicker: float = 0.90 + 0.10 * sin(age * 10.0 + seed_val)
+                if not field.has("_cannon_fire"):
+                    var cf_rng := RandomNumberGenerator.new()
+                    cf_rng.seed = int(absf(center.x * 83.0 + center.y * 167.0)) + 19
+                    var visual_r: float = radius * 0.68
+                    var placed: Array = []
+                    var pools: Array = []
+                    for i in range(3):
+                        var p: Vector2 = center
+                        var sz: float = (6.5 if i == 0 else cf_rng.randf_range(3.8, 5.2)) * clampf(radius / 58.0, 0.78, 1.15)
+                        for _try in range(24):
+                            var norm_d: float = cf_rng.randf_range(0.0, 0.14) if i == 0 else cf_rng.randf_range(0.26, 0.52)
+                            var a: float = cf_rng.randf_range(0.0, TAU)
+                            var cand: Vector2 = center + Vector2(cos(a) * visual_r * norm_d, sin(a) * visual_r * norm_d * 0.74)
+                            var ok: bool = true
+                            for prev in placed:
+                                if cand.distance_to(prev["pos"]) < sz + float(prev["r"]) + 2.8:
+                                    ok = false
+                                    break
+                            if ok:
+                                p = cand
+                                break
+                        placed.append({"pos": p, "r": sz})
+                        var poly := PackedVector2Array()
+                        for s in range(8):
+                            var sa: float = TAU * float(s) / 8.0 + cf_rng.randf_range(-0.2, 0.2)
+                            var sr: float = sz * cf_rng.randf_range(0.78, 1.14)
+                            poly.append(p + Vector2(cos(sa) * sr, sin(sa) * sr * 0.72))
+                        pools.append({"poly": poly, "center": p, "r": sz})
+                    var dots: Array = []
+                    for _s in range(10):
+                        var nd: float = pow(cf_rng.randf(), 1.25) * 0.94
+                        var dr: float = lerpf(3.0, 1.4, nd) * cf_rng.randf_range(0.85, 1.12)
+                        var p: Vector2 = center
+                        var found: bool = false
+                        for _try in range(24):
+                            var cand_nd: float = pow(cf_rng.randf(), 1.25) * 0.94
+                            var a: float = cf_rng.randf_range(0.0, TAU)
+                            var cand: Vector2 = center + Vector2(cos(a) * visual_r * cand_nd, sin(a) * visual_r * cand_nd * 0.74)
+                            var ok: bool = true
+                            for prev in placed:
+                                if cand.distance_to(prev["pos"]) < dr + float(prev["r"]) + 2.6:
+                                    ok = false
+                                    break
+                            if ok:
+                                p = cand
+                                nd = cand_nd
+                                found = true
+                                break
+                        if not found:
+                            continue
+                        placed.append({"pos": p, "r": dr})
+                        dots.append({"pos": p, "r": dr, "phase": cf_rng.randf_range(0.0, TAU), "hot": nd < 0.72 and cf_rng.randf() < 0.65})
+                    var embers: Array = []
+                    for _e in range(4):
+                        var ea: float = cf_rng.randf_range(0.0, TAU)
+                        var ed: float = visual_r * cf_rng.randf_range(0.10, 0.72)
+                        embers.append({
+                            "base": center + Vector2(cos(ea) * ed, sin(ea) * ed * 0.74),
+                            "phase": cf_rng.randf_range(0.0, 1.0),
+                            "speed": cf_rng.randf_range(0.85, 1.45),
+                            "height": cf_rng.randf_range(14.0, 28.0),
+                            "r": cf_rng.randf_range(1.2, 2.2)
+                        })
+                    field["_cannon_fire"] = {"pools": pools, "dots": dots, "embers": embers}
+                var cf: Dictionary = field["_cannon_fire"]
+                # Soft warm ground scorch wash wide enough to enclose all magma blobs & sparks
+                var wash_r: float = radius * 1.12
+                canvas.draw_texture_rect(glow, Rect2(center - Vector2(wash_r, wash_r * 0.74), Vector2(wash_r * 2.0, wash_r * 1.48)), false, Color(0.12, 0.56, 0.28, 0.42 * alpha) if is_green_fire else Color(0.58, 0.21, 0.08, 0.42 * alpha))
+                var inner_wash_r: float = radius * 0.72
+                canvas.draw_texture_rect(glow, Rect2(center - Vector2(inner_wash_r, inner_wash_r * 0.74), Vector2(inner_wash_r * 2.0, inner_wash_r * 1.48)), false, Color(0.18, 0.72, 0.36, 0.34 * alpha) if is_green_fire else Color(0.72, 0.25, 0.07, 0.34 * alpha))
+                # Center-dense non-stacked volcanic molten magma blobs & dots, strictly inside the scorch wash
+                var pool_dark := Color(0.08, 0.42, 0.20, 0.88 * alpha) if is_green_fire else Color(0.62, 0.16, 0.06, 0.88 * alpha)
+                var pool_mid := Color(0.22, 0.86, 0.46, 0.86 * alpha * flicker) if is_green_fire else Color(0.92, 0.38, 0.09, 0.86 * alpha * flicker)
+                var pool_core := Color(0.78, 1.0, 0.62, 0.86 * alpha * flicker) if is_green_fire else Color(1.0, 0.74, 0.24, 0.86 * alpha * flicker)
+                for pool in cf["pools"]:
+                    canvas.draw_colored_polygon(pool["poly"], pool_dark)
+                    var cr: float = float(pool["r"]) * 0.56
+                    canvas.draw_circle(pool["center"], cr, pool_mid)
+                    canvas.draw_circle(pool["center"], cr * 0.44, pool_core)
+                for dt in cf["dots"]:
+                    var tw: float = 0.55 + 0.45 * sin(age * 8.5 + float(dt["phase"]))
+                    var p: Vector2 = dt["pos"]
+                    var dr: float = float(dt["r"])
+                    canvas.draw_circle(p, dr, Color(0.10, 0.48, 0.24, 0.86 * alpha) if is_green_fire else Color(0.68, 0.19, 0.07, 0.86 * alpha))
+                    if bool(dt["hot"]):
+                        canvas.draw_circle(p, dr * 0.50, Color(0.78, 1.0, 0.62, 0.90 * alpha * tw) if is_green_fire else Color(1.0, 0.66, 0.18, 0.90 * alpha * tw))
+                # Rising embers
+                for em in cf["embers"]:
+                    var cyc: float = fmod(age * float(em["speed"]) + float(em["phase"]), 1.0)
+                    var ea_fade: float = alpha * clampf(cyc / 0.15, 0.0, 1.0) * clampf((1.0 - cyc) / 0.35, 0.0, 1.0)
+                    var ep: Vector2 = Vector2(em["base"]) + Vector2(sin(cyc * 5.0 + float(em["phase"]) * 6.0) * 3.0, -cyc * float(em["height"]))
+                    canvas.draw_circle(ep, float(em["r"]) * lerpf(1.0, 0.45, cyc), Color(0.74, 1.0, 0.56, 0.90 * ea_fade * flicker) if is_green_fire else Color(1.0, 0.68, 0.18, 0.90 * ea_fade * flicker))
+            else:
+                # Hammer Fire Crater: unified 3-layer ground cracks + well-distributed non-clumped magma & rising embers around the cracks!
+                var flicker: float = 0.90 + 0.10 * sin(age * 9.5 + seed_val)
+                if not field.has("_crater_cracks"):
+                    var cseed: int = int(absf(center.x * 71.0 + center.y * 149.0)) + 29
+                    field["_crater_cracks"] = Effects.make_radial_cracks(center, radius * 1.18, cseed, 3, 6, 0.74, false)
+                if not field.has("_fire_magma"):
+                    var fseed: int = int(absf(center.x * 89.0 + center.y * 173.0)) + int(roundi(radius * 17.0))
+                    var fr := RandomNumberGenerator.new()
+                    fr.seed = fseed
+                    var visual_r: float = radius * 0.88
+                    var placed: Array = []
+                    var pools: Array = []
+                    # Place 4 well-separated magma spots distributed around the cracks (NO clumping/piling in the center!)
+                    for i in range(4):
+                        var sz: float = fr.randf_range(4.2, 6.4) * clampf(radius / 58.0, 0.78, 1.15)
+                        var p: Vector2 = center
+                        var found: bool = false
+                        for _try in range(24):
+                            var nd: float = fr.randf_range(0.24, 0.76)
+                            var a: float = fr.randf_range(0.0, TAU)
+                            var cand: Vector2 = center + Vector2(cos(a) * visual_r * nd, sin(a) * visual_r * nd * 0.74)
+                            var ok: bool = true
+                            for prev in placed:
+                                if cand.distance_to(prev["pos"]) < sz + float(prev["r"]) + 8.0:
+                                    ok = false
+                                    break
+                            if ok:
+                                p = cand
+                                found = true
+                                break
+                        if not found:
+                            continue
+                        placed.append({"pos": p, "r": sz})
+                        var poly := PackedVector2Array()
+                        for s in range(8):
+                            var sa: float = TAU * float(s) / 8.0 + fr.randf_range(-0.2, 0.2)
+                            var sr: float = sz * fr.randf_range(0.76, 1.14)
+                            poly.append(p + Vector2(cos(sa) * sr, sin(sa) * sr * 0.72))
+                        pools.append({"poly": poly, "center": p, "r": sz})
+                    # Well-spaced glowing magma dots scattered across the cracked zone (non-overlapping!)
+                    var dots: Array = []
+                    for _i in range(14):
+                        var dr: float = fr.randf_range(1.6, 3.2)
+                        var p: Vector2 = center
+                        var nd: float = 0.5
+                        var found: bool = false
+                        for _try in range(20):
+                            nd = sqrt(fr.randf()) * 0.94
+                            var a: float = fr.randf_range(0.0, TAU)
+                            var cand: Vector2 = center + Vector2(cos(a) * visual_r * nd, sin(a) * visual_r * nd * 0.74)
+                            var ok: bool = true
+                            for prev in placed:
+                                if cand.distance_to(prev["pos"]) < dr + float(prev["r"]) + 4.5:
+                                    ok = false
+                                    break
+                            if ok:
+                                p = cand
+                                found = true
+                                break
+                        if not found:
+                            continue
+                        placed.append({"pos": p, "r": dr})
+                        dots.append({"pos": p, "r": dr, "phase": fr.randf_range(0.0, TAU), "hot": nd < 0.75 and fr.randf() < 0.65})
+                    var embers: Array = []
+                    var f_spines: Array = []
+                    for ck in field["_crater_cracks"]:
+                        var sp_arr: Array = ck.get("spine", [])
+                        for s_i in range(maxi(0, sp_arr.size() - 1)):
+                            f_spines.append(Vector2(sp_arr[s_i]).lerp(Vector2(sp_arr[s_i + 1]), 0.35))
+                    for _e in range(9):
+                        var ebase: Vector2
+                        if not f_spines.is_empty() and fr.randf() < 0.85:
+                            ebase = Vector2(f_spines[fr.randi_range(0, f_spines.size() - 1)]) + Vector2(fr.randf_range(-4.0, 4.0), fr.randf_range(-3.0, 3.0))
+                        else:
+                            var ea: float = fr.randf_range(0.0, TAU)
+                            var ed: float = visual_r * fr.randf_range(0.18, 0.72)
+                            ebase = center + Vector2(cos(ea) * ed, sin(ea) * ed * 0.74)
+                        embers.append({
+                            "base": ebase,
+                            "phase": fr.randf_range(0.0, 1.0),
+                            "speed": fr.randf_range(0.80, 1.35),
+                            "height": fr.randf_range(18.0, 38.0),
+                            "r": fr.randf_range(1.4, 2.6)
+                        })
+                    field["_fire_magma"] = {"pools": pools, "dots": dots, "embers": embers}
+                var fm: Dictionary = field["_fire_magma"]
+                # 1) Soft warm volcanic-amber/emerald pit wash
+                var pit_r: float = radius * 1.14
+                canvas.draw_texture_rect(glow, Rect2(center - Vector2(pit_r, pit_r * 0.74), Vector2(pit_r * 2.0, pit_r * 1.48)), false, Color(0.12, 0.56, 0.28, 0.44 * alpha) if is_green_fire else Color(0.62, 0.22, 0.08, 0.44 * alpha))
+                var inner_r: float = radius * 0.72
+                canvas.draw_texture_rect(glow, Rect2(center - Vector2(inner_r, inner_r * 0.74), Vector2(inner_r * 2.0, inner_r * 1.48)), false, Color(0.20, 0.78, 0.42, 0.40 * alpha * flicker) if is_green_fire else Color(0.84, 0.30, 0.08, 0.40 * alpha * flicker))
+                # 2) Unified 3-layer ground cracks ON TOP of the wash
+                Effects.draw_elemental_cracks(
+                    canvas, field["_crater_cracks"],
+                    Color(0.26, 0.19, 0.13, 0.88 * alpha),
+                    Color(0.14, 0.10, 0.08, 0.90 * alpha),
+                    Color(0.32, 0.96, 0.56, 0.94 * alpha * flicker) if is_green_fire else Color(0.98, 0.48, 0.14, 0.94 * alpha * flicker)
+                )
+                # 3) Well-spaced magma spots around the cracks (NOT piled in the middle!)
+                var fm_dark := Color(0.08, 0.42, 0.20, 0.86 * alpha) if is_green_fire else Color(0.62, 0.16, 0.06, 0.86 * alpha)
+                var fm_mid := Color(0.22, 0.86, 0.46, 0.86 * alpha * flicker) if is_green_fire else Color(0.92, 0.38, 0.09, 0.86 * alpha * flicker)
+                var fm_core := Color(0.78, 1.0, 0.62, 0.86 * alpha * flicker) if is_green_fire else Color(1.0, 0.74, 0.24, 0.86 * alpha * flicker)
+                for pool in fm["pools"]:
+                    canvas.draw_colored_polygon(pool["poly"], fm_dark)
+                    var cr: float = float(pool["r"]) * 0.56
+                    canvas.draw_circle(pool["center"], cr, fm_mid)
+                    canvas.draw_circle(pool["center"], cr * 0.44, fm_core)
+                # 4) Evenly-distributed glowing magma dots + rising hot embers
+                for dt in fm["dots"]:
+                    var tw: float = 0.55 + 0.45 * sin(age * 8.0 + float(dt["phase"]))
+                    var p: Vector2 = dt["pos"]
+                    var dr: float = float(dt["r"])
+                    canvas.draw_circle(p, dr, Color(0.10, 0.48, 0.24, 0.86 * alpha) if is_green_fire else Color(0.68, 0.19, 0.07, 0.86 * alpha))
+                    if bool(dt["hot"]):
+                        canvas.draw_circle(p, dr * 0.52, Color(0.78, 1.0, 0.62, 0.90 * alpha * tw) if is_green_fire else Color(1.0, 0.68, 0.18, 0.90 * alpha * tw))
+                for em in fm["embers"]:
+                    var cyc: float = fmod(age * float(em["speed"]) + float(em["phase"]), 1.0)
+                    var ea_fade: float = alpha * clampf(cyc / 0.15, 0.0, 1.0) * clampf((1.0 - cyc) / 0.35, 0.0, 1.0)
+                    var ep: Vector2 = Vector2(em["base"]) + Vector2(sin(cyc * 5.0 + float(em["phase"]) * 6.0) * 3.5, -cyc * float(em["height"]))
+                    canvas.draw_circle(ep, float(em["r"]) * lerpf(1.0, 0.45, cyc), Color(0.76, 1.0, 0.58, 0.92 * ea_fade * flicker) if is_green_fire else Color(1.0, 0.70, 0.20, 0.92 * ea_fade * flicker))
+        elif kind == "thunder_mark":
+            # Fine, continuous Lichtenberg electric ground veins radiating seamlessly FROM center (stopping cleanly at lava rims!)
+            if not field.has("_thunder_polys"):
+                if map_view != null and map_view.is_in_lava(center, 4.0):
+                    field["_thunder_polys"] = []
+                    field["_in_lava"] = true
+                else:
+                    field["_in_lava"] = false
+                    var tr := RandomNumberGenerator.new()
+                    tr.seed = int(absf(center.x * 79.0 + center.y * 151.0)) + 41
+                    var polys: Array = []
+                    var v_count: int = tr.randi_range(6, 8)
+                    var base_a: float = tr.randf_range(0.0, TAU)
+                    var step_a: float = TAU / float(v_count)
+                    for i in range(v_count):
+                        var a: float = base_a + float(i) * step_a + tr.randf_range(-step_a * 0.32, step_a * 0.32)
+                        var cur: Vector2 = center
+                        var spine: Array = [cur]
+                        var segs: int = tr.randi_range(4, 5)
+                        var seg_len: float = (radius * tr.randf_range(0.72, 1.06)) / float(segs)
+                        var zig: float = 1.0 if tr.randf() < 0.5 else -1.0
+                        for _s in range(segs):
+                            var sa: float = a + zig * tr.randf_range(0.10, 0.24)
+                            zig = -zig
+                            var next_pt: Vector2 = cur + Vector2(cos(sa), sin(sa) * 0.74) * seg_len * tr.randf_range(0.82, 1.18)
+                            var clip: Dictionary = _clip_point_before_lava(cur, next_pt, 4.0)
+                            if bool(clip["hit"]):
+                                var rim_pt: Vector2 = clip["point"]
+                                if rim_pt.distance_squared_to(cur) > 4.0:
+                                    spine.append(rim_pt)
+                                break
+                            cur = next_pt
+                            spine.append(cur)
+                        if spine.size() >= 2:
+                            polys.append(Effects._build_tapered_crack(spine, radius * tr.randf_range(0.018, 0.026)))
+                        # Fine branching sub-veins along the main vein
+                        for b_try in range(2):
+                            if spine.size() >= 4 and tr.randf() < 0.70:
+                                var fidx: int = clampi(1 + b_try, 1, spine.size() - 2)
+                                var fcur: Vector2 = spine[fidx]
+                                var fspine: Array = [fcur]
+                                var fa: float = a + (1.0 if b_try == 0 else -1.0) * tr.randf_range(0.32, 0.62)
+                                for _fs in range(2):
+                                    var fsa: float = fa + (1.0 if _fs % 2 == 0 else -1.0) * tr.randf_range(0.06, 0.16)
+                                    var fnext: Vector2 = fcur + Vector2(cos(fsa), sin(fsa) * 0.74) * (radius * tr.randf_range(0.12, 0.22))
+                                    var fclip: Dictionary = _clip_point_before_lava(fcur, fnext, 4.0)
+                                    if bool(fclip["hit"]):
+                                        var frim: Vector2 = fclip["point"]
+                                        if frim.distance_squared_to(fcur) > 4.0:
+                                            fspine.append(frim)
+                                        break
+                                    fcur = fnext
+                                    fspine.append(fcur)
+                                if fspine.size() >= 2:
+                                    polys.append(Effects._build_tapered_crack(fspine, radius * 0.012))
+                    field["_thunder_polys"] = polys
+            if bool(field.get("_in_lava", false)):
+                continue
+            # Unified scorched strike core + fine silver-white (or crimson Red Lightning) tapered electric veins
+            var mark_alpha: float = clampf((1.0 - age / life) / 0.35, 0.0, 1.0)
+            var is_red_mark: bool = bool(field.get("red", false))
+            var glow_r: float = radius * 1.05
+            canvas.draw_texture_rect(glow, Rect2(center - Vector2(glow_r, glow_r * 0.74), Vector2(glow_r * 2.0, glow_r * 1.48)), false, Color(0.86, 0.20, 0.14, 0.38 * mark_alpha) if is_red_mark else Color(0.76, 0.86, 0.96, 0.38 * mark_alpha))
+            var pulse: float = 0.82 + 0.18 * sin(age * 14.0 + seed_val)
+            var rim_col: Color = Color(0.32, 0.09, 0.09, 0.86 * mark_alpha) if is_red_mark else Color(0.22, 0.27, 0.36, 0.82 * mark_alpha)
+            var inner_col: Color = Color(1.0, 0.34, 0.20, 0.96 * mark_alpha * pulse) if is_red_mark else Color(0.96, 0.99, 1.0, 0.98 * mark_alpha * pulse)
+            # 2-pass layered draw: ALL dark rims first, then ALL bright glowing cores on top
+            # so center hub and every branch junction merge seamlessly with ZERO dark cutoffs!
+            canvas.draw_circle(center, 5.2 * mark_alpha, rim_col)
+            for ck in field["_thunder_polys"]:
+                canvas.draw_colored_polygon(ck["outer"], rim_col)
+            canvas.draw_circle(center, 3.4 * mark_alpha, inner_col)
+            for ck in field["_thunder_polys"]:
+                canvas.draw_colored_polygon(ck["inner"], inner_col)
+        elif kind == "thunder":
+            # Persistent crackling thunder crater residue (e.g. thunder_hammer slam pit)
+            var t_pulse: float = 0.88 + 0.12 * sin(age * 16.0 + seed_val)
+            var tr_out: float = radius * 0.98
+            canvas.draw_texture_rect(glow, Rect2(center - Vector2(tr_out, tr_out * 0.74), Vector2(tr_out * 2.0, tr_out * 1.48)), false, Color(0.32, 0.68, 0.84, 0.34 * alpha))
+            var tr_in: float = radius * 0.54 * t_pulse
+            canvas.draw_texture_rect(glow, Rect2(center - Vector2(tr_in, tr_in * 0.74), Vector2(tr_in * 2.0, tr_in * 1.48)), false, Color(0.86, 0.94, 0.62, 0.36 * alpha))
+            var arc_step: int = int(floor(age * 11.0))
+            var tr_rng := _draw_rng
+            tr_rng.seed = int(absf(center.x * 53.0 + center.y * 113.0)) + arc_step * 17
+            for _a in range(3):
+                var ang: float = tr_rng.randf_range(0.0, TAU)
+                var cur: Vector2 = center + Vector2(cos(ang), sin(ang) * 0.74) * tr_rng.randf_range(4.0, radius * 0.18)
+                var pts := PackedVector2Array([cur])
+                for _s in range(3):
+                    ang += tr_rng.randf_range(-0.65, 0.65)
+                    cur += Vector2(cos(ang), sin(ang) * 0.74) * tr_rng.randf_range(radius * 0.16, radius * 0.28)
+                    pts.append(cur)
+                canvas.draw_polyline(pts, Color(0.36, 0.82, 0.94, 0.82 * alpha), 3.0, true)
+                canvas.draw_polyline(pts, Color(1.0, 0.97, 0.78, 0.92 * alpha), 1.3, true)
+            for sp_i in range(10):
+                var cyc: float = fmod(age * 1.15 + float(sp_i) * 0.1 + seed_val * 0.07, 1.0)
+                var ang2: float = float(sp_i) * 2.399 + seed_val
+                var d2: float = radius * (0.20 + 0.55 * fmod(float(sp_i) * 0.37, 1.0))
+                var sp: Vector2 = center + Vector2(cos(ang2) * d2, sin(ang2) * d2 * 0.74 - cyc * 34.0)
+                var sa: float = alpha * clampf(cyc / 0.15, 0.0, 1.0) * clampf((1.0 - cyc) / 0.35, 0.0, 1.0)
+                canvas.draw_circle(sp, lerpf(2.5, 1.0, cyc), Color(0.96, 0.98, 0.70, 0.94 * sa))
+        else:
+            # Lightweight translucent parchment dust puffs (airy dust, NOT meteorite cloud or opaque sticker)
+            if not field.has("_smoke_puffs"):
+                var sr := RandomNumberGenerator.new()
+                sr.seed = int(absf(center.x * 61.0 + center.y * 131.0)) + 7
+                var spuffs: Array = []
+                for _sp in range(3):
+                    spuffs.append({"off": Vector2(sr.randf_range(-radius * 0.42, radius * 0.42), sr.randf_range(-radius * 0.24, radius * 0.24)), "r": radius * sr.randf_range(0.30, 0.46), "drift": Vector2(sr.randf_range(-10.0, 10.0), sr.randf_range(-20.0, -10.0)), "seed": sr.randf_range(0.0, 10.0)})
+                field["_smoke_puffs"] = spuffs
+            for sp in field["_smoke_puffs"]:
+                var sp_pos: Vector2 = center + Vector2(sp["off"]) + Vector2(sp["drift"]) * age
+                var sp_r: float = float(sp["r"]) * (0.82 + age * 0.42)
+                Effects.draw_dust_puff(canvas, sp_pos, sp_r, alpha, float(sp["seed"]))
+
+func draw_link_shapes() -> void:
+    if ground_marks_layer == null:
+        draw_burning_fields(self)
     var chain_recipe: Dictionary = current_chain_link()
     if chain_recipe.is_empty():
         return
@@ -3387,26 +4651,51 @@ func set_music(enabled: bool) -> void:
     music.set_enabled(enabled)
     hud.configure_music(enabled)
 
+func current_vfx_mode() -> String:
+    var raw: String = str(settings.get("vfx_mode", ""))
+    if raw in ["full", "minimal", "off"]:
+        return raw
+    return "full" if bool(settings.get("vfx_enabled", true)) else "minimal"
+
 func set_damage_numbers(enabled: bool) -> void:
     var previous: bool = bool(settings.get("damage_numbers", true))
     settings["damage_numbers"] = enabled
     var result: Dictionary = save_store.write_settings(settings)
     if not result.get("ok", false):
         settings["damage_numbers"] = previous
-        hud.configure_display(previous, bool(settings.get("fullscreen", false)))
+        hud.configure_display(previous, bool(settings.get("fullscreen", false)), current_vfx_mode())
         hud.save_note = "显示设置未保存：" + str(result.get("error", ""))
         if is_instance_valid(hud.save_note_label): hud.save_note_label.text = hud.save_note
         return
-    hud.configure_display(enabled, bool(settings.get("fullscreen", false)))
+    hud.configure_display(enabled, bool(settings.get("fullscreen", false)), current_vfx_mode())
+
+func set_vfx_mode(mode: String) -> void:
+    var target_mode: String = mode if mode in ["full", "minimal", "off"] else "full"
+    var previous: String = current_vfx_mode()
+    settings["vfx_mode"] = target_mode
+    settings["vfx_enabled"] = target_mode == "full"
+    effects.set_vfx_mode(target_mode)
+    var result: Dictionary = save_store.write_settings(settings)
+    if not result.get("ok", false):
+        settings["vfx_mode"] = previous
+        settings["vfx_enabled"] = previous == "full"
+        effects.set_vfx_mode(previous)
+        hud.configure_display(bool(settings.get("damage_numbers", true)), bool(settings.get("fullscreen", false)), previous)
+        hud.save_note = "特效设置未保存：" + str(result.get("error", ""))
+        if is_instance_valid(hud.save_note_label): hud.save_note_label.text = hud.save_note
+        return
+    hud.configure_display(bool(settings.get("damage_numbers", true)), bool(settings.get("fullscreen", false)), target_mode)
 
 func apply_display_mode(fullscreen: bool) -> void:
     if DisplayServer.get_name() == "headless":
         return
     if fullscreen:
+        DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
         DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
     else:
         DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
         _fit_playable_window()
+        call_deferred("_fit_playable_window")
     _apply_content_scale()
 
 func _apply_content_scale() -> void:
@@ -3462,3 +4751,154 @@ func set_volume(kind: String, value: float) -> void:
         if audio != null and audio.has_method("set_volume"):
             audio.set_volume(sfx_volume)
     hud.configure_volumes(music_volume, sfx_volume)
+
+func start_training_camp() -> void:
+    # Protect any active normal run via autosave before entering training camp.
+    if running and not trial_mode and not training_mode and not demo and not animation_demo and settings.get("autosave", true):
+        save_game()
+    start_run(false)
+    training_mode = true
+    training_godmode = true
+    training_enemy_wave = 10
+    training_enemy_immortal = false
+    wave = 10
+    paused = false
+    clear_enemies()
+    projectiles.clear()
+    burning_fields.clear()
+    pickups.clear()
+    coins = 99999
+    if hud != null and hud.has_method("hide_overlay"):
+        hud.hide_overlay()
+    update_hud()
+    open_training_panel()
+
+func toggle_training_panel() -> void:
+    if not training_mode or not running:
+        return
+    if training_panel_open:
+        close_training_panel()
+    else:
+        open_training_panel()
+
+func open_training_panel() -> void:
+    if not training_mode or hud == null:
+        return
+    close_link_pack()
+    if training_panel == null or not is_instance_valid(training_panel):
+        training_panel = TrainingPanelScript.new()
+        training_panel.name = "TrainingCampPanel"
+        training_panel.z_index = 90
+        training_panel.closed.connect(close_training_panel)
+        training_panel.exit_training_requested.connect(exit_training_camp)
+        training_panel.open_links_requested.connect(func():
+            close_training_panel()
+            paused = false
+            if hud != null and hud.screen not in ["combat", "link_pack", "shop", ""]:
+                hud.hide_menu()
+            open_link_pack()
+        )
+        hud.root.add_child(training_panel)
+        training_panel.setup(self)
+    else:
+        training_panel.visible = true
+        training_panel.refresh()
+    training_panel_open = true
+    audio.set_paused(true)
+
+func close_training_panel() -> void:
+    training_panel_open = false
+    if training_panel != null and is_instance_valid(training_panel):
+        training_panel.visible = false
+    if running and not paused and not shop_open and not link_pack_open:
+        audio.set_paused(false)
+
+func exit_training_camp() -> void:
+    close_training_panel()
+    training_mode = false
+    go_home()
+
+func training_set_weapon_level(weapon_id: String, target_level: int) -> void:
+    if not Catalog.WEAPONS.has(weapon_id):
+        return
+    var clamped: int = clampi(target_level, 1, Growth.MAX_WEAPON_LEVEL)
+    var existing_idx: int = -1
+    for i in range(inventory.size()):
+        if str(inventory[i].get("id", "")) == weapon_id:
+            existing_idx = i
+            break
+    if existing_idx >= 0:
+        inventory[existing_idx]["level"] = clamped
+        bind_weapon_view(weapon_id)
+    else:
+        if inventory.size() >= 6:
+            return
+        grant_weapon(weapon_id, clamped)
+    available_links = Rules.link_options(Catalog.inventory_ids(inventory))
+    refresh_stats()
+    update_hud()
+
+func training_remove_weapon(weapon_id: String) -> void:
+    for i in range(inventory.size() - 1, -1, -1):
+        if str(inventory[i].get("id", "")) == weapon_id:
+            inventory.remove_at(i)
+            break
+    if weapon_views.has(weapon_id):
+        if is_instance_valid(weapon_views[weapon_id]):
+            weapon_views[weapon_id].queue_free()
+        weapon_views.erase(weapon_id)
+    weapon_runtime.erase(weapon_id)
+    if armory != null:
+        armory.states.erase(weapon_id)
+    var keep_links: Array = []
+    for recipe in active_links:
+        if not recipe.get("weapons", []).has(weapon_id):
+            keep_links.append(str(recipe.get("id", "")))
+    apply_links(keep_links)
+    available_links = Rules.link_options(Catalog.inventory_ids(inventory))
+    refresh_stats()
+    update_hud()
+
+func training_set_buff(buff_id: String, target_level: int) -> void:
+    if not Growth.BUFFS.has(buff_id):
+        return
+    buff_levels[buff_id] = maxi(0, target_level)
+    refresh_stats()
+    if buff_id == "vitality":
+        player_hp = float(stats["max_hp"])
+    update_hud()
+
+func training_set_enemy_wave(target_wave: int) -> void:
+    training_enemy_wave = target_wave
+    wave = target_wave if target_wave > 0 else 10
+    update_hud()
+
+func training_spawn(pack_kind: String, count: int) -> void:
+    var n: int = maxi(1, count)
+    wave = training_enemy_wave if training_enemy_wave > 0 else 10
+    var spawned: Array = []
+    if pack_kind == "boss":
+        var pos: Vector2 = player_position + Vector2(260.0, 0.0)
+        spawn_enemy("boss", pos, false, "instant")
+        if not enemies.is_empty():
+            spawned.append(enemies.back())
+    elif pack_kind == "elite":
+        var pos: Vector2 = player_position + Vector2(220.0, -30.0)
+        spawn_enemy("tank", pos, true, "instant")
+        if not enemies.is_empty():
+            spawned.append(enemies.back())
+    else:
+        var pool: Array = ["hunter", "raptor", "charger", "spitter"] if pack_kind == "mixed" else ["tank", "charger", "spitter", "reedspitter", "cindertusk"]
+        for i in range(n):
+            var a: float = TAU * float(i) / float(n) + rng.randf_range(-0.2, 0.2)
+            var d: float = rng.randf_range(210.0, 310.0)
+            var kind: String = str(pool[i % pool.size()])
+            spawn_enemy(kind, player_position + Vector2(cos(a) * d, sin(a) * d * 0.78), false, "instant")
+            if not enemies.is_empty():
+                spawned.append(enemies.back())
+    if training_enemy_wave == 0:
+        for e in spawned:
+            e["hp"] = 100000.0
+            e["max_hp"] = 100000.0
+            if is_instance_valid(e.get("view", null)):
+                e["view"].health_fraction = 1.0

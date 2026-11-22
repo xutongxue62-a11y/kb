@@ -22,12 +22,53 @@ func _init() -> void:
     var shader: Shader = Shader.new()
     shader.code = """shader_type canvas_item;
 render_mode unshaded;
+uniform float charge_progress = 0.0;
+uniform vec4 charge_color : source_color = vec4(1.0, 0.72, 0.32, 1.0);
+uniform float flow_horizontal = 0.0;
+uniform int elem_style = 0; // 0=neutral, 1=rune, 2=fire, 3=thunder
 varying vec4 tint;
 void vertex() { tint = COLOR; }
 void fragment() {
     vec4 sample_color = texture(TEXTURE, UV);
     float coverage = smoothstep(0.72, 0.97, sample_color.a);
-    COLOR = vec4(sample_color.rgb, coverage) * tint;
+    vec3 rgb = sample_color.rgb;
+    if (charge_progress > 0.01 && elem_style > 0 && coverage > 0.05) {
+        vec2 px = TEXTURE_PIXEL_SIZE * 2.0;
+        vec4 s_u = texture(TEXTURE, UV + vec2(0.0, -px.y));
+        vec4 s_d = texture(TEXTURE, UV + vec2(0.0, px.y));
+        vec4 s_l = texture(TEXTURE, UV + vec2(-px.x, 0.0));
+        vec4 s_r = texture(TEXTURE, UV + vec2(px.x, 0.0));
+        float interior = smoothstep(0.62, 0.95, min(min(s_u.a, s_d.a), min(s_l.a, s_r.a)));
+        float luma = dot(rgb, vec3(0.299, 0.587, 0.114));
+        float avg_luma = dot((s_u.rgb + s_d.rgb + s_l.rgb + s_r.rgb) * 0.25, vec3(0.299, 0.587, 0.114));
+        float seam = clamp((avg_luma - luma) * 5.8 + smoothstep(0.36, 0.14, luma) * 0.52, 0.0, 1.0) * interior;
+        float axis_t = mix(1.0 - UV.y, UV.x, flow_horizontal);
+        float ramp = smoothstep(0.02, 0.25, charge_progress);
+        vec3 col = charge_color.rgb;
+        if (elem_style == 1) {
+            // 魔法本体：柔和奥术内光随聚焦渐亮
+            float glow_m = clamp((seam * 0.65 + interior * 0.28) * charge_progress * ramp, 0.0, 1.0);
+            rgb = mix(rgb, col, glow_m * 0.62);
+            rgb += mix(col, vec3(1.0), 0.5) * (seam * charge_progress * ramp * 0.25);
+        } else if (elem_style == 2) {
+            // 火焰本体：熔炉鼓风式由内向外烧红至炽金白热
+            float core_dist = length((UV - vec2(0.5, 0.5)) * vec2(1.4, 1.4));
+            float forge = clamp((1.0 - smoothstep(0.05, 0.85, core_dist - charge_progress * 0.45)) * interior * charge_progress, 0.0, 1.0);
+            float heat = clamp(forge * (0.72 + 0.28 * sin(TIME * 22.0)) + seam * charge_progress * 0.55, 0.0, 1.0);
+            vec3 ember = mix(vec3(0.82, 0.16, 0.02), vec3(1.0, 0.68, 0.14), smoothstep(0.18, 0.82, heat));
+            vec3 white_hot = vec3(1.0, 0.94, 0.56);
+            rgb = mix(rgb, ember, heat * 0.82);
+            rgb += white_hot * (smoothstep(0.62, 1.0, heat) * 0.45);
+        } else if (elem_style == 3) {
+            // 雷电本体：高压电纹沿缝隙随充能加快劈闪
+            float t_step = floor(TIME * (14.0 + 16.0 * charge_progress));
+            float h = fract(sin(dot(vec2(floor(axis_t * 14.0), t_step), vec2(12.9898, 78.233))) * 43758.5453);
+            float bolt = clamp(seam * step(0.42 - 0.22 * charge_progress, h) * ramp * (0.65 + 0.55 * charge_progress), 0.0, 1.0);
+            rgb = mix(rgb, col, bolt * 0.88);
+            rgb += mix(col, vec3(1.0), 0.65) * (bolt * 0.48);
+        }
+    }
+    COLOR = vec4(rgb, coverage) * tint;
 }
 """
     weapon_material = ShaderMaterial.new()
@@ -105,7 +146,10 @@ func weapon_texture(key: String,level: int=1) -> Texture2D:
 func make_weapon(key: String, target_size: float,level: int=1) -> Sprite2D:
     var sprite: Sprite2D = Sprite2D.new()
     sprite.texture = weapon_texture(key,level)
-    sprite.material = weapon_material
+    var mat: ShaderMaterial = weapon_material.duplicate() as ShaderMaterial
+    mat.set_shader_parameter("flow_horizontal", 1.0 if key == "powder" else 0.0)
+    mat.set_shader_parameter("charge_progress", 0.0)
+    sprite.material = mat
     sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
     var dimensions: Vector2 = sprite.texture.get_size()
     sprite.scale = Vector2.ONE * target_size / float(sprite.texture.get_meta("display_extent",maxf(dimensions.x,dimensions.y)))

@@ -156,7 +156,7 @@ func check_exclusive_weapons() -> void:
     var pot_target: Array = [enemy(1, Vector2(150, 0))]
     simulate_weapon(armory, views, "firepot", 0.8, pot_target, {"attack_speed": 1.0, "character_id": "barbarian"})
     var base_fire: Dictionary = armory.states.get("firepot", {}).get("fires", [{}])[0] if not armory.states.get("firepot", {}).get("fires", []).is_empty() else {}
-    expect(not base_fire.is_empty() and is_equal_approx(float(base_fire.get("radius", 0.0)), 56.0) and is_equal_approx(float(base_fire.get("life", 0.0)), 1.85), "a non-firekeeper pot keeps the default field")
+    expect(not base_fire.is_empty() and is_equal_approx(float(base_fire.get("radius", 0.0)), 56.0) and is_equal_approx(float(base_fire.get("life", 0.0)), 1.15), "a non-firekeeper pot keeps the default field")
     var base_damage: float = float(base_fire.get("damage", 0.0))
     armory.reset()
     simulate_weapon(armory, views, "firepot", 0.8, pot_target, {"attack_speed": 1.0, "character_id": "firekeeper"})
@@ -164,7 +164,7 @@ func check_exclusive_weapons() -> void:
     expect(not mastered.is_empty(), "the firekeeper pot still lands a field")
     if not mastered.is_empty():
         expect(is_equal_approx(float(mastered.get("radius", 0.0)), 56.0 * 1.25), "the firekeeper field is larger")
-        expect(is_equal_approx(float(mastered.get("life", 0.0)), 1.85 * 1.35), "the firekeeper field lasts longer")
+        expect(is_equal_approx(float(mastered.get("life", 0.0)), 1.15 * 1.35), "the firekeeper field lasts longer")
         expect(is_equal_approx(float(mastered.get("damage", 0.0)), base_damage * 1.25), "the firekeeper field burns harder")
 
     var chain: Array = [enemy(1, Vector2(90, 0), 20.0), enemy(2, Vector2(140, 0), 20.0), enemy(3, Vector2(190, 0), 20.0), enemy(4, Vector2(240, 0), 20.0), enemy(5, Vector2(290, 0), 20.0)]

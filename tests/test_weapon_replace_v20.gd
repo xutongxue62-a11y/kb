@@ -170,8 +170,8 @@ func run() -> void:
     expect(store.write_run(state).ok, "optional high-tier shop level is a backward-compatible save field")
     var restored: Dictionary = store.read_run()
     expect(restored.ok and int(restored.state.shop_stock[0].get("level", 0)) == 5, "a direct Lv.5 shop offer survives a save roundtrip")
-    state.shop_stock[0].level = 9
-    expect(not store.write_run(state).ok, "shop levels outside 1-5 are rejected")
+    state.shop_stock[0].level = Growth.MAX_WEAPON_LEVEL + 1
+    expect(not store.write_run(state).ok, "shop levels outside 1-%d are rejected" % Growth.MAX_WEAPON_LEVEL)
 
     world.queue_free()
     print("WEAPON REPLACE V20 RESULT: %d checks, %d failures" % [checks, failures])

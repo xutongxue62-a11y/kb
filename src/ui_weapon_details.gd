@@ -11,7 +11,7 @@ const COPY={
     "powder":["远程 · 范围爆炸","发射炮弹，命中后爆炸，\n对爆点周围敌人造成伤害。"],
     "staff":["远程 · 符能弹伤害","向目标同时发射多枚符弹，\n只有伤害，没有控制；5级可展开符阵轰击。"],
     "spear":["近战 · 贯刺伤害","朝目标直线刺出骨矛，\n贯穿同一直线上的敌人。"],
-    "hammer":["近战 · 范围震击","挥槌重砸近处目标，\n落点周围敌人同时受伤。"],
+    "hammer":["近战 · 跃砸震击","高抛跃起砸向目标敌群，\n落地引发大范围重砸与击退。"],
     "boomerang":["投掷 · 往返命中","掷出骨镖后飞回角色，\n去程、回程各可命中一次。"],
     "totem":["远程 · 连锁雷击","雷击在附近敌人间跳跃，\n3级起可短暂麻痹，同敌一生仅一次。"],
     "bonebow":["远程 · 贯穿骨箭","向目标发射直线骨箭，\n沿飞行路径贯穿多个敌人。"],
@@ -59,8 +59,27 @@ static func attack(key: String,level: int) -> String:
     if key=="firepot" and level>=5: return "抛出火壶形成火场，\n冷却完毕后召炎柱砸向敌群。"
     if key=="boomerang" and level>=3: return "连续 %d 轮掷出并飞回，\n每轮去程、回程各命中一次。" % (3 if level>=5 else 2)
     return str(COPY[key][1]) if COPY.has(key) else ""
+const MILESTONE_DESC := {
+    "club": ["每3击触发震荡冲击波", "每2击触发大范围震荡冲击波"],
+    "axe": ["击杀敌人触发旋风裂斩", "击杀与每3击触发大范围裂斩"],
+    "blade": ["每4击追加一次高速穿刺连斩", "每3击触发范围刃风连斩"],
+    "sling": ["每次发射2枚石弹", "每次发射3枚石弹，命中额外弹射1次"],
+    "powder": ["爆炸后残留灼烧烟场", "爆炸向四周分裂4枚破片并扩大范围"],
+    "staff": ["每次发射4枚符能弹", "每次5枚且穿透+1，定期展开符阵轰击"],
+    "spear": ["向前方扇面同时刺出多道骨矛", "往返双重贯刺，覆盖更广扇面"],
+    "hammer": ["跃砸落地追加震荡余波", "连续跃砸两次，震击更大范围"],
+    "boomerang": ["连续投掷2轮往返骨镖", "连续投掷3轮往返骨镖"],
+    "totem": ["4敌连锁雷击并概率麻痹（同敌限1次）", "连锁分叉并定期召天雷，高概率劈出赤雷"],
+    "bonebow": ["每次齐射2支贯穿骨箭", "每次齐射3支，最大穿透提升至5敌"],
+    "firepot": ["每次抛出2只火种壶", "每次抛出3只并定期召炎柱砸向敌群"],
+    "wardrum": ["三拍震波扩大范围", "强力四拍大范围震波扫场"],
+    "crystal": ["晶簇可连续引爆2次", "更大引爆范围，迸射10道贯晶"]
+}
 static func abilities(key: String,shown: int,owned: int=0) -> String:
     var labels: Array=Evolution.MILESTONES.get(key,["进阶","觉醒"])
-    if shown>=5: return ("本次觉醒" if owned<5 else "已含觉醒")+" · "+str(labels[1])+"\n已含进阶 · "+str(labels[0])
-    if shown>=3: return ("本次进阶" if owned<3 else "已含进阶")+" · "+str(labels[0])+"\n5级觉醒 · "+str(labels[1])
-    return "3级进阶 · "+str(labels[0])+"\n5级觉醒 · "+str(labels[1])
+    var descs: Array=MILESTONE_DESC.get(key,["",""])
+    var d0: String=("（"+str(descs[0])+"）") if not str(descs[0]).is_empty() else ""
+    var d1: String=("（"+str(descs[1])+"）") if not str(descs[1]).is_empty() else ""
+    if shown>=5: return ("本次觉醒" if owned<5 else "已含觉醒")+" · "+str(labels[1])+d1+"\n已含进阶 · "+str(labels[0])+d0
+    if shown>=3: return ("本次进阶" if owned<3 else "已含进阶")+" · "+str(labels[0])+d0+"\n5级觉醒 · "+str(labels[1])+d1
+    return "3级进阶 · "+str(labels[0])+d0+"\n5级觉醒 · "+str(labels[1])+d1

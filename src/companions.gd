@@ -37,13 +37,19 @@ func advance(delta: float, hero: Vector2, enemies: Array, levels: Dictionary, st
         # Cooldowns are real seconds. Haste shortens interval once, with a hard floor.
         state["cooldown"] = maxf(0.0, state["cooldown"] - delta)
         state["attack"] = maxf(0.0, state["attack"] - delta)
-        var candidates: Array = enemies
-        if key == "pet":
-            candidates = enemies.filter(func(enemy): return hero.distance_to(enemy["position"]) <= minf(PET_RANGE, PET_LEASH + float(enemy["radius"]) + PET_BITE))
-        else:
-            candidates=enemies.filter(func(enemy):return hero.distance_squared_to(enemy.position)<=420.0*420.0)
-        var target: Dictionary=Rules.choose_target(hero if key=="pet" else state.position,PET_RANGE if key=="pet" else 420.0,candidates,prefer_elite)
-        if state.regroup: target={}
+        var target: Dictionary = {}
+        if not state["regroup"]:
+            var candidates: Array = []
+            if key == "pet":
+                for enemy in enemies:
+                    var lim: float = minf(PET_RANGE, PET_LEASH + float(enemy["radius"]) + PET_BITE)
+                    if hero.distance_squared_to(enemy["position"]) <= lim * lim:
+                        candidates.append(enemy)
+            else:
+                for enemy in enemies:
+                    if hero.distance_squared_to(enemy["position"]) <= 420.0 * 420.0:
+                        candidates.append(enemy)
+            target = Rules.choose_target(hero if key == "pet" else state["position"], PET_RANGE if key == "pet" else 420.0, candidates, prefer_elite)
         var destination := hero + offset
         if key == "pet" and not target.is_empty():
             var approach: Vector2=(target.position-state.position).normalized()

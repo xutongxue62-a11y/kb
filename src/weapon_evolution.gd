@@ -19,6 +19,7 @@ static func offer_description(key: String,level: int) -> String:
     if next==5: return "5级觉醒 · "+labels[1]+"\n保留已解锁的进阶能力"
     return "3级 · "+labels[0]+"\n5级 · "+labels[1]
 
+const MELEE_IDS = ["club", "axe", "blade", "spear", "hammer"]
 const SKY_LIGHTNING_LEVEL: int = 5
 const SKY_LIGHTNING_COOLDOWN: float = 9.0
 const SKY_LIGHTNING_DAMAGE_MULT: float = 5.5
@@ -26,12 +27,45 @@ const SKY_LIGHTNING_RADIUS: float = 92.0
 const SKY_LIGHTNING_HEIGHT: float = 240.0
 const FIRE_PILLAR_LEVEL: int = 5
 const FIRE_PILLAR_COOLDOWN: float = 8.0
-const FIRE_PILLAR_DAMAGE_MULT: float = 3.2
+const FIRE_PILLAR_DAMAGE_MULT: float = 3.6
 const FIRE_PILLAR_RADIUS: float = 78.0
 const RUNE_NOVA_LEVEL: int = 5
 const RUNE_NOVA_COOLDOWN: float = 7.5
-const RUNE_NOVA_DAMAGE_MULT: float = 2.8
+const RUNE_NOVA_DAMAGE_MULT: float = 3.4
 const RUNE_NOVA_RADIUS: float = 110.0
+
+static func stage_damage_bonus(level: int) -> float:
+    if level >= 10:
+        return 3.15
+    if level >= 9:
+        return 2.75
+    if level >= 8:
+        return 2.40
+    if level >= 7:
+        return 2.10
+    if level >= 6:
+        return 1.85
+    if level >= 5:
+        return 1.65
+    if level >= 4:
+        return 1.35
+    if level >= 3:
+        return 1.25
+    return 1.0
+
+static func damage_multiplier(key: String, level: int) -> float:
+    var lvl: int = maxi(1, level)
+    var base: float = 1.0 + float(lvl - 1) * 0.35
+    var mult: float = base * stage_damage_bonus(lvl)
+    if key in MELEE_IDS:
+        mult *= (1.22 if lvl >= 5 else 1.15)
+    elif key == "sling":
+        mult *= (1.22 if lvl >= 5 else (1.10 if lvl >= 3 else 1.0))
+    elif key == "powder":
+        mult *= (1.25 if lvl >= 5 else (1.12 if lvl >= 3 else 1.0))
+    elif lvl >= 5 and key in ["firepot", "staff"]:
+        mult *= 1.28
+    return mult
 
 static func sky_lightning_unlocked(level: int) -> bool:
     return level >= SKY_LIGHTNING_LEVEL
