@@ -103,7 +103,7 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                 state["mines"].append({"from": mount, "position": target["position"], "age": 0.0, "damage": damage, "speed": data["speed"] * bullet_speed, "trigger": 78.0 * area,"fragments":10 if stage>=1 else 8,"bursts_left":2 if stage>=2 else 1})
     match key:
         "bonebow":
-            advance_projectiles(state["arrows"], dt, targets, events, key)
+            advance_projectiles(state["arrows"], dt, targets, events, key, hero)
             if state["has_fired"]:
                 view.position -= state["direction"] * maxf(0.0, 1.0 - state["age"] / 0.16) * 8.0
         "firepot":
@@ -117,8 +117,10 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                 state["fan_fire"]=true
             view.position.y -= maxf(0.0, sin(state["age"] / 0.24 * TAU)) * 3.5 if state["phase"] == "playing" else 0.0
         "crystal":
-            advance_projectiles(state["shards"], dt, targets, events, key)
+            advance_projectiles(state["shards"], dt, targets, events, key, hero)
             advance_crystals(state, dt, targets, events)
+            if state["shards"].size() > 28:
+                state["shards"] = state["shards"].slice(state["shards"].size() - 28)
             view.rotation = sin(state["age"] * 3.0) * 0.05
     state["position"] = view.position
     return events
@@ -126,18 +128,28 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
 static func projectile(point: Vector2, direction: Vector2, damage: float, speed: float, reach: float, shared_hits: Array) -> Dictionary:
     return {"position": point, "direction": direction, "damage": damage, "speed": speed, "left": reach, "hit_ids": shared_hits, "hit_count": 0}
 
-static func advance_projectiles(projectiles: Array, dt: float, targets: Array, events: Array, key: String) -> void:
+static func advance_projectiles(projectiles: Array, dt: float, targets: Array, events: Array, key: String, hero: Vector2 = Vector2(INF, INF)) -> void:
+    var has_hero: bool = hero.is_finite()
     for index in range(projectiles.size() - 1, -1, -1):
         var shot: Dictionary = projectiles[index]
         var before: Vector2 = shot["position"]
         var distance: float = minf(shot["left"], shot["speed"] * dt)
         var after: Vector2 = before + shot["direction"] * distance
+        var seg_min_x: float = minf(before.x, after.x) - 8.0
+        var seg_max_x: float = maxf(before.x, after.x) + 8.0
+        var seg_min_y: float = minf(before.y, after.y) - 8.0
+        var seg_max_y: float = maxf(before.y, after.y) + 8.0
         var crossed: Array = []
-        for target in targets:
-            if target["hp"] <= 0.0 or shot["hit_ids"].has(target["id"]):
-                continue
-            if Geometry2D.get_closest_point_to_segment(target["position"], before, after).distance_to(target["position"]) <= target["radius"] + 6.0:
-                crossed.append(target)
+        if not has_hero or (absf(before.x - hero.x) <= 860.0 and absf(before.y - hero.y) <= 860.0):
+            for target in targets:
+                if target["hp"] <= 0.0 or shot["hit_ids"].has(target["id"]):
+                    continue
+                var tpos: Vector2 = target["position"]
+                var tr: float = float(target["radius"]) + 6.0
+                if tpos.x + tr < seg_min_x or tpos.x - tr > seg_max_x or tpos.y + tr < seg_min_y or tpos.y - tr > seg_max_y:
+                    continue
+                if Geometry2D.get_closest_point_to_segment(tpos, before, after).distance_squared_to(tpos) <= tr * tr:
+                    crossed.append(target)
         # Pierce the nearest bodies first even when the roster is in spawn order.
         crossed.sort_custom(func(first, second): return before.distance_squared_to(first["position"]) < before.distance_squared_to(second["position"]))
         for target in crossed:

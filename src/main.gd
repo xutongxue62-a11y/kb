@@ -131,6 +131,8 @@ var _ground_marks_accum: float = 0.0
 var _pickup_sync_accum: float = 0.0
 var _last_pickup_count: int = -1
 var _sep_parity: int = 0
+var _armory_options_cache: Dictionary = {}
+var _armory_options_dirty: bool = true
 var _cached_stone_targets: Array = []
 var _cached_stone_pos: Vector2 = Vector2(INF, INF)
 var _cached_stone_biome: String = ""
@@ -389,6 +391,8 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     _pickup_sync_accum = 0.0
     _last_pickup_count = -1
     _sep_parity = 0
+    _armory_options_dirty = true
+    _armory_options_cache.clear()
     coins = 0
     wave_elapsed = 0.0
     boss_round = false
@@ -736,6 +740,7 @@ func refresh_stats() -> Dictionary:
     stats = Growth.stats(buff_levels, stage_hp_bonus)
     if not trial_mode:
         Catalog.apply_character_modifiers(stats, character_id)
+    _armory_options_dirty = true
     return stats
 
 func apply_buff(key: String) -> bool:
@@ -811,6 +816,7 @@ func grant_weapon(key: String, level: int = 1) -> bool:
 func bind_weapon_view(key: String) -> void:
     if not Catalog.WEAPONS.has(key):
         return
+    _armory_options_dirty = true
     if not weapon_views.has(key):
         var view: Sprite2D = library.make_weapon(key, Catalog.WEAPONS[key]["size"] * (1.24 if key == "sling" else 1.12))
         view.set_meta("base_scale", view.scale)
@@ -944,6 +950,7 @@ func apply_links(link_ids: Array, refresh: bool = true) -> void:
             weapon_runtime[key]["blend_left"] = 0.2
             weapon_runtime[key]["blend_start"] = weapon_views[key].position
     active_links = profiles
+    _armory_options_dirty = true
     active_link = Catalog.LINKS["none"].duplicate(true) if profiles.is_empty() else profiles.back().duplicate(true)
     pending_link = ""
     pending_link_ids = []
@@ -2557,30 +2564,34 @@ func enchant_damage_multiplier(weapon_id: String) -> float:
     return Rules.enchant_damage_bonus(active_links, weapon_id, Evolution.tier(weapon_level("firepot")), Evolution.tier(weapon_level("staff")), Evolution.tier(weapon_level("totem")))
 
 func update_armory(delta: float) -> void:
-    var options: Dictionary=stats.duplicate()
-    options["link_kind"]=active_link.get("kind","none") if active_links.size()<=1 else "multi"
-    options["link_kinds"]=[]
-    for recipe in active_links:
-        var kind: String = str(recipe.get("kind", "none"))
-        if not kind.is_empty() and not options["link_kinds"].has(kind):
-            options["link_kinds"].append(kind)
-    options["suppressed_weapons"]=Rules.suppressed_weapon_ids(active_links)
-    options["reload_weapon"]=str(active_link.get("reload_weapon",""))
-    options["reload_multiplier"]=float(active_link.get("cooldown_multiplier",1.0))
-    options["reload_multipliers"]=Rules.reload_multipliers(active_links)
-    options["staff_tier"]=Evolution.tier(weapon_level("staff"))
-    options["firepot_tier"]=Evolution.tier(weapon_level("firepot"))
-    options["totem_tier"]=Evolution.tier(weapon_level("totem"))
-    options["totem_level"]=weapon_level("totem")
-    options["totem_next_red"]=_peek_thunder_red("totem")
-    options["bonebow_next_red"]=_peek_thunder_red("bonebow") if Rules.host_is_thunder_enchanted(active_links, "bonebow") else false
-    options["hammer_thunder"]=Rules.host_is_thunder_enchanted(active_links, "hammer")
-    options["enchant_mults"]={
-        "spear": enchant_damage_multiplier("spear"),
-        "hammer": enchant_damage_multiplier("hammer"),
-        "boomerang": enchant_damage_multiplier("boomerang"),
-        "bonebow": enchant_damage_multiplier("bonebow")
-    }
+    if _armory_options_dirty or _armory_options_cache.is_empty():
+        _armory_options_cache = stats.duplicate()
+        _armory_options_cache["link_kind"] = active_link.get("kind", "none") if active_links.size() <= 1 else "multi"
+        var lk: Array = []
+        for recipe in active_links:
+            var rkind: String = str(recipe.get("kind", "none"))
+            if not rkind.is_empty() and not lk.has(rkind):
+                lk.append(rkind)
+        _armory_options_cache["link_kinds"] = lk
+        _armory_options_cache["suppressed_weapons"] = Rules.suppressed_weapon_ids(active_links)
+        _armory_options_cache["reload_weapon"] = str(active_link.get("reload_weapon", ""))
+        _armory_options_cache["reload_multiplier"] = float(active_link.get("cooldown_multiplier", 1.0))
+        _armory_options_cache["reload_multipliers"] = Rules.reload_multipliers(active_links)
+        _armory_options_cache["staff_tier"] = Evolution.tier(weapon_level("staff"))
+        _armory_options_cache["firepot_tier"] = Evolution.tier(weapon_level("firepot"))
+        _armory_options_cache["totem_tier"] = Evolution.tier(weapon_level("totem"))
+        _armory_options_cache["totem_level"] = weapon_level("totem")
+        _armory_options_cache["hammer_thunder"] = Rules.host_is_thunder_enchanted(active_links, "hammer")
+        _armory_options_cache["enchant_mults"] = {
+            "spear": enchant_damage_multiplier("spear"),
+            "hammer": enchant_damage_multiplier("hammer"),
+            "boomerang": enchant_damage_multiplier("boomerang"),
+            "bonebow": enchant_damage_multiplier("bonebow")
+        }
+        _armory_options_dirty = false
+    var options: Dictionary = _armory_options_cache
+    options["totem_next_red"] = _peek_thunder_red("totem")
+    options["bonebow_next_red"] = _peek_thunder_red("bonebow") if Rules.host_is_thunder_enchanted(active_links, "bonebow") else false
     for command in armory.advance(delta,player_position,combat_targets(),inventory,options,prefer_elite,weapon_views,current_weapon_mounts()):
         match command.get("type",""):
             "motion":
@@ -3198,7 +3209,7 @@ func update_projectiles(delta: float) -> void:
         var next_pos: Vector2 = previous + projectile["velocity"] * delta
         projectile["position"] = next_pos
         projectile["life"] = life_before - delta
-        if allow_trails and projectile["kind"] in ["staff", "powder", "sling"]:
+        if allow_trails and projectile["kind"] in ["staff", "powder", "sling"] and absf(next_pos.x - player_position.x) <= 780.0 and absf(next_pos.y - player_position.y) <= 540.0:
             projectile["trail_clock"] = float(projectile.get("trail_clock", 0.0)) - delta
             if projectile["trail_clock"] <= 0.0:
                 effects.flight_trail(previous, next_pos, projectile["kind"] == "staff" or projectile.get("enchanted", false), projectile["kind"], int(projectile.get("vfx_tier", 0)), bool(projectile.get("fire_enchanted", false)), int(projectile.get("fire_tier", 0)), bool(projectile.get("thunder_enchanted", false)), int(projectile.get("thunder_tier", 0)), bool(projectile.get("thunder_red", false)))

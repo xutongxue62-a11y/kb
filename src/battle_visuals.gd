@@ -71,8 +71,8 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
             canvas.draw_colored_polygon(_shape(point, direction, [Vector2(-5, -2), Vector2(-22 - flicker * 0.5, 0), Vector2(-6, 2.5)]), rune_core)
             canvas.draw_circle(point, 10.0, INK)
             canvas.draw_circle(point, 7.6, rune_color.darkened(0.22) if any_ench else Color("#57534c"))
-            canvas.draw_arc(point, 7.7, 0.0, TAU, 24, rune_color if any_ench else Color("#c6a366"), 1.8 if any_ench else 1.6, true)
-            canvas.draw_arc(point + Vector2(-1.0, -1.4), 4.7, -2.8, -0.4, 12, rune_core if any_ench else Color("#e3dbc4"), 1.8 if any_ench else 1.7, true)
+            canvas.draw_arc(point, 7.7, 0.0, TAU, 12, rune_color if any_ench else Color("#c6a366"), 1.8 if any_ench else 1.6, true)
+            canvas.draw_arc(point + Vector2(-1.0, -1.4), 4.7, -2.8, -0.4, 8, rune_core if any_ench else Color("#e3dbc4"), 1.8 if any_ench else 1.7, true)
             if enchanted:
                 var rune := _shape(point, direction.rotated(sin(elapsed * 5.0) * 0.15), [Vector2(14, 0), Vector2(0, 11), Vector2(-14, 0), Vector2(0, -11), Vector2(14, 0)])
                 canvas.draw_polyline(rune, INK, 3.5, true)
@@ -99,7 +99,7 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
             # High-contrast crimson danger aura + pulsing warning ring so ALL enemy projectiles stand out unmistakably from coins & XP!
             var danger_pulse: float = 1.0 + 0.16 * sin(elapsed * 20.0 + point.x * 0.05)
             canvas.draw_circle(point, 15.5 * danger_pulse, Color(1.0, 0.14, 0.24, 0.30))
-            canvas.draw_arc(point, 13.0 * danger_pulse, 0.0, TAU, 18, Color(1.0, 0.22, 0.30, 0.88), 2.2, true)
+            canvas.draw_arc(point, 13.0 * danger_pulse, 0.0, TAU, 12, Color(1.0, 0.22, 0.30, 0.88), 2.2, true)
             canvas.draw_line(point - direction * 28.0, point - direction * 4.0, Color(0.96, 0.18, 0.28, 0.62), 5.2, true)
             var style: String = str(projectile.get("hostile_style",""))
             if style in ["quill", "reed"]:
@@ -113,18 +113,18 @@ static func draw_projectile(canvas, projectile: Dictionary, elapsed: float) -> b
                     var center: Vector2 = point - direction * (12.0 + 7.0 * i)
                     var edge : Color = Color("#ff4655", 0.96 - 0.18 * i)
                     var sweep: float = direction.angle()
-                    canvas.draw_arc(center,21.0,sweep-0.68,sweep+0.68,12,Color("#3b0e18",edge.a),7.2,true)
-                    canvas.draw_arc(center,21.0,sweep-0.68,sweep+0.68,12,edge,3.6,true)
+                    canvas.draw_arc(center,21.0,sweep-0.68,sweep+0.68,10,Color("#3b0e18",edge.a),7.2,true)
+                    canvas.draw_arc(center,21.0,sweep-0.68,sweep+0.68,10,edge,3.6,true)
                 return true
             if style in ["spore","fire"]:
                 var pigment: Color = Color("#ff4d24") if style == "fire" else Color("#ff3366")
                 var glow: Color = Color("#fff0c4") if style == "fire" else Color("#ffd9e8")
                 for i in range(3):
                     var spot: Vector2 = point - direction * (8.0 + i * 6.5) + normal * sin(elapsed * 21.0 + i * 2.0) * (i + 1)
-                    canvas.draw_circle(spot,5.8-i,Color(pigment,0.72-i*0.14),true,-1.0,true)
-                canvas.draw_circle(point,10.8,INK,true,-1.0,true)
-                canvas.draw_circle(point,8.0,pigment,true,-1.0,true)
-                canvas.draw_circle(point + Vector2(-1.8,-2.0),3.4,glow,true,-1.0,true)
+                    canvas.draw_circle(spot,5.8-i,Color(pigment,0.72-i*0.14),true,-1.0,false)
+                canvas.draw_circle(point,10.8,INK,true,-1.0,false)
+                canvas.draw_circle(point,8.0,pigment,true,-1.0,false)
+                canvas.draw_circle(point + Vector2(-1.8,-2.0),3.4,glow,true,-1.0,false)
                 return true
             if projectile.get("hostile_style","")=="stone":
                 canvas.draw_line(point-direction*26,point-direction*4,Color("#ff3a2e", 0.72),6.2,true)
