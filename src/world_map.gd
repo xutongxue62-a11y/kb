@@ -74,9 +74,12 @@ func set_view(center: Vector2, stage: int) -> void:
 
 func _process(delta: float) -> void:
     if not animate_world: return
+    if OS.has_feature("android") and biome != "volcano":
+        return
     clock += delta
     _draw_accum += delta
-    if _draw_accum >= 0.25:
+    var redraw_interval: float = 0.35 if OS.has_feature("android") else 0.25
+    if _draw_accum >= redraw_interval:
         _draw_accum = 0.0
         if props_layer != null:
             props_layer.queue_redraw()

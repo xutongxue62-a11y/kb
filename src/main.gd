@@ -2208,7 +2208,10 @@ func hatch_enemy(enemy: Dictionary, fx: bool = true) -> void:
         effects.burst(enemy["position"], Color("#d7b17a"), 10.0, "hit")
 
 func enemy_limit() -> int:
-    return Rules.enemy_limit_for(wave, boss_round)
+    var cap: int = Rules.enemy_limit_for(wave, boss_round)
+    if OS.has_feature("android"):
+        return maxi(8 if boss_round else 12, int(round(float(cap) * 0.75)))
+    return cap
 
 func spawn_enemy(kind: String, point: Vector2 = Vector2(INF, INF), wave_spawn: bool = false, arrival: String = "") -> void:
     map_view.set_view(player_position,wave)
@@ -4677,6 +4680,8 @@ func current_vfx_mode() -> String:
     var raw: String = str(settings.get("vfx_mode", ""))
     if raw in ["full", "minimal", "off"]:
         return raw
+    if OS.has_feature("android"):
+        return "minimal"
     return "full" if bool(settings.get("vfx_enabled", true)) else "minimal"
 
 func set_damage_numbers(enabled: bool) -> void:
@@ -4726,8 +4731,13 @@ func _apply_content_scale() -> void:
         return
     var win := get_tree().root
     win.content_scale_size = Vector2i(1280, 800)
-    win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
-    win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND if OS.has_feature("android") else Window.CONTENT_SCALE_ASPECT_KEEP
+    if OS.has_feature("android"):
+        win.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+        win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+        Engine.max_fps = 60
+    else:
+        win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+        win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 
 func set_key_bindings() -> void:
     var previous: Dictionary = settings.duplicate(true)

@@ -62,6 +62,7 @@ var formation_button: Button
 var combo_button: Button
 var elite_button: Button
 var hide_ui_button: Button
+var vital_restore_button: Button
 var hud_hidden: bool = false
 var xp_bar: ProgressBar
 var hp_bar: ProgressBar
@@ -1479,6 +1480,10 @@ func apply_battle_visibility() -> void:
         hide_ui_button.visible = not menu_hides_hud and not hud_hidden
         hide_ui_button.text = "隐藏界面"
         KeyBindings.attach_to_button(hide_ui_button, "hide_ui")
+    if vital_restore_button != null and is_instance_valid(vital_restore_button):
+        var show_restore: bool = not menu_hides_hud and hud_hidden
+        vital_restore_button.visible = show_restore
+        vital_restore_button.mouse_filter = Control.MOUSE_FILTER_STOP if show_restore else Control.MOUSE_FILTER_IGNORE
     refresh_debug_controls()
 
 func configure_save(available: bool, autosave: bool, note: String = "", summary: Dictionary = {}) -> void:

@@ -3,11 +3,16 @@ const Fonts=preload("res://src/game_fonts.gd")
 var world
 var active:=false
 var stick_finger: int=-1
-var stick_center:=Vector2(126,558)
-var dodge_center:=Vector2(1154,558)
+var stick_center:=Vector2(175,540)
+var dodge_center:=Vector2(1105,540)
 var movement:=Vector2.ZERO
 var surface: Control
 var font: SystemFont=Fonts.create_system(PackedStringArray(["Microsoft YaHei","Noto Sans CJK SC"]),700)
+var _last_active:=false
+var _last_movement:=Vector2(-99,-99)
+var _last_stick_center:=Vector2(-99,-99)
+var _last_dodge_center:=Vector2(-99,-99)
+var _last_cd_tenths: int=-2
 class TouchSurface extends Control:
     var owner_controls
     func _draw() -> void: owner_controls.paint(self)
@@ -28,9 +33,9 @@ func feed_touch(index: int,pressed: bool,at: Vector2) -> bool:
     if not pressed:
         if index!=stick_finger: return false
         reset_input();return true
-    if stick_finger==-1 and at.distance_to(stick_center)<=104:
+    if stick_finger==-1 and at.distance_to(stick_center)<=152:
         stick_finger=index;feed_drag(index,at);return true
-    if at.distance_to(dodge_center)<=65:
+    if at.distance_to(dodge_center)<=112:
         if is_instance_valid(world): world.request_dodge(movement)
         return true
     return false
@@ -60,26 +65,39 @@ func _sync_centers() -> void:
             var scale_x: float = vp.x / win_size.x
             safe_left = maxf(0.0, float(safe.position.x) * scale_x)
             safe_right = maxf(0.0, (win_size.x - float(safe.end.x)) * scale_x)
-    stick_center = Vector2(maxf(126.0, safe_left + 106.0), vp.y - 242.0)
-    dodge_center = Vector2(minf(vp.x - 126.0, vp.x - safe_right - 106.0), vp.y - 242.0)
+    var margin_x: float = maxf(0.0, (vp.x - 1280.0) * 0.5)
+    stick_center = Vector2(maxf(175.0, maxf(safe_left + 150.0, margin_x + 48.0)), vp.y - 260.0)
+    dodge_center = Vector2(minf(vp.x - 175.0, minf(vp.x - safe_right - 150.0, vp.x - margin_x - 48.0)), vp.y - 260.0)
 func _process(_delta: float) -> void:
     if not is_instance_valid(world): return
     _sync_centers()
-    set_active(world.running and not world.paused and not world.upgrade_pending and not world.shop_open and not world.stats_open and not world.player_frozen and not world.wave_closing and not world.training_panel_open and not world.link_pack_open and not world.link_notice_open and world.departure_left<=0 and not world.hud.ui_busy())
-    if surface!=null: surface.queue_redraw()
+    var next_active: bool = world.running and not world.paused and not world.upgrade_pending and not world.shop_open and not world.stats_open and not world.player_frozen and not world.wave_closing and not world.training_panel_open and not world.link_pack_open and not world.link_notice_open and world.departure_left<=0 and not world.hud.ui_busy()
+    set_active(next_active)
+    if not next_active:
+        _last_active = false
+        return
+    var cd_tenths: int = int(ceil(float(world.dodge_cooldown) * 10.0)) if world.get("dodge_cooldown") != null and float(world.dodge_cooldown) > 0.05 else 0
+    if surface != null and (not _last_active or movement != _last_movement or stick_center != _last_stick_center or dodge_center != _last_dodge_center or cd_tenths != _last_cd_tenths):
+        _last_active = true
+        _last_movement = movement
+        _last_stick_center = stick_center
+        _last_dodge_center = dodge_center
+        _last_cd_tenths = cd_tenths
+        surface.queue_redraw()
 func _notification(what: int) -> void:
     if what in [NOTIFICATION_APPLICATION_FOCUS_OUT,NOTIFICATION_WM_WINDOW_FOCUS_OUT,NOTIFICATION_APPLICATION_PAUSED]: reset_input()
     if what==NOTIFICATION_WM_GO_BACK_REQUEST and is_instance_valid(world): world.toggle_pause()
 func paint(canvas: Control) -> void:
     var fill:=Color(0.94,0.85,0.65,0.62)
     var ink:=Color(0.35,0.22,0.12,0.80)
-    canvas.draw_circle(stick_center,76,fill)
-    canvas.draw_arc(stick_center,76,0,TAU,64,ink,2,true)
-    canvas.draw_circle(stick_center+movement*48,26,Color(0.67,0.40,0.22,0.78))
-    canvas.draw_string(font,stick_center+Vector2(-22,-98),"移动",HORIZONTAL_ALIGNMENT_LEFT,-1,22,ink)
-    canvas.draw_circle(dodge_center,60,fill)
-    canvas.draw_arc(dodge_center,60,0,TAU,64,ink,2,true)
+    canvas.draw_circle(stick_center,112,fill)
+    canvas.draw_arc(stick_center,112,0,TAU,32,ink,2.5,false)
+    canvas.draw_circle(stick_center+movement*66,42,Color(0.67,0.40,0.22,0.78))
+    canvas.draw_string(font,stick_center+Vector2(-28,-124),"移动",HORIZONTAL_ALIGNMENT_LEFT,-1,28,ink)
+    canvas.draw_circle(dodge_center,92,fill)
+    canvas.draw_arc(dodge_center,92,0,TAU,32,ink,2.5,false)
     var caption: String="闪避"
-    if is_instance_valid(world) and world.get("dodge_cooldown")!=null and world.dodge_cooldown>0.05:
+    var cd_active: bool = is_instance_valid(world) and world.get("dodge_cooldown")!=null and world.dodge_cooldown>0.05
+    if cd_active:
         caption="%.1f" % world.dodge_cooldown
-    canvas.draw_string(font,dodge_center+Vector2(-24,8),caption,HORIZONTAL_ALIGNMENT_LEFT,-1,24,ink)
+    canvas.draw_string(font,dodge_center+Vector2(-28 if cd_active else -32,11),caption,HORIZONTAL_ALIGNMENT_LEFT,-1,32,ink)

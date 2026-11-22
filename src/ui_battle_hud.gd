@@ -74,6 +74,26 @@ static func build(h) -> void:
     h.timer_label = label(h,status[1],"第 1 关 00:30",Rect2(18,108,286,32),18)
     h.timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     h.timer_label.set_meta("vital_hud", true)
+    var vital_restore := Button.new()
+    vital_restore.name = "VitalRestoreButton"
+    vital_restore.position = Vector2(18, 16)
+    vital_restore.size = Vector2(322, 148)
+    vital_restore.focus_mode = Control.FOCUS_NONE
+    vital_restore.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+    vital_restore.z_index = 5
+    vital_restore.visible = false
+    vital_restore.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    var vr_empty := StyleBoxEmpty.new()
+    var vr_hl := StyleBoxFlat.new()
+    vr_hl.bg_color = Color(0.95, 0.88, 0.72, 0.12)
+    for state in ["normal", "disabled", "focus"]:
+        vital_restore.add_theme_stylebox_override(state, vr_empty)
+    for state in ["hover", "pressed"]:
+        vital_restore.add_theme_stylebox_override(state, vr_hl)
+    vital_restore.pressed.connect(func():
+        if h.hud_hidden and not h.ui_busy(): h.toggle_hud_hidden())
+    h.root.add_child(vital_restore)
+    h.vital_restore_button = vital_restore
     var map_paper: Array = paper(h,Rect2(356,16,280,44))
     h.map_label = label(h,map_paper[1],"荒草原",Rect2(14,6,252,32),15,Color("#7d6746"))
     h.title_label = h.map_label

@@ -83,16 +83,21 @@ varying vec4 item_tint;
 void vertex() { item_tint = COLOR; }
 void fragment() {
     vec4 base = texture(TEXTURE, UV);
-    float edge = base.a;
-    for (int x = -1; x <= 1; x++) {
-        for (int y = -1; y <= 1; y++) {
-            vec2 sample_uv = UV + vec2(float(x), float(y)) * TEXTURE_PIXEL_SIZE * outline_width;
-            if (sample_uv.x >= region_bounds.x && sample_uv.y >= region_bounds.y && sample_uv.x <= region_bounds.z && sample_uv.y <= region_bounds.w) {
-                edge = max(edge, texture(TEXTURE, sample_uv).a);
-            }
-        }
+    if (base.a > 0.98) {
+        COLOR = base * item_tint;
+    } else {
+        float edge = base.a;
+        vec2 step_uv = TEXTURE_PIXEL_SIZE * outline_width;
+        vec2 uv_r = UV + vec2(step_uv.x, 0.0);
+        vec2 uv_l = UV - vec2(step_uv.x, 0.0);
+        vec2 uv_d = UV + vec2(0.0, step_uv.y);
+        vec2 uv_u = UV - vec2(0.0, step_uv.y);
+        if (uv_r.x <= region_bounds.z) edge = max(edge, texture(TEXTURE, uv_r).a);
+        if (uv_l.x >= region_bounds.x) edge = max(edge, texture(TEXTURE, uv_l).a);
+        if (uv_d.y <= region_bounds.w) edge = max(edge, texture(TEXTURE, uv_d).a);
+        if (uv_u.y >= region_bounds.y) edge = max(edge, texture(TEXTURE, uv_u).a);
+        COLOR = vec4(mix(team_color.rgb, base.rgb, base.a), max(base.a, edge * team_color.a)) * item_tint;
     }
-    COLOR = vec4(mix(team_color.rgb, base.rgb, base.a), max(base.a, edge * team_color.a)) * item_tint;
 }
 """
 
