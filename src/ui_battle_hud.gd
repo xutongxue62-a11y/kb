@@ -80,6 +80,7 @@ static func build(h) -> void:
     var wallet: Array = paper(h,Rect2(751,16,280,66))
     h.coin_label = label(h,wallet[1],"金币 0",Rect2(15,7,126,46),17,Color("#956c2f"))
     h.score_label = label(h,wallet[1],"击败 0",Rect2(145,7,124,46),17)
+    var touch_ui: bool = KeyBindings.is_touch_platform()
     KeyBindings.attach_to_button(action(h,"BattlePause","暂停 / 设置",Rect2(1050,21,208,48),func():h.pause_requested.emit()), "cancel")
     h.hide_ui_button = action(h,"HideUI","隐藏界面",Rect2(350,94,170,42),func():h.toggle_hud_hidden())
     h.hide_ui_button.set_meta("hud_toggle", true)
@@ -88,15 +89,17 @@ static func build(h) -> void:
     h.growth_button = action(h,"TrialGrowth","成长",Rect2(1133,94,124,36),func():h.growth_requested.emit())
     KeyBindings.attach_to_button(h.growth_button, "growth_trial")
     h.growth_button.visible = false
+    h.training_panel_button = action(h,"TrainingPanel","训练台" if touch_ui else "训练台 · T",Rect2(1133,94,124,36),func():h.training_panel_requested.emit(),true)
+    h.training_panel_button.visible = false
     var notice: Array = paper(h,Rect2(18,661,208,32))
     h.notice_label = label(h,notice[1],"",Rect2(10,3,188,25),13,Color("#5b624d"))
     h.notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
     var link_note: Array = paper(h,Rect2(246,661,698,32))
-    h.combo_label = label(h,link_note[1],"Q 打开武器背包",Rect2(10,3,678,24),14)
+    h.combo_label = label(h,link_note[1],"点击下方武器栏打开武器背包" if touch_ui else "Q 打开武器背包",Rect2(10,3,678,24),14)
     h.combo_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
     var dodge: Array = paper(h,Rect2(18,704,208,77))
     dodge[0].name = "DodgeStatus"
-    label(h,dodge[1],"闪避 [Shift]",Rect2(17,8,112,24),17)
+    label(h,dodge[1],"闪避" if touch_ui else "闪避 [Shift]",Rect2(17,8,112,24),17)
     h.dodge_label = label(h,dodge[1],"就绪",Rect2(130,8,61,24),15,Color("#547957"))
     h.dodge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
     h.dodge_bar = meter(h,dodge[1],Rect2(18,45,171,10),Color("#6b9b9b"))
@@ -116,9 +119,28 @@ static func build(h) -> void:
         var level: Label = label(h,slot[1],"",Rect2(5,55,98,17),11)
         level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         h.slots.append({"icon":icon,"name":title,"level":level})
+    var bar_button := Button.new()
+    bar_button.name = "WeaponBarButton"
+    bar_button.position = Vector2(246, 661)
+    bar_button.size = Vector2(698, 120)
+    bar_button.focus_mode = Control.FOCUS_NONE
+    bar_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+    bar_button.z_index = 2
+    bar_button.tooltip_text = "打开武器背包（拖拽配对联动）"
+    var bar_empty := StyleBoxEmpty.new()
+    var bar_hl := StyleBoxFlat.new()
+    bar_hl.bg_color = Color(0.95, 0.88, 0.72, 0.14)
+    bar_hl.set_corner_radius_all(6)
+    for state in ["normal", "disabled", "focus"]:
+        bar_button.add_theme_stylebox_override(state, bar_empty)
+    for state in ["hover", "pressed"]:
+        bar_button.add_theme_stylebox_override(state, bar_hl)
+    bar_button.pressed.connect(func():
+        if not h.ui_busy(): h.combo_requested.emit())
+    h.root.add_child(bar_button)
     var growth: Array = paper(h,Rect2(980,658,276,64))
     h.growth_label = label(h,growth[1],"Buff 0 项 · 支援 0",Rect2(12,7,252,48),14,Color("#46675d"))
-    action(h,"BattleTrial","六武器试用 [F2]",Rect2(1000,735,250,39),func():h.trial_requested.emit())
+    action(h,"BattleTrial","六武器试用" if touch_ui else "六武器试用 [F2]",Rect2(1000,735,250,39),func():h.trial_requested.emit())
     var trial_button: BaseButton = h.root.find_child("BattleTrial", true, false) as BaseButton
     if trial_button != null:
         trial_button.visible = bool(h.debug_cheats)

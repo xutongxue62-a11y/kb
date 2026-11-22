@@ -284,6 +284,8 @@ func _ready() -> void:
         hud.link_pack_closed.connect(close_link_pack)
     if hud.has_signal("training_requested"):
         hud.training_requested.connect(start_training_camp)
+    if hud.has_signal("training_panel_requested"):
+        hud.training_panel_requested.connect(toggle_training_panel)
     hud.next_round_requested.connect(leave_shop)
     hud.save_requested.connect(save_game)
     hud.continue_requested.connect(begin_continue)
@@ -360,6 +362,8 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     close_training_panel()
     training_mode = false
     if hud != null:
+        if hud.has_method("set_training_mode"):
+            hud.set_training_mode(false)
         hud.debug_cheats = debug_cheats
         hud.refresh_debug_controls()
     # Protect the current normal run before resetting any world or transient data.
@@ -639,6 +643,8 @@ func go_home() -> void:
     if running and settings.get("autosave",true) and not trial_mode and not training_mode and not demo and not save_game():
         return
     training_mode = false
+    if hud != null and hud.has_method("set_training_mode"):
+        hud.set_training_mode(false)
     departure_left = 0.0
     running = false
     paused = false
@@ -1335,7 +1341,12 @@ func sell_reward(key: String) -> bool:
     return true
 
 func visible_world_rect() -> Rect2:
-    return Rect2(player_position - Vector2(640,400), Vector2(1280,800))
+    var vp_size: Vector2 = Vector2(1280.0, 800.0)
+    if is_inside_tree():
+        var raw_size: Vector2 = get_viewport_rect().size
+        if raw_size.x > 10.0 and raw_size.y > 10.0:
+            vp_size = raw_size
+    return Rect2(player_position - vp_size * 0.5, vp_size)
 
 func update_hud() -> void:
     if map_view != null:
@@ -4700,13 +4711,14 @@ func set_vfx_mode(mode: String) -> void:
 func apply_display_mode(fullscreen: bool) -> void:
     if DisplayServer.get_name() == "headless":
         return
-    if fullscreen:
-        DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
-        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-    else:
-        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-        _fit_playable_window()
-        call_deferred("_fit_playable_window")
+    if not OS.has_feature("android"):
+        if fullscreen:
+            DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
+            DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+        else:
+            DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+            _fit_playable_window()
+            call_deferred("_fit_playable_window")
     _apply_content_scale()
 
 func _apply_content_scale() -> void:
@@ -4715,7 +4727,7 @@ func _apply_content_scale() -> void:
     var win := get_tree().root
     win.content_scale_size = Vector2i(1280, 800)
     win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
-    win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+    win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND if OS.has_feature("android") else Window.CONTENT_SCALE_ASPECT_KEEP
 
 func set_key_bindings() -> void:
     var previous: Dictionary = settings.duplicate(true)
@@ -4779,8 +4791,11 @@ func start_training_camp() -> void:
     burning_fields.clear()
     pickups.clear()
     coins = 99999
-    if hud != null and hud.has_method("hide_overlay"):
-        hud.hide_overlay()
+    if hud != null:
+        if hud.has_method("set_training_mode"):
+            hud.set_training_mode(true)
+        if hud.has_method("hide_overlay"):
+            hud.hide_overlay()
     update_hud()
     open_training_panel()
 
@@ -4827,6 +4842,8 @@ func close_training_panel() -> void:
 func exit_training_camp() -> void:
     close_training_panel()
     training_mode = false
+    if hud != null and hud.has_method("set_training_mode"):
+        hud.set_training_mode(false)
     go_home()
 
 func training_set_weapon_level(weapon_id: String, target_level: int) -> void:

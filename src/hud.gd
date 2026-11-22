@@ -26,6 +26,7 @@ signal reward_sell_requested(weapon_id: String)
 signal starter_selected(weapon_id: String)
 signal stats_requested
 signal growth_requested
+signal training_panel_requested
 signal new_trial_requested
 signal buy_requested(index: int)
 signal reroll_requested
@@ -70,6 +71,9 @@ var last_xp: float = -1.0
 var status_strip: PanelContainer
 var growth_label: Label
 var growth_button: Button
+var training_panel_button: Button
+var training_mode: bool = false
+var overlay_dim: ColorRect
 var current_max_hp: float = 8.0
 var screen: String = "start"
 var save_available: bool = false
@@ -801,8 +805,15 @@ func setup(asset_library) -> void:
     backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
     backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
     root.add_child(backdrop)
+    overlay_dim = ColorRect.new()
+    overlay_dim.name = "OverlayDim"
+    overlay_dim.color = Color(0.16, 0.12, 0.08, 0.46)
+    overlay_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    overlay_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+    root.add_child(overlay_dim)
     overlay = ColorRect.new()
     overlay.color = Color(0.16, 0.12, 0.08, 0.46)
+    overlay.self_modulate.a = 0.0
     overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     overlay.mouse_filter = Control.MOUSE_FILTER_STOP
     root.add_child(overlay)
@@ -813,8 +824,51 @@ func setup(asset_library) -> void:
     ink_veil.progress = 1.0
     root.add_child(ink_veil)
     veil = ink_veil
+    if get_viewport() != null and not get_viewport().size_changed.is_connected(_sync_viewport_layout):
+        get_viewport().size_changed.connect(_sync_viewport_layout)
+    _sync_viewport_layout()
     preload_ui_sfx()
     show_title()
+
+func _viewport_local_rect() -> Rect2:
+    var vp: Vector2 = get_viewport().get_visible_rect().size if is_inside_tree() and get_viewport() != null else Vector2(1280.0, 800.0)
+    if vp.x <= 4.0 or vp.y <= 4.0:
+        vp = Vector2(1280.0, 800.0)
+    var margin_x: float = maxf(0.0, (vp.x - 1280.0) * 0.5)
+    var margin_y: float = maxf(0.0, (vp.y - 800.0) * 0.5)
+    return Rect2(Vector2(-margin_x, -margin_y), vp)
+
+func _sync_viewport_layout() -> void:
+    if root == null or not is_instance_valid(root):
+        return
+    var vp: Vector2 = get_viewport().get_visible_rect().size if is_inside_tree() and get_viewport() != null else Vector2(1280.0, 800.0)
+    if vp.x <= 4.0 or vp.y <= 4.0:
+        vp = Vector2(1280.0, 800.0)
+    var margin_x: float = maxf(0.0, (vp.x - 1280.0) * 0.5)
+    var margin_y: float = maxf(0.0, (vp.y - 800.0) * 0.5)
+    root.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    root.position = Vector2(margin_x, margin_y)
+    root.size = Vector2(1280.0, 800.0)
+    var full_pos := Vector2(-margin_x, -margin_y)
+    for node in [backdrop, overlay_dim, hurt_flash_layer, veil]:
+        if node != null and is_instance_valid(node):
+            node.set_anchors_preset(Control.PRESET_TOP_LEFT)
+            node.position = full_pos
+            node.size = vp
+    if overlay != null and is_instance_valid(overlay):
+        overlay.set_anchors_preset(Control.PRESET_TOP_LEFT)
+        overlay.position = Vector2.ZERO
+        overlay.size = Vector2(1280.0, 800.0)
+
+func _process(_delta: float) -> void:
+    if overlay != null and is_instance_valid(overlay) and overlay_dim != null and is_instance_valid(overlay_dim):
+        overlay_dim.visible = overlay.visible
+        overlay_dim.color = overlay.color
+
+func set_training_mode(enabled: bool) -> void:
+    training_mode = enabled
+    if training_panel_button != null and is_instance_valid(training_panel_button):
+        training_panel_button.visible = training_mode and screen == "combat" and not hud_hidden and not menu_hides_hud
 
 func _set_text(node: Control, value: String) -> void:
     if node != null and node.text != value:
@@ -858,8 +912,11 @@ func update_state(hp: float, elapsed: float, kills: int, xp: float, xp_needed: i
             elite_button.set_meta("_bind_caption", KeyBindings.caption_for("aim"))
             elite_button.text = elite_text
             KeyBindings.attach_to_button(elite_button, "aim")
-    _set_text(notice_label, ("试用：按 %s 自选成长" % KeyBindings.caption_for("growth_trial")) if trial else "绿石经验 · 金币用于营地")
+    var touch_ui: bool = KeyBindings.is_touch_platform()
+    _set_text(notice_label, ("试用：点击右上成长自选" if touch_ui else ("试用：按 %s 自选成长" % KeyBindings.caption_for("growth_trial"))) if trial else "绿石经验 · 金币用于营地")
     growth_button.visible = trial and screen == "combat" and not hud_hidden and not menu_hides_hud
+    if training_panel_button != null and is_instance_valid(training_panel_button):
+        training_panel_button.visible = training_mode and screen == "combat" and not hud_hidden and not menu_hides_hud
     _set_text(combo_label, str(link["summary"]).replace("\n", " · "))
     xp_bar.max_value = maxf(1.0, float(xp_needed))
     xp_bar.value = xp
@@ -1254,6 +1311,10 @@ func choose_replace_slot(key: String) -> void:
     replace_confirm_dim.name = "ReplaceConfirmDim"
     replace_confirm_dim.color = Color(0.04, 0.08, 0.13, 0.55)
     replace_confirm_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+    replace_confirm_dim.offset_left = -800
+    replace_confirm_dim.offset_top = -400
+    replace_confirm_dim.offset_right = 800
+    replace_confirm_dim.offset_bottom = 400
     replace_confirm_dim.mouse_filter = Control.MOUSE_FILTER_STOP
     overlay.add_child(replace_confirm_dim)
     screen = "replace_confirm"
@@ -1407,6 +1468,9 @@ func apply_battle_visibility() -> void:
         if menu_hides_hud:
             node.visible = false
             continue
+        if node == training_panel_button:
+            node.visible = training_mode and not menu_hides_hud and not hud_hidden
+            continue
         if vital:
             node.visible = true
         else:
@@ -1458,7 +1522,7 @@ func update_round(stage: int, stage_time: float, is_boss: bool, coins: int, boss
     var limit_sec: float = 180.0 if is_boss else 30.0
     var remaining: int = maxi(0, ceili(limit_sec - stage_time))
     if stage < 0:
-        timer_label.text = "训练营 · 按T配置 / Q联动"
+        timer_label.text = "训练营 · 右上训练台 / 下方武器栏" if KeyBindings.is_touch_platform() else "训练营 · 按T配置 / Q联动"
         timer_label.add_theme_font_size_override("font_size", 16)
         timer_label.add_theme_color_override("font_color", Color("#2e6f6b"))
         timer_label.modulate = Color.WHITE
@@ -1626,6 +1690,10 @@ func show_link_discovery(recipes: Array, owned: Array) -> void:
         link_discover_dim.name = "LinkDiscoverDim"
         link_discover_dim.color = Color(0.04, 0.08, 0.13, 0.55)
         link_discover_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+        link_discover_dim.offset_left = -800
+        link_discover_dim.offset_top = -400
+        link_discover_dim.offset_right = 800
+        link_discover_dim.offset_bottom = 400
         link_discover_dim.mouse_filter = Control.MOUSE_FILTER_STOP
         overlay.add_child(link_discover_dim)
     screen = "link_discover"
@@ -1831,11 +1899,14 @@ func snapshot_region(logical_rect: Rect2) -> Texture2D:
     var image: Image = texture.get_image()
     if image == null or image.is_empty():
         return null
-    var view_size: Vector2 = root.size if root != null and root.size.x > 4.0 and root.size.y > 4.0 else Vector2(1280.0, 800.0)
+    var view_size: Vector2 = get_viewport().get_visible_rect().size if is_inside_tree() and get_viewport() != null else Vector2(1280.0, 800.0)
+    if view_size.x <= 4.0 or view_size.y <= 4.0:
+        view_size = Vector2(1280.0, 800.0)
+    var origin_offset: Vector2 = root.position if root != null else Vector2.ZERO
     var sx: float = float(image.get_width()) / view_size.x
     var sy: float = float(image.get_height()) / view_size.y
-    var px: int = clampi(int(round(logical_rect.position.x * sx)), 0, image.get_width() - 2)
-    var py: int = clampi(int(round(logical_rect.position.y * sy)), 0, image.get_height() - 2)
+    var px: int = clampi(int(round((logical_rect.position.x + origin_offset.x) * sx)), 0, image.get_width() - 2)
+    var py: int = clampi(int(round((logical_rect.position.y + origin_offset.y) * sy)), 0, image.get_height() - 2)
     var pw: int = clampi(int(round(logical_rect.size.x * sx)), 2, image.get_width() - px)
     var ph: int = clampi(int(round(logical_rect.size.y * sy)), 2, image.get_height() - py)
     var sub: Image = image.get_region(Rect2i(px, py, pw, ph))
@@ -2464,14 +2535,16 @@ func update_world_status(map_name: String, dodge_cooldown: float, dodge_total: f
             KeyBindings.attach_to_button(combo_button, "link")
     elif combo_button != null:
         combo_button.set_meta("_display_label", combo_button.get_meta("_raw_label", ""))
+    var touch_ui: bool = KeyBindings.is_touch_platform()
     if links.size() <= 1:
         if combo_button != null:
-            var tip: String = "获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包拖拽启用，不会自动开启。" % KeyBindings.caption_for("link")
+            var tip: String = "获得可搭配的武器时会提示联动与优缺点。点击下方武器栏打开背包拖拽启用，不会自动开启。" if touch_ui else ("获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包拖拽启用，不会自动开启。" % KeyBindings.caption_for("link"))
             if combo_button.tooltip_text != tip:
                 combo_button.tooltip_text = tip
         # When the player already holds one half of a recipe, main passes a
         # hint naming the missing piece instead of the generic recipe list.
-        _set_text(combo_label, link_hint if link_hint != "" else ("获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包，拖到一起即可联动。" % KeyBindings.caption_for("link")))
+        var default_hint: String = "获得可搭配的武器时会提示联动与优缺点。集齐后点击下方武器栏打开背包，拖到一起即可联动。" if touch_ui else ("获得可搭配的武器时会提示联动与优缺点。集齐后按 %s 打开背包，拖到一起即可联动。" % KeyBindings.caption_for("link"))
+        _set_text(combo_label, link_hint if link_hint != "" else default_hint)
     elif link_hint != "":
         _set_text(combo_label, link_hint)
 

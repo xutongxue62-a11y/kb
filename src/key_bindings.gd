@@ -260,6 +260,10 @@ static func _style_hint(button: BaseButton, hint: KeyHint) -> void:
     hint.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 
 
+static func is_touch_platform() -> bool:
+    return OS.has_feature("android") or OS.has_feature("ios") or OS.get_cmdline_args().has("--touch-controls") or OS.get_cmdline_user_args().has("--touch-controls")
+
+
 static func attach_to_button(button: BaseButton, action: String) -> void:
     if button == null or not is_instance_valid(button):
         return
@@ -283,6 +287,11 @@ static func attach_to_button(button: BaseButton, action: String) -> void:
     if not applied.is_empty() and text.ends_with(applied):
         text = text.left(text.length() - applied.length())
     text = strip_legacy_hint(text)
+    if is_touch_platform():
+        button.set_meta("key_hint_suffix", "")
+        button.set_meta("key_base_text", text)
+        button.text = text
+        return
     var suffix: String = " · " + caption_for(action)
     button.set_meta("key_hint_suffix", suffix)
     button.set_meta("key_base_text", text)

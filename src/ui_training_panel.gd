@@ -7,6 +7,7 @@ const Growth = preload("res://src/growth.gd")
 const GameFonts = preload("res://src/game_fonts.gd")
 const UiFrontend = preload("res://src/ui_frontend.gd")
 const TornCard = preload("res://src/ui_torn_card.gd")
+const KeyBindings = preload("res://src/key_bindings.gd")
 
 signal closed
 signal exit_training_requested
@@ -91,6 +92,10 @@ func _build() -> void:
     var dim := ColorRect.new()
     dim.color = Color(0.08, 0.06, 0.04, 0.56)
     dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+    dim.offset_left = -800
+    dim.offset_top = -400
+    dim.offset_right = 800
+    dim.offset_bottom = 400
     dim.mouse_filter = Control.MOUSE_FILTER_STOP
     add_child(dim)
 
@@ -105,7 +110,8 @@ func _build() -> void:
     title.position = Vector2(24, 14)
     sheet.add_child(title)
 
-    status_label = _lbl("不计入正式存档 · 按 T 随时开关本面板 · 按 Q 拖拽武器联动", 14, MUTED)
+    var touch_ui: bool = KeyBindings.is_touch_platform()
+    status_label = _lbl("不计入正式存档 · 点击右上「训练台」开关本面板 · 点击武器栏拖拽联动" if touch_ui else "不计入正式存档 · 按 T 随时开关本面板 · 按 Q 拖拽武器联动", 14, MUTED)
     status_label.position = Vector2(360, 22)
     sheet.add_child(status_label)
 
@@ -116,7 +122,7 @@ func _build() -> void:
     w_hdr.position = Vector2(24, 58)
     sheet.add_child(w_hdr)
     sheet.add_child(_btn("已装备全升5级", Rect2(278, 54, 122, 28), func(): _set_all_weapons_level(5), Color("#f6e4bd"), INK, 13))
-    sheet.add_child(_btn("去Q配联动", Rect2(408, 54, 98, 28), func(): open_links_requested.emit(), Color("#dceee9"), TEAL, 13))
+    sheet.add_child(_btn("去配联动" if touch_ui else "去Q配联动", Rect2(408, 54, 98, 28), func(): open_links_requested.emit(), Color("#dceee9"), TEAL, 13))
 
     var w_bg := Panel.new()
     w_bg.position = Vector2(20, 88)
@@ -311,7 +317,7 @@ func _spawn_pack(kind: String, count: int) -> void:
     if host == null:
         return
     host.training_spawn(kind, count)
-    status_label.text = "已刷出测试目标，点「开始测试」或按 T 关闭面板开打！"
+    status_label.text = "已刷出测试目标，点「开始测试」关闭面板开打！" if KeyBindings.is_touch_platform() else "已刷出测试目标，点「开始测试」或按 T 关闭面板开打！"
 
 func _clear_enemies() -> void:
     if host == null:

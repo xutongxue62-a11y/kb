@@ -45,9 +45,27 @@ func _input(event: InputEvent) -> void:
     if event is InputEventScreenTouch: handled=feed_touch(event.index,event.pressed,event.position)
     elif event is InputEventScreenDrag: handled=feed_drag(event.index,event.position)
     if handled: get_viewport().set_input_as_handled()
+func _sync_centers() -> void:
+    if not is_inside_tree() or get_viewport() == null:
+        return
+    var vp: Vector2 = get_viewport().get_visible_rect().size
+    if vp.x <= 4.0 or vp.y <= 4.0:
+        return
+    var safe_left: float = 0.0
+    var safe_right: float = 0.0
+    if DisplayServer.get_name() != "headless":
+        var win_size := Vector2(DisplayServer.window_get_size())
+        if win_size.x > 10.0 and win_size.y > 10.0:
+            var safe := DisplayServer.get_display_safe_area()
+            var scale_x: float = vp.x / win_size.x
+            safe_left = maxf(0.0, float(safe.position.x) * scale_x)
+            safe_right = maxf(0.0, (win_size.x - float(safe.end.x)) * scale_x)
+    stick_center = Vector2(maxf(126.0, safe_left + 106.0), vp.y - 242.0)
+    dodge_center = Vector2(minf(vp.x - 126.0, vp.x - safe_right - 106.0), vp.y - 242.0)
 func _process(_delta: float) -> void:
     if not is_instance_valid(world): return
-    set_active(world.running and not world.paused and not world.upgrade_pending and not world.shop_open and not world.stats_open and not world.player_frozen and not world.wave_closing and world.departure_left<=0 and not world.hud.ui_busy())
+    _sync_centers()
+    set_active(world.running and not world.paused and not world.upgrade_pending and not world.shop_open and not world.stats_open and not world.player_frozen and not world.wave_closing and not world.training_panel_open and not world.link_pack_open and not world.link_notice_open and world.departure_left<=0 and not world.hud.ui_busy())
     if surface!=null: surface.queue_redraw()
 func _notification(what: int) -> void:
     if what in [NOTIFICATION_APPLICATION_FOCUS_OUT,NOTIFICATION_WM_WINDOW_FOCUS_OUT,NOTIFICATION_APPLICATION_PAUSED]: reset_input()

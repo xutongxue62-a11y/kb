@@ -128,6 +128,7 @@ def presets():
             'launcher_icons/main_192x192="res://release/icon.png"',
             'launcher_icons/adaptive_foreground_432x432="res://release/icon.png"',
             'permissions/internet=true', 'screen/immersive_mode=true',
+            'screen/edge_to_edge=true',
         ]),
     ]
     sections = []

@@ -126,7 +126,8 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
     var shortcut: String="1–6" if compact else "1 / 2 / 3"
-    var hint: Label = h.make_label("选择 1 份 · 数字键 %s 或点击选择 · 点选立即生效 · 也可出售该份奖励，保留现有装备" % [shortcut],16,Color("#65704f"))
+    var hint_text: String = "选择 1 份 · 点击选择立即生效 · 也可出售该份奖励，保留现有装备" if KeyBindings.is_touch_platform() else ("选择 1 份 · 数字键 %s 或点击选择 · 点选立即生效 · 也可出售该份奖励，保留现有装备" % [shortcut])
+    var hint: Label = h.make_label(hint_text,16,Color("#65704f"))
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(hint)
     var grid := GridContainer.new()
@@ -210,7 +211,8 @@ static func shop(h,stock: Array,coins: int,stage: int,inventory: Array,levels: D
     var heading: Label=h.make_display("营地商店 · 第 %d 关结束" % stage,26)
     heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
-    var wallet: Label=h.make_display("金币 %d · 生命 %.1f / %.0f · 数字键 1–6 或点击直接购买" % [coins,hp,max_hp],18,Color("#704127"))
+    var wallet_text: String = ("金币 %d · 生命 %.1f / %.0f · 点击直接购买" if KeyBindings.is_touch_platform() else "金币 %d · 生命 %.1f / %.0f · 数字键 1–6 或点击直接购买") % [coins,hp,max_hp]
+    var wallet: Label=h.make_display(wallet_text,18,Color("#704127"))
     wallet.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(wallet)
     var grid:=GridContainer.new()

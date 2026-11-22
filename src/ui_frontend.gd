@@ -296,12 +296,21 @@ static func modal(h, rect: Rect2):
         bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
         bg.texture = h.modal_snapshot
-        bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        if h.has_method("_viewport_local_rect"):
+            var r: Rect2 = h._viewport_local_rect()
+            bg.position = r.position
+            bg.size = r.size
+        else:
+            bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
         bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.overlay.add_child(bg)
         var dim := ColorRect.new()
         dim.name = "ModalDim"
         dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        dim.offset_left = -800
+        dim.offset_top = -400
+        dim.offset_right = 800
+        dim.offset_bottom = 400
         dim.color = Color(0.02, 0.045, 0.09, 0.46)
         dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.overlay.add_child(dim)
@@ -475,7 +484,8 @@ static func settings(h, in_run: bool) -> void:
         if h.ui_busy(): return
         h.play_ui("button_press")
         h.get_tree().quit(),false,22)
-    button(h,body,"OpenKeyBindings","改按键",Rect2(246,640,180,54),func():h.show_key_bindings(in_run),false,22)
+    if not KeyBindings.is_touch_platform():
+        button(h,body,"OpenKeyBindings","改按键",Rect2(246,640,180,54),func():h.show_key_bindings(in_run),false,22)
     button(h,body,"Back","完成",Rect2(540,640,180,54),func():h.close_front_modal(),true,25)
 
 static func continued(h) -> void:
@@ -536,14 +546,21 @@ static func continued(h) -> void:
 static func help_page(h, page: String, in_run: bool) -> void:
     var sheet = modal(h, Rect2(146, 72, 988, 656))
     var body: Control = sheet.content
-    var heading: String = "按键操作" if page == "keys" else ("武器联动" if page == "links" else "玩法说明")
+    var touch_ui: bool = KeyBindings.is_touch_platform()
+    var keys_title: String = "触控操作" if touch_ui else "按键操作"
+    var heading: String = keys_title if page == "keys" else ("武器联动" if page == "links" else "玩法说明")
     label(h, body, heading, Rect2(40, 20, 800, 65), 40, INK, true)
     line(body, Vector2(40, 100), 904, RED)
-    var text: String = "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n每过一关，生命上限加一，并补满这一格。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后按 %s 打开武器背包。把可以搭配的两件拖到一起即可联动，拖开即可断开。屏幕下方会提示还差哪一件。\n获得有配方的武器时会弹出说明，写出优点和缺点。锁链类联动会从火药筒炮口弹出。\n按 %s 可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("hide_ui")]
+    var text: String = ("普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n每过一关，生命上限加一，并补满这一格。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后点击下方武器栏打开武器背包。把可以搭配的两件拖到一起即可联动，拖开即可断开。屏幕下方会提示还差哪一件。\n获得有配方的武器时会弹出说明，写出优点和缺点。锁链类联动会从火药筒炮口弹出。\n点击「隐藏界面」可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。" if touch_ui else "普通关生存 30 秒，随后进入营地商店。\n每 5 关迎战 Boss：不限时，击败它才能结算。\n\n绿色经验石用于升级，金币用于营地购买。\n每过一关，生命上限加一，并补满这一格。\n成长三选一；不想要的卡片可以出售换金币。\n击败精英恐龙会掉落宝箱，开箱同样三选一。\n最多携带 6 把武器，伙伴不占武器槽。\n\n集齐配对武器后按 %s 打开武器背包。把可以搭配的两件拖到一起即可联动，拖开即可断开。屏幕下方会提示还差哪一件。\n获得有配方的武器时会弹出说明，写出优点和缺点。锁链类联动会从火药筒炮口弹出。\n按 %s 可隐藏大部分战斗界面，生命和经验会保留。\n熔岩地面会持续烫伤。营地可花金币刷新货物。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("hide_ui")])
     if page == "keys":
-        text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒（不可改）\n← / → 翻页预览角色，点击画像确认选择\n%s 确认出发 · %s 返回 / 暂停\n%s 角色属性 · %s 手动保存 · %s 隐藏或显示界面\n%s 散射 / 集火切换 · %s 打开武器背包 · %s 切换瞄准目标\n%s / %s / %s 选择成长 · 商店按栏位键直接购买 · 结算页按 %s 再出发" % [KeyBindings.caption_for("confirm"), KeyBindings.caption_for("cancel"), KeyBindings.caption_for("stats"), KeyBindings.caption_for("save"), KeyBindings.caption_for("hide_ui"), KeyBindings.caption_for("scatter"), KeyBindings.caption_for("link"), KeyBindings.caption_for("aim"), KeyBindings.caption_for("shop_1"), KeyBindings.caption_for("shop_2"), KeyBindings.caption_for("shop_3"), KeyBindings.caption_for("confirm")]
+        if touch_ui:
+            text = "左下虚拟摇杆    移动 · 镜头跟随\n右下「闪避」按钮    向移动方向冲刺 · 冷却 1.4 秒\n点击底部武器栏    打开武器背包并拖拽配对联动\n右上「暂停 / 设置」与「属性」    查看面板或暂停\n训练营中点击右上「训练台」开关配置与刷怪面板\n成长卡片与营地商店直接点击购买或出售\n左上「隐藏界面」    隐藏非关键战斗 UI（生命与倒计时保留）"
+        else:
+            text = "WASD / 方向键    移动 · 镜头跟随\nShift 闪避 · 冷却 1.4 秒（不可改）\n← / → 翻页预览角色，点击画像确认选择\n%s 确认出发 · %s 返回 / 暂停\n%s 角色属性 · %s 手动保存 · %s 隐藏或显示界面\n%s 散射 / 集火切换 · %s 打开武器背包 · %s 切换瞄准目标\n%s / %s / %s 选择成长 · 商店按栏位键直接购买 · 结算页按 %s 再出发" % [KeyBindings.caption_for("confirm"), KeyBindings.caption_for("cancel"), KeyBindings.caption_for("stats"), KeyBindings.caption_for("save"), KeyBindings.caption_for("hide_ui"), KeyBindings.caption_for("scatter"), KeyBindings.caption_for("link"), KeyBindings.caption_for("aim"), KeyBindings.caption_for("shop_1"), KeyBindings.caption_for("shop_2"), KeyBindings.caption_for("shop_3"), KeyBindings.caption_for("confirm")]
     elif page == "links":
-        text = "集齐配对武器后，按 %s 打开武器背包。把可以搭配的两件武器拖到一起即可联动，再叠到已连上的那一件上，或拖开，即可断开。不能搭配的拖到一起会提示「这两件武器不能联动」。第一次获得有配方的武器时会弹出说明，写出两件武器、联动名称、优点和缺点。商店和升级卡片也会标明「可联动」或还差哪一件。\n\n火药筒 + 木棒 / 石斧 / 骨刃 → 锁链武器。\n锁链从火药筒炮口弹出并弹射往返；被联动的近战不再环绕，火药筒不再发普通炮弹。\n火药筒 + 魔法杖 → 魔法炮。炮弹化为符能爆炸并留下灼烧，但魔法杖停止独立发射。\n火种壶、魔法杖、雷鸣图腾都可以同时给多件武器附魔，例如火药筒、弹弓、石槌、石斧、骨刃，以及木棒、骨弩、骨矛、回旋骨镖。同一件武器只能接受一种附魔，新的会顶掉旧的，被顶掉的触媒仍可去附别的武器。\n火种壶 + 战鼓、骨弩 + 图腾、图腾 + 晶簇也有各自配方。\n\n多组配方可以一起生效。火药筒的锁链弹射与普通炮弹、魔法炮或导雷火炮不能同时进行。每一种联动都有代价，默认不会自动启用。之后可按 %s 打开背包，继续拖拽启用或断开。" % [KeyBindings.caption_for("link"), KeyBindings.caption_for("link")]
+        var open_bag: String = "点击下方武器栏打开武器背包" if touch_ui else ("按 %s 打开武器背包" % KeyBindings.caption_for("link"))
+        var open_bag_short: String = "点击下方武器栏打开背包" if touch_ui else ("按 %s 打开背包" % KeyBindings.caption_for("link"))
+        text = "集齐配对武器后，%s。把可以搭配的两件武器拖到一起即可联动，再叠到已连上的那一件上，或拖开，即可断开。不能搭配的拖到一起会提示「这两件武器不能联动」。第一次获得有配方的武器时会弹出说明，写出两件武器、联动名称、优点和缺点。商店和升级卡片也会标明「可联动」或还差哪一件。\n\n火药筒 + 木棒 / 石斧 / 骨刃 → 锁链武器。\n锁链从火药筒炮口弹出并弹射往返；被联动的近战不再环绕，火药筒不再发普通炮弹。\n火药筒 + 魔法杖 → 魔法炮。炮弹化为符能爆炸并留下灼烧，但魔法杖停止独立发射。\n火种壶、魔法杖、雷鸣图腾都可以同时给多件武器附魔，例如火药筒、弹弓、石槌、石斧、骨刃，以及木棒、骨弩、骨矛、回旋骨镖。同一件武器只能接受一种附魔，新的会顶掉旧的，被顶掉的触媒仍可去附别的武器。\n火种壶 + 战鼓、骨弩 + 图腾、图腾 + 晶簇也有各自配方。\n\n多组配方可以一起生效。火药筒的锁链弹射与普通炮弹、魔法炮或导雷火炮不能同时进行。每一种联动都有代价，默认不会自动启用。之后可%s，继续拖拽启用或断开。" % [open_bag, open_bag_short]
     var copy_scroll := ScrollContainer.new()
     copy_scroll.position = Vector2(44, 112)
     copy_scroll.size = Vector2(900, 382)
@@ -558,7 +575,7 @@ static func help_page(h, page: String, in_run: bool) -> void:
     copy_scroll.add_child(copy)
     line(body, Vector2(40, 498), 904, Color(INK, 0.25))
     button(h, body, "HelpGameplay", "玩法", Rect2(40, 508, 110, 43), func(): h.show_help("gameplay", in_run), false, 18)
-    button(h, body, "HelpKeys", "按键操作", Rect2(160, 508, 150, 43), func(): h.show_help("keys", in_run), false, 18)
+    button(h, body, "HelpKeys", keys_title, Rect2(160, 508, 150, 43), func(): h.show_help("keys", in_run), false, 18)
     button(h, body, "HelpLinks", "武器联动", Rect2(320, 508, 150, 43), func(): h.show_help("links", in_run), false, 18)
     KeyBindings.attach_to_button(button(h, body, "Stats", "角色属性", Rect2(480, 508, 186, 43), func(): h.stats_requested.emit(), false, 18), "stats")
     button(h, body, "TrialBasic", "基础试用" + (" [F2]" if h.debug_cheats else ""), Rect2(40, 581, 222, 44), func(): h.request_help_trial("base"), false, 18)

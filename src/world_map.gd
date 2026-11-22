@@ -44,7 +44,12 @@ static func biome_for_wave(stage: int) -> String:
 
 func set_view(center: Vector2, stage: int) -> void:
     view_center = center
-    view = Rect2(center - Vector2(640,400),Vector2(1280,800))
+    var vp_size := Vector2(1280, 800)
+    if is_inside_tree():
+        var raw := get_viewport_rect().size
+        if raw.x > 10.0 and raw.y > 10.0:
+            vp_size = raw
+    view = Rect2(center - vp_size * 0.5, vp_size)
     var next: String = biome_for_wave(stage)
     var dirty := false
     if next != biome:

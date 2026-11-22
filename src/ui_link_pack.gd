@@ -558,6 +558,10 @@ func _build() -> void:
 	dim.name = "LinkPackDim"
 	dim.color = Color(0.04, 0.08, 0.13, 0.0)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.offset_left = -800
+	dim.offset_top = -400
+	dim.offset_right = 800
+	dim.offset_bottom = 400
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(dim)
 	sheet = PaperUI.new()
