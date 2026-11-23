@@ -60,10 +60,11 @@ func run_checks() -> void:
     for stage in [1, 8, 10, 15, 20]:
         var profile: Dictionary = progression.enemy_profile(stage, "boss", 1.75)
         var late_boss_multiplier: float = 1.0 + 0.04 * float(stage - 9) if stage >= 10 else 1.0
-        var expected_hp: float = 160.0 * expected_hp_scale(stage, 1.75, false) * late_boss_multiplier * 1.05
-        expect(is_equal_approx(float(profile["hp"]), expected_hp), "wave %d boss HP follows the current curve with the five percent increase" % stage)
+        var expected_hp: float = 160.0 * expected_hp_scale(stage, 1.75, false) * late_boss_multiplier * pow(1.004, stage - 1)
+        expect(is_equal_approx(float(profile["hp"]), expected_hp), "wave %d boss HP follows the faster wave-based growth curve" % stage)
     var boss30: float = float(progression.enemy_profile(30, "boss", 1.75)["hp"])
-    expect(is_equal_approx(boss30, 160.0 * expected_hp_scale(30, 1.75, true) * 1.84 * 1.05), "wave 30 Boss HP uses the softened late curve")
+    expect(is_equal_approx(boss30, 160.0 * expected_hp_scale(30, 1.75, true) * 1.84 * pow(1.004, 29)), "wave 30 Boss HP combines the softened late curve with faster Boss growth")
+    expect(is_equal_approx(progression.cap_boss_hp(160.0, 6.0, 10), 6.0 * 58.0 * pow(1.004, 9)), "the power-driven HP branch also uses wave growth")
     var weak: float = progression.estimate_power([{"id":"sling", "level":1}], {})
     var strong: float = progression.estimate_power([{"id":"sling", "level":5}, {"id":"club", "level":5}], {"power":3,"haste":3,"crit_chance":3,"crit_power":3,"pet":3})
     expect(strong > weak * 3.0, "build estimate includes weapon levels, passive stats and followers")
@@ -129,12 +130,13 @@ func run_checks() -> void:
     world.invulnerable = 0.0
     var cap: float = progression.HIT_CAP_RATIO * float(world.stats["max_hp"])
     world.player_hp = world.stats["max_hp"]
-    world.hurt_player(Vector2.ZERO, 100.0, false)
+    world.hurt_player(Vector2.ZERO, 100.0)
     expect(is_equal_approx(world.player_hp, world.stats["max_hp"] - cap) and world.running, "regular combat hits are capped at 70% of max HP")
     world.invulnerable = 0.0
     world.player_hp = world.stats["max_hp"]
-    world.hurt_player(Vector2.ZERO, 100.0, true)
-    expect(is_equal_approx(world.player_hp, float(world.stats["max_hp"]) * 0.65) and world.running, "Boss hits remain capped at 35% of max HP")
+    world.projectiles.append({"position": world.player_position, "velocity": Vector2.ZERO, "damage": 100.0, "kind": "hostile", "life": 1.0, "radius": 6.5, "boss": true})
+    world.update_projectiles(0.01)
+    expect(is_equal_approx(world.player_hp, float(world.stats["max_hp"]) - cap) and world.running, "Boss projectiles use the shared combat cap")
     world.map_view.chunks.clear()
     for x in range(-2, 5):
         for y in range(-2, 5):

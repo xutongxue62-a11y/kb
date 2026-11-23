@@ -1684,7 +1684,7 @@ func simulate(delta: float, movement: Vector2) -> void:
             spawn_enemy("boss",offscreen_point(1)+Vector2(48,0),false,"enter")
             var boss: Dictionary=enemies.back()
             var formula_hp: float = float(boss.max_hp)
-            var capped_hp: float = Progression.cap_boss_hp(formula_hp, Progression.estimate_power(inventory,buff_levels,active_links))
+            var capped_hp: float = Progression.cap_boss_hp(formula_hp, Progression.estimate_power(inventory,buff_levels,active_links), wave)
             boss.hp=capped_hp
             boss.max_hp=capped_hp
             boss.timer=1.6
@@ -2460,7 +2460,7 @@ func update_enemies(delta: float) -> void:
                 break
         var contact_r: float = float(enemy["radius"]) + 18.0
         if (not encounter or enemy["state"] == "walk") and enemy["position"].distance_squared_to(player_position) < contact_r * contact_r:
-            hurt_player((player_position - enemy["position"]).normalized(), enemy["damage"], enemy["kind"] == "boss")
+            hurt_player((player_position - enemy["position"]).normalized(), enemy["damage"])
             if not running:
                 break
 
@@ -2605,7 +2605,10 @@ func refresh_weapon_draw_order() -> void:
             view.z_index = 11 if view.position.y >= player_position.y else 9
 
 func enchant_damage_multiplier(weapon_id: String) -> float:
-    return Rules.enchant_damage_bonus(active_links, weapon_id, Evolution.tier(weapon_level("firepot")), Evolution.tier(weapon_level("staff")), Evolution.tier(weapon_level("totem")))
+    var totem_level: int = weapon_level("totem")
+    if weapon_id == "hammer" and Rules.host_is_thunder_enchanted(active_links, weapon_id):
+        return Rules.thunder_hammer_enchant_multiplier(totem_level)
+    return Rules.enchant_damage_bonus(active_links, weapon_id, Evolution.tier(weapon_level("firepot")), Evolution.tier(weapon_level("staff")), Evolution.tier(totem_level))
 
 func update_armory(delta: float) -> void:
     if _armory_options_dirty or _armory_options_cache.is_empty():
@@ -3268,7 +3271,7 @@ func update_projectiles(delta: float) -> void:
         if is_hostile:
             var hr: float = pradius + 19.0
             if Geometry2D.get_closest_point_to_segment(player_position, previous, next_pos).distance_squared_to(player_position) < hr * hr:
-                hurt_player(projectile["velocity"].normalized(), projectile["damage"], bool(projectile.get("boss", false)))
+                hurt_player(projectile["velocity"].normalized(), projectile["damage"])
                 consumed = true
         else:
             var seg_min_x: float = minf(previous.x, next_pos.x) - pradius
@@ -3755,7 +3758,7 @@ func update_terrain_damage(delta: float, player_exposure: float = -1.0) -> void:
         if amount > 0.0:
             hurt_enemy(enemy,amount,"terrain_lava",false,Vector2.ZERO)
 
-func hurt_player(direction: Vector2, damage: float = 1.0, from_boss: bool = false) -> void:
+func hurt_player(direction: Vector2, damage: float = 1.0) -> void:
     if not running or invulnerable > 0.0 or demo or animation_demo or (training_mode and training_godmode):
         return
     if rng.randf() < stats["dodge"]:
@@ -3763,10 +3766,7 @@ func hurt_player(direction: Vector2, damage: float = 1.0, from_boss: bool = fals
         effects.floating_text(player_position, "闪避", Color("#9ce7f0"), 22)
         return
     var amount: float = damage * (1.0 - stats["reduction"])
-    # Cap every combat hit (Boss hits at 35% max HP so a Boss never 2-shots; regular hits at 70%).
-    # Terrain DoT stays on update_terrain_damage and is intentionally uncapped.
-    var hit_cap: float = Progression.BOSS_HIT_CAP_RATIO if from_boss else Progression.HIT_CAP_RATIO
-    amount = minf(amount, hit_cap * float(stats["max_hp"]))
+    amount = minf(amount, Progression.HIT_CAP_RATIO * float(stats["max_hp"]))
     player_hp = maxf(1.0 if (training_mode and training_godmode) else 0.0, player_hp - amount)
     invulnerable = 0.7
     hero.hurt()

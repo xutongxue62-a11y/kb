@@ -33,7 +33,7 @@ static func estimate_power(inventory: Array, levels: Dictionary, link: Variant =
         if not Catalog.WEAPONS.has(key) or suppressed.has(key):
             continue
         var data: Dictionary = Catalog.WEAPONS[key]
-        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item["level"]), key == "hammer" and Rules.host_is_thunder_enchanted(links, key))
+        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item["level"]))
         if key == "powder" and not chain.is_empty():
             var partner: String = chain["weapons"][1]
             var partner_level: int = 1
@@ -58,17 +58,18 @@ const ADAPT_CAP: float = 1.75
 const ADAPT_FULL_WAVE: int = 28
 const BOSS_DYNAMIC_MULT: float = 58.0
 const BOSS_DYNAMIC_CAP: float = 4.8
-const BOSS_HEALTH_TUNING: float = 1.05
-const BOSS_DAMAGE_TUNING: float = 1.08
+const BOSS_HEALTH_GROWTH: float = 1.004
 const MINION_DAMAGE_TUNING: float = 0.94
 # A single combat hit may never remove more than this share of the player's
 # max HP (applied after armor reduction, at the hurt_player funnel).
 # Lava and other terrain DoT ticks do not pass through this cap.
 const HIT_CAP_RATIO: float = 0.70
-const BOSS_HIT_CAP_RATIO: float = 0.35
 
-static func cap_boss_hp(formula_hp: float, power: float) -> float:
-    var dynamic_hp: float = power * BOSS_DYNAMIC_MULT * BOSS_HEALTH_TUNING
+static func boss_health_growth(wave: int) -> float:
+    return exp(minf(27.6, maxi(0, wave - 1) * log(BOSS_HEALTH_GROWTH)))
+
+static func cap_boss_hp(formula_hp: float, power: float, wave: int = 1) -> float:
+    var dynamic_hp: float = power * BOSS_DYNAMIC_MULT * boss_health_growth(wave)
     return maxf(formula_hp, minf(dynamic_hp, formula_hp * BOSS_DYNAMIC_CAP))
 
 static func adapt_ceiling(wave: int) -> float:
@@ -134,7 +135,9 @@ static func enemy_profile(wave: int, kind: String, adaptive: float = 1.0, elite:
     var damage_log: float = late_damage_log(stage)
     var damage_scale: float = minf(1000000.0, (1.0 + 0.06 * (stage - 1)) * exp(minf(14.0, milestone_log + damage_log)))
     if kind == "boss":
-        damage_scale = minf(1000000.0, (0.50 + 0.03 * (stage - 1)) * exp(minf(14.0, milestone_log * 0.55 + damage_log * 0.55)))
+        damage_scale = minf(1000000.0, (0.50 + 0.033 * (stage - 1)) * exp(minf(14.0, (milestone_log + damage_log) * 0.58)))
+    else:
+        damage_scale *= MINION_DAMAGE_TUNING
     var dodge: float = minf(0.22, maxf(0, stage - 2) * 0.006 + milestones * 0.012) if stage > 2 else 0.0
     if kind in ["tank", "boss", "armored", "basaltroller"]:
         dodge *= 0.35
@@ -144,11 +147,11 @@ static func enemy_profile(wave: int, kind: String, adaptive: float = 1.0, elite:
         dodge += 0.05
     var data: Dictionary = Catalog.DINOS.get(kind, EnemyRoster.BiomeEncounters.MOBS.get(kind, Catalog.DINOS["hunter"]))
     var boss_hp_mult: float = minf(1.85, 1.0 + 0.04 * float(stage - 9)) if (kind == "boss" and stage >= 10) else 1.0
-    var hp_tuning: float = BOSS_HEALTH_TUNING if kind == "boss" else 1.0
-    var damage_tuning: float = BOSS_DAMAGE_TUNING if kind == "boss" else MINION_DAMAGE_TUNING
+    if kind == "boss":
+        boss_hp_mult *= boss_health_growth(stage)
     return {
-        "hp": data["hp"] * hp_scale * (1.8 if elite else 1.0) * boss_hp_mult * hp_tuning,
-        "damage": float(BASE_DAMAGE.get(kind, EnemyRoster.base_damage(kind))) * damage_scale * (1.35 if elite else 1.0) * damage_tuning,
+        "hp": data["hp"] * hp_scale * (1.8 if elite else 1.0) * boss_hp_mult,
+        "damage": float(BASE_DAMAGE.get(kind, EnemyRoster.base_damage(kind))) * damage_scale * (1.35 if elite else 1.0),
         "dodge": minf(0.30, dodge),
         "speed_multiplier": 1.0 + minf(0.35, (stage - 1) * 0.009 + milestones * 0.025),
         "bullet_multiplier": 1.0 + minf(0.30, (stage - 1) * 0.007)

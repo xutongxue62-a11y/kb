@@ -164,6 +164,28 @@ func check_named_host_combat_effects(world: Node) -> void:
         else:
             world.apply_weapon_link_hit(world.enemies[0]["position"], host_id, str(world.enemies[0]["id"]), 10.0)
             expect(world.enemies[1]["hp"] < neighbor_before, link_id + " jumps lightning to a nearby enemy")
+    for level in [1, 2, 4, 6, 10]:
+        world.start_run(false)
+        world.grant_weapon("hammer")
+        world.grant_weapon("totem", level)
+        world.select_link("thunder_hammer")
+        var rank: int = world.Evolution.tier(level)
+        var expected: float = 1.22 + (level - 1) * 0.013 + [0.0, 0.08, 0.18][rank]
+        expect(world.has_active_link("thunder_hammer") and is_equal_approx(world.enchant_damage_multiplier("hammer"), expected), "thunder hammer uses the totem's exact enchant growth at Lv.%d" % level)
+        _clear_combat(world)
+        world.stats["crit_chance"] = 0.0
+        world.stats["damage_multiplier"] = 1.0
+        world.stats["close_damage_bonus"] = 0.0
+        world.spawn_enemy("tank", world.player_position + Vector2(95.0, 0.0))
+        var target: Dictionary = world.enemies.back()
+        target.hp = 1000.0
+        target.max_hp = 1000.0
+        world.weapon_runtime["hammer"]["next_thunder_red"] = false
+        for frame in range(32):
+            world.update_armory(1.0 / 60.0)
+        var jump_damage: float = Catalog.WEAPONS["totem"]["damage"] * world.Evolution.damage_multiplier("totem", level) * 0.58
+        jump_damage *= float(Catalog.exclusive_bonus(world.character_id, "totem").get("damage_multiplier", 1.0))
+        expect(is_equal_approx(1000.0 - target.hp, 21.6 * expected + jump_damage), "the real bolt at Totem Lv.%d applies the enchant multiplier and its usual jump" % level)
 
 func check_ranged_torso_clearance(world: Node) -> void:
     world.start_run(true)

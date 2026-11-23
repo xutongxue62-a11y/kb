@@ -124,10 +124,12 @@ func check_weapon_growth() -> void:
     var evolution = load("res://src/weapon_evolution.gd")
     for key in ["sling", "powder"]:
         expect(is_equal_approx(evolution.damage_multiplier(key, 1), 1.0), key + " keeps its opening damage")
-        var old_tier_bonus: float = 1.20 if key == "sling" else 1.24
-        var old_damage: float = (1.0 + 9.0 * 0.325) * 2.75 * old_tier_bonus
-        var boost: float = evolution.damage_multiplier(key, 10) / old_damage
-        expect(boost >= 1.06 and boost <= 1.09, key + " has a modest late-game damage boost")
+        var rate: float = 0.365 if key == "sling" else 0.360
+        for level in [2, 4, 7, 10]:
+            var skill_tier: int = evolution.tier(level)
+            var bonus: float = [1.0, 1.09, 1.20][skill_tier] if key == "sling" else [1.0, 1.11, 1.24][skill_tier]
+            var expected: float = (1.0 + (level - 1) * rate) * evolution.stage_damage_bonus(level) * bonus
+            expect(is_equal_approx(evolution.damage_multiplier(key, level), expected), "%s uses its new per-level growth at Lv.%d" % [key, level])
 
 func check_staff_ward() -> void:
     var rules = load("res://src/rules.gd")
@@ -598,9 +600,12 @@ func check_late_balance() -> void:
     var boss30: float = float(progression.enemy_profile(30, "boss", 1.75)["hp"])
     var baseline_boss20: float = 32.0 * twentieth["hp"] * 1.75 * 1.44
     var baseline_boss30: float = 32.0 * thirtieth["hp"] * 1.75 * 1.84
-    expect(is_equal_approx(boss20, baseline_boss20 * 1.05) and is_equal_approx(boss30, baseline_boss30 * 1.05), "Boss formula HP rises five percent along the existing curve")
-    expect(is_equal_approx(progression.cap_boss_hp(160.0 * 1.05, 6.0), 6.0 * 58.0 * 1.05), "power-scaled Boss HP also rises five percent")
-    expect(is_equal_approx(progression.enemy_profile(1, "boss")["damage"], 1.08), "Boss damage rises eight percent")
+    expect(boss20 > baseline_boss20 and boss30 / baseline_boss30 > boss20 / baseline_boss20, "the Boss HP increase grows across waves")
+    expect(is_equal_approx(progression.enemy_profile(1, "boss")["damage"], 1.0), "Boss damage retains its first-wave base")
+    var wave5_damage: float = progression.enemy_profile(5, "boss")["damage"]
+    var wave15_damage: float = progression.enemy_profile(15, "boss")["damage"]
+    expect(is_equal_approx(wave5_damage, 2.0 * (0.50 + 0.033 * 4.0) * pow(1.18, 0.58)), "Boss damage grows faster from the first playable Boss")
+    expect(wave15_damage / wave5_damage > (0.50 + 0.03 * 14.0) / (0.50 + 0.03 * 4.0) * pow(1.18, 1.10), "the Boss damage curve gains more in later waves")
     expect(is_equal_approx(progression.outgoing_damage_scale(1), 1.0) and is_equal_approx(progression.outgoing_damage_scale(8), 1.0), "player damage is unchanged through wave 8")
     expect(progression.outgoing_damage_scale(16) < 0.90 and is_equal_approx(progression.outgoing_damage_scale(30), 0.72), "mid-to-late outgoing player damage stays gently reduced, 0.72 at wave 30")
     expect(is_equal_approx(rules.BURN_TICK_SCALE, 0.68), "burn and residual DoT ticks scale with weapon progression")

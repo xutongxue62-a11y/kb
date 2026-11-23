@@ -53,21 +53,23 @@ static func stage_damage_bonus(level: int) -> float:
         return 1.20
     return 1.0
 
-static func damage_multiplier(key: String, level: int, thunder_hammer: bool = false) -> float:
+static func damage_multiplier(key: String, level: int) -> float:
     var lvl: int = maxi(1, level)
-    var base: float = 1.0 + float(lvl - 1) * 0.325
+    var growth_rate: float = 0.325
+    if key == "sling":
+        growth_rate = 0.365
+    elif key == "powder":
+        growth_rate = 0.360
+    var base: float = 1.0 + float(lvl - 1) * growth_rate
     var mult: float = base * stage_damage_bonus(lvl)
-    var late_growth: float = clampf(float(lvl - 1) / 9.0, 0.0, 1.0)
     if key == "hammer":
         mult *= (1.13 if lvl >= 5 else 1.08)
-        if thunder_hammer:
-            mult *= 1.0 + 0.06 * late_growth
     elif key in MELEE_IDS:
         mult *= (1.16 if lvl >= 5 else 1.10)
     elif key == "sling":
-        mult *= (1.20 if lvl >= 5 else (1.09 if lvl >= 3 else 1.0)) * (1.0 + 0.08 * late_growth)
+        mult *= (1.20 if lvl >= 5 else (1.09 if lvl >= 3 else 1.0))
     elif key == "powder":
-        mult *= (1.24 if lvl >= 5 else (1.11 if lvl >= 3 else 1.0)) * (1.0 + 0.07 * late_growth)
+        mult *= (1.24 if lvl >= 5 else (1.11 if lvl >= 3 else 1.0))
     elif lvl >= 5 and key in ["firepot", "staff"]:
         mult *= 1.23
     elif lvl >= 5:

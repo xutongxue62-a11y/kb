@@ -292,7 +292,7 @@ static func strike_travel(world, enemy: Dictionary, previous: Vector2) -> void:
     var nearest: Vector2 = Geometry2D.get_closest_point_to_segment(world.player_position, previous, current) if previous != current else current
     if contains(attack, world.player_position) and world.player_position.distance_to(nearest) <= float(attack.width):
         enemy.strike_hit = true
-        world.hurt_player(Vector2(attack.direction), float(enemy.damage), enemy.kind == "boss")
+        world.hurt_player(Vector2(attack.direction), float(enemy.damage))
 
 static func blocks(enemy: Dictionary, point: Vector2) -> bool:
     return enemy.get("state") == "encounter_aim" and enemy.get("attack", {}).get("mode") == "guard" and contains(enemy.attack, point)
@@ -329,7 +329,7 @@ static func _impact(world, enemy: Dictionary, attack: Dictionary) -> void:
         return
     if contains(attack, world.player_position):
         var knock: Vector2 = Vector2(attack.origin).direction_to(world.player_position)
-        world.hurt_player(knock, float(enemy.damage) * (0.82 if attack.mode == "echo" else 1.0), enemy.kind == "boss")
+        world.hurt_player(knock, float(enemy.damage) * (0.82 if attack.mode == "echo" else 1.0))
 
 static func _sector(origin: Vector2, radius: float, start: float, span: float, segments: int) -> PackedVector2Array:
     var rim := PackedVector2Array()
