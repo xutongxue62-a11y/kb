@@ -231,41 +231,26 @@ static func format_amount(amount: float) -> String:
 
 func damage_number(at: Vector2, amount: float, critical: bool = false, color: Color = Color("#fffdf4")) -> void:
     # Coalesce bursts arriving at the same contact point; combat damage is already
-    # resolved by Main. Keep a few recent totals rather than covering the weapons.
+    # resolved by Main. Active numbers are never evicted mid-air so they never flicker.
     var nearby := 0
-    var oldest := -1
-    var oldest_age := -1.0
     for index in range(particles.size()):
         var particle: Dictionary = particles[index]
         if particle.kind != "number" or not particle.has("damage_origin"): continue
         if particle.damage_origin.distance_to(at) > 76: continue
         nearby += 1
-        if float(particle.age) > oldest_age:
-            oldest = index
-            oldest_age = particle.age
         if particle.damage_origin.distance_to(at) <= 34 and particle.age < 0.12 and bool(particle.critical) == critical:
             particle.value += amount
             particle.text = format_amount(particle.value) + ("!" if critical else "")
             queue_redraw()
             return
+    if nearby >= 2:
+        return
     var total_numbers := 0
-    var oldest_any := -1
-    var oldest_any_age := -1.0
     for index in range(particles.size()):
-        var particle: Dictionary = particles[index]
-        if particle.kind != "number":
-            continue
-        total_numbers += 1
-        if float(particle.age) > oldest_any_age:
-            oldest_any = index
-            oldest_any_age = float(particle.age)
-    if nearby >= 2 and oldest >= 0:
-        particles.remove_at(oldest)
-        if oldest_any > oldest:
-            oldest_any -= 1
-        total_numbers -= 1
-    elif total_numbers >= 7 and oldest_any >= 0:
-        particles.remove_at(oldest_any)
+        if particles[index].kind == "number":
+            total_numbers += 1
+    if total_numbers >= 10:
+        return
     var text: String = format_amount(amount)
     if critical:
         text += "!"
@@ -286,7 +271,7 @@ func floating_text(at: Vector2, text: String, color: Color, size: int = 20, valu
         if float(particle.age) > oldest_age:
             oldest = index
             oldest_age = float(particle.age)
-    if total_numbers >= 7 and oldest >= 0:
+    if total_numbers >= 10 and oldest >= 0:
         particles.remove_at(oldest)
     number_serial += 1
     add_particle({"at": at + Vector2((number_serial % 5 - 2) * 12, -36 - (number_serial % 3) * 10), "color": color, "size": size, "kind": "number", "age": 0.0, "life": 0.58, "text": text, "value": value, "critical": critical})
