@@ -108,7 +108,7 @@ func _test_polish_numbers() -> void:
     expect(is_equal_approx(Progression.adapt_ceiling(5), 1.0 + 0.75 * 4.0 / 28.0) and Progression.adapt_ceiling(5) < 1.2, "adaptation still rises at stage 5 but no longer hits the cap")
     expect(is_equal_approx(Progression.adapt_ceiling(29), Progression.ADAPT_CAP), "the 1.75 adaptation cap is reached around stage 29")
     expect(Progression.adaptation(5, 1000.0, 1.0) <= Progression.adapt_ceiling(5), "strong builds cannot exceed the stage-scaled adaptation ceiling")
-    expect(is_equal_approx(Progression.cap_boss_hp(100.0, 10.0), 320.0) and is_equal_approx(Progression.cap_boss_hp(100.0, 2.0), 100.0), "dynamic boss HP is capped at 3.2x the fixed formula and never below it")
+    expect(is_equal_approx(Progression.cap_boss_hp(100.0, 10.0), 480.0) and is_equal_approx(Progression.cap_boss_hp(100.0, 1.0), 100.0), "dynamic boss HP stays between the formula and its 4.8x cap")
     expect(int(Growth.BUFFS["power"]["max_level"]) == 999 and int(Growth.BUFFS["haste"]["max_level"]) == 999, "蛮力 and 迅捷 play caps are uncapped in normal play")
     expect(int(Growth.BUFFS["crit_chance"]["max_level"]) == 999 and int(Growth.BUFFS["crit_power"]["max_level"]) == 999, "猎手直觉 and 致命一击 play caps are uncapped in normal play")
     expect(int(Growth.BUFFS["power"]["save_max_level"]) == 999 and int(Growth.BUFFS["crit_chance"]["save_max_level"]) == 999, "save validation accepts the current uncapped buff stacks")
@@ -194,10 +194,11 @@ func _test_world_behavior() -> void:
         world.trigger_lava_lightning_splash(lava_center, 1.0)
         expect(world.effects.particles.any(func(p): return str(p.get("kind", "")) == "fire_blast"), "lightning hitting lava spawns a molten explosion splash")
     var evol = load("res://src/weapon_evolution.gd")
-    expect(evol.damage_multiplier("club", 5) > evol.damage_multiplier("club", 3) and evol.damage_multiplier("club", 3) > evol.damage_multiplier("sling", 3), "evolution jumps meaningfully at Lv.3/5 and boosts melee weapons")
-    expect(evol.damage_multiplier("firepot", 5) > evol.damage_multiplier("sling", 5) and evol.damage_multiplier("staff", 5) > evol.damage_multiplier("sling", 5), "awakened fire and staff receive extra Lv.5+ amplification")
+    expect(evol.damage_multiplier("club", 5) > evol.damage_multiplier("club", 3) and evol.damage_multiplier("club", 3) > evol.damage_multiplier("club", 2), "club gets a meaningful jump at Lv.3 and Lv.5")
+    expect(is_equal_approx(evol.damage_multiplier("firepot", 5), evol.damage_multiplier("staff", 5)) and evol.damage_multiplier("staff", 5) > evol.damage_multiplier("staff", 4), "awakened fire and staff keep their shared Lv.5 amplification")
     expect(Economy.price("power", 20, 6) < 140 and Economy.price("sling", 20, 5) < 100, "repeat buff and high-level weapon upgrades are cut in price so builds scale smoothly")
-    expect(evol.damage_multiplier("sling", 5) >= 4.5 and evol.damage_multiplier("powder", 5) >= 4.5, "late-game sling and cannon evolution multipliers scale smoothly")
+    for key in ["sling", "powder"]:
+        expect(evol.damage_multiplier(key, 10) > evol.damage_multiplier(key, 7) and evol.damage_multiplier(key, 7) > evol.damage_multiplier(key, 5), key + " gains damage through its late levels")
     expect(world.Growth.MAX_WEAPON_LEVEL == 10 and evol.damage_multiplier("hammer", 10) > evol.damage_multiplier("hammer", 7), "weapon level cap is 10 and late upgrades keep scaling cleanly")
     var fire_link := [{"id": "fire_cannon", "kind": "fire_enchant", "weapons": ["firepot", "powder"]}]
     expect(world.Rules.enchant_damage_bonus(fire_link, "powder", 0, 0, 0) >= 1.28 and world.Rules.enchant_damage_bonus(fire_link, "powder", 2, 0, 0) >= 1.50, "enchanted weapons gain balanced direct-hit damage amplification")

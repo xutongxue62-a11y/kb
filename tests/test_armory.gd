@@ -35,7 +35,17 @@ func run_checks() -> void:
     for index in range(32):
         events.append_array(armory.advance(1.0/60.0,Vector2.ZERO,enemies,[{"id":"hammer","level":1}],stats,false,views))
     var areas: Array = events.filter(func(event):return event["type"]=="area")
-    expect(areas.size()==1 and areas[0]["radius"]>=70 and is_equal_approx(areas[0]["damage"], load("res://src/catalog.gd").WEAPONS["hammer"]["damage"]),"hammer produces one delayed area smash with actual damage")
+    expect(areas.size()==1 and areas[0]["radius"]>=70 and is_equal_approx(areas[0]["damage"], 21.6),"hammer produces one delayed area smash with actual starting damage")
+    var hammer_damage: Array[float] = []
+    for thunder in [false, true]:
+        armory.reset()
+        events.clear()
+        stats["hammer_thunder"] = thunder
+        for index in range(32):
+            events.append_array(armory.advance(1.0/60.0, Vector2.ZERO, enemies, [{"id":"hammer","level":10}], stats, false, views))
+        areas = events.filter(func(event): return event["type"] == "area")
+        hammer_damage.append(float(areas[0]["damage"]) if not areas.is_empty() else 0.0)
+    expect(hammer_damage[0] > 0.0 and is_equal_approx(hammer_damage[1], hammer_damage[0] * 1.06), "late thunder hammer alone gains six percent on its actual strike")
     armory.reset()
     events.clear()
     # One cycle returns in ~0.56s; the new 0.76s interval would already start a

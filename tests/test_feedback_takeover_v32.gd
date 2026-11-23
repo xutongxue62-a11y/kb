@@ -198,7 +198,8 @@ func test_magnet_and_text_budget(world) -> void:
         world.effects.floating_text(Vector2(index * 160, 200), "提示" + str(index), Color.WHITE)
     var numbers: Array = world.effects.particles.filter(func(particle): return particle.kind == "number")
     expect(numbers.size() <= 10, "mixed damage and status floating text share the ten-number screen budget")
-    expect(numbers.any(func(particle): return particle.text == "提示79"), "the floating-text budget keeps recent feedback")
+    expect(numbers.any(func(particle): return particle.text == "1"), "later hits and statuses cannot evict a number that is still rising")
+    expect(numbers.any(func(particle): return particle.text == "提示0"), "damage numbers leave room for status text")
     world.pickups.clear()
 
 func test_continue_panel(world) -> void:

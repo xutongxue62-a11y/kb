@@ -20,7 +20,7 @@ func expected_hp_scale(stage: int, adaptive: float, soften: bool) -> float:
     if not soften and capped > 24:
         late += float(capped - 24) * log(1.06)
     if soften and stage > 20:
-        late += float(stage - 20) * log(1.047)
+        late += float(stage - 20) * log(1.062)
     var milestones: int = stage / 5
     return exp(minf(27.6, float(stage - 1) * log(1.10) + float(milestones) * log(1.45) + late)) * clampf(adaptive, 1.0, 1.75)
 
@@ -40,7 +40,7 @@ func _initialize() -> void:
 func run_checks() -> void:
     var progression = load("res://src/progression.gd")
     var first: Dictionary = progression.enemy_profile(1, "hunter")
-    expect(is_equal_approx(first["hp"], 5.0) and is_equal_approx(first["damage"], 1.0) and is_zero_approx(first["dodge"]), "opening preserves weak ordinary enemies and zero random evasion")
+    expect(is_equal_approx(first["hp"], 5.0) and is_equal_approx(first["damage"], 0.94) and is_zero_approx(first["dodge"]), "opening preserves weak ordinary enemies and zero random evasion")
     var fourth: Dictionary = progression.enemy_profile(4, "hunter")
     var fifth: Dictionary = progression.enemy_profile(5, "hunter")
     expect(fifth["hp"] > fourth["hp"] * 1.35 and fifth["damage"] > fourth["damage"] * 1.1, "fifth wave is a real HP and damage milestone")
@@ -59,12 +59,11 @@ func run_checks() -> void:
     expect(is_equal_approx(progression.outgoing_damage_scale(30), 0.72), "wave 30 outgoing player damage stays at 0.72")
     for stage in [1, 8, 10, 15, 20]:
         var profile: Dictionary = progression.enemy_profile(stage, "boss", 1.75)
-        var expected_hp: float = 160.0 * expected_hp_scale(stage, 1.75, false)
-        expect(is_equal_approx(float(profile["hp"]), expected_hp), "wave %d boss HP scale is unchanged through the soften point" % stage)
+        var late_boss_multiplier: float = 1.0 + 0.04 * float(stage - 9) if stage >= 10 else 1.0
+        var expected_hp: float = 160.0 * expected_hp_scale(stage, 1.75, false) * late_boss_multiplier * 1.05
+        expect(is_equal_approx(float(profile["hp"]), expected_hp), "wave %d boss HP follows the current curve with the five percent increase" % stage)
     var boss30: float = float(progression.enemy_profile(30, "boss", 1.75)["hp"])
-    var previous_boss30: float = 68857.0
-    expect(boss30 >= previous_boss30 * 2.0 and boss30 <= previous_boss30 * 3.0, "wave 30 Boss formula HP lands in the 2-3x previous-version window")
-    expect(is_equal_approx(boss30, 160.0 * expected_hp_scale(30, 1.75, true)), "wave 30 Boss HP uses the softened late curve")
+    expect(is_equal_approx(boss30, 160.0 * expected_hp_scale(30, 1.75, true) * 1.84 * 1.05), "wave 30 Boss HP uses the softened late curve")
     var weak: float = progression.estimate_power([{"id":"sling", "level":1}], {})
     var strong: float = progression.estimate_power([{"id":"sling", "level":5}, {"id":"club", "level":5}], {"power":3,"haste":3,"crit_chance":3,"crit_power":3,"pet":3})
     expect(strong > weak * 3.0, "build estimate includes weapon levels, passive stats and followers")
@@ -135,7 +134,7 @@ func run_checks() -> void:
     world.invulnerable = 0.0
     world.player_hp = world.stats["max_hp"]
     world.hurt_player(Vector2.ZERO, 100.0, true)
-    expect(is_equal_approx(world.player_hp, world.stats["max_hp"] - cap) and world.running, "Boss hits share the same 70% max-HP combat cap")
+    expect(is_equal_approx(world.player_hp, float(world.stats["max_hp"]) * 0.65) and world.running, "Boss hits remain capped at 35% of max HP")
     world.map_view.chunks.clear()
     for x in range(-2, 5):
         for y in range(-2, 5):

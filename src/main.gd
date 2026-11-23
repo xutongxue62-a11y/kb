@@ -454,7 +454,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
             enemy["view"].queue_free()
     enemies.clear()
     projectiles.clear()
-    effects.particles.clear()
+    effects.expire_all()
     for view in weapon_views.values():
         view.queue_free()
     inventory.clear()
@@ -3606,9 +3606,9 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
     var feedback: bool = not neutral or elapsed >= float(enemy.get("lava_feedback_next",-INF)) or enemy["hp"]<=0
     if neutral: enemy["lava_feedback_sum"] = float(enemy.get("lava_feedback_sum",0.0)) + amount
     if feedback:
-        enemy["view"].hit()
         var allow_hit_vfx: bool = elapsed >= float(enemy.get("_vfx_cd", -1.0))
         if allow_hit_vfx:
+            enemy["view"].hit()
             enemy["_vfx_cd"] = elapsed + (0.24 if enemies.size() > 26 else 0.18)
             var ench_kinds: Array = [] if neutral else Rules.host_enchant_kinds(active_links, weapon_id)
             if ench_kinds.is_empty():
@@ -3630,7 +3630,8 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
         if slammed:
             effects.slam_cue(enemy["position"], direction)
         if bool(settings.get("damage_numbers", true)):
-            effects.damage_number(enemy["position"],float(enemy.get("lava_feedback_sum",amount)) if neutral else amount,critical,Color("#ffbc65") if neutral else Color("#fffdf4"))
+            var number_at: Vector2 = enemy["position"] - Vector2(0.0, maxf(0.0, float(enemy["view"].display_width) * 0.46 - 32.0))
+            effects.damage_number(number_at, float(enemy.get("lava_feedback_sum", amount)) if neutral else amount, critical, Color("#ffbc65") if neutral else Color("#fffdf4"))
         if neutral:
             enemy["lava_feedback_sum"] = 0.0
             enemy["lava_feedback_next"] = elapsed+0.35

@@ -50,7 +50,9 @@ func advance(delta: float, hero: Vector2, enemies: Array, inventory: Array, stat
         state["cooldown"] = maxf(0.0,state["cooldown"]-delta*weapon_haste)
         state["age"] += delta * weapon_haste
         var target: Dictionary = Rules.choose_target(hero,reach,enemies,prefer_elite)
-        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item.get("level", 1))) * float(stats.get("enchant_mults", {}).get(key, 1.0))
+        var is_thunder_hammer: bool = key == "hammer" and bool(stats.get("hammer_thunder", false))
+        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item.get("level", 1)), is_thunder_hammer)
+        damage *= float(stats.get("enchant_mults", {}).get(key, 1.0))
         if key == "totem":
             events.append_array(try_sky_lightning(state, item, hero, enemies, damage, delta * haste))
         if state["phase"] == "rest" and state["cooldown"] <= 0 and not target.is_empty():
@@ -132,7 +134,6 @@ func advance(delta: float, hero: Vector2, enemies: Array, inventory: Array, stat
             if state["age"]>=0.28:
                 state["phase"] = "rest"
         elif key == "hammer":
-            var is_thunder_hammer: bool = bool(stats.get("hammer_thunder", false))
             state["thunder_mode"] = is_thunder_hammer
             if state["phase"] == "windup":
                 var start_pt: Vector2 = state.get("start", mount)

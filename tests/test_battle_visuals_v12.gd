@@ -170,6 +170,26 @@ func check_lightning() -> void:
     fx.damage_number(Vector2.ZERO, 400.0)
     fx.damage_number(Vector2(1, 0), 600.0)
     expect(fx.particles.filter(func(p): return p.kind == "number").size() == 1 and is_equal_approx(fx.particles.back().value, 1000.0), "visual additions preserve damage-number coalescing")
+    for index in range(64):
+        fx.burst(Vector2(index * 40, 40), Color.WHITE, 24.0, "smoke")
+    fx.set_vfx_mode("off")
+    fx.advance(0.10)
+    expect(fx.particles.size() == 1 and fx.particles[0].value == 1000.0, "a busy effects budget and VFX changes leave the active number intact")
+    fx.damage_number(Vector2.ZERO, 500.0)
+    expect(fx.particles[0].value == 1000.0, "later hits do not rewrite an already visible number")
+    if fx.has_method("_draw_numbers") and fx.particles.size() == 2:
+        var number_canvas := CanvasRecorder.new()
+        fx._draw_numbers(number_canvas)
+        var early: Dictionary = number_canvas.commands[1]
+        fx.advance(0.57)
+        number_canvas.commands.clear()
+        fx._draw_numbers(number_canvas)
+        var late: Dictionary = number_canvas.commands[1]
+        expect(late.point.y < early.point.y and is_equal_approx(late.point.x, early.point.x) and late.color.a < early.color.a, "the existing number rises and fades without moving sideways")
+        fx.advance(1.0)
+        number_canvas.commands.clear()
+        fx._draw_numbers(number_canvas)
+        expect(number_canvas.commands.is_empty(), "all numbers disappear naturally at the end of their lifetimes")
     fx.queue_free()
 
 func check_pickups_and_projectiles() -> void:

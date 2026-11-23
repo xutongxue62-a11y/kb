@@ -30,9 +30,9 @@ var walk_time: float = 0.0
 var hit_time: float = 0.0
 var health_fraction: float = 1.0:
     set(value):
-        var changed: bool = absf(health_fraction - value) >= 0.02 or value <= 0.0 or (health_fraction >= 0.99 and value < 0.99)
-        health_fraction = value
-        if changed:
+        var fraction: float = clampf(value, 0.0, 1.0)
+        if health_fraction != fraction:
+            health_fraction = fraction
             queue_redraw()
 var elite: bool = false:
     set(value):
@@ -157,12 +157,12 @@ func animate(velocity: Vector2, delta: float, state: String = "walk", travelled:
         last_pose = state
     pose_clock += delta
     frames.pose(foot_phase, stepping and distance > 0.001, state, pose_clock, facing)
-    var tint: Color = Color(2.0, 1.75, 1.55) if hit_time > 0.13 else encounter_tint
+    var tint: Color = encounter_tint.lerp(Color("#f49b8b"), hit_time * 2.4)
     frames.modulate = tint
     sprite.modulate = tint
 
 func hit() -> void:
-    hit_time = 0.2
+    hit_time = 0.10
 
 func _draw_egg() -> void:
     var amount: float = crack_progress
@@ -239,7 +239,7 @@ func _draw() -> void:
     _draw_ground_shadow()
     if shell == "egg":
         _draw_egg()
-        if health_fraction < 0.99:
+        if health_fraction < 1.0:
             var bar_width: float = minf(display_width * 0.75, 55.0)
             var height: float = -display_width * 0.46 - 7.0
             draw_line(Vector2(-bar_width / 2, height), Vector2(bar_width / 2, height), Color("#4c2937"), 5.5, true)
@@ -252,7 +252,7 @@ func _draw() -> void:
             var mark: Vector2 = spot + Vector2(x * 7.0, absf(x) * 2.0)
             draw_line(mark + Vector2(-2.0, 4.0), mark + Vector2(2.0, -3.0), Color("#36271f"), 5.0, true)
             draw_line(mark + Vector2(-2.0, 4.0), mark + Vector2(2.0, -3.0), color, 2.5, true)
-    if health_fraction < 0.99:
+    if health_fraction < 1.0:
         var bar_width: float = minf(display_width * 0.75, 55.0)
         var height: float = -display_width * 0.46 - 7.0
         draw_line(Vector2(-bar_width / 2, height), Vector2(bar_width / 2, height), Color("#4c2937"), 5.5, true)

@@ -18,8 +18,15 @@ var ink: Color = Color("#2a221c")
 var paper: Color = Color("#f4ead6")
 var _draw_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var ground_layer: Node2D
+var number_layer: Node2D
 var _had_ground_particles: bool = false
 var _had_particles: bool = false
+var _had_numbers: bool = false
+
+const NUMBER_LIFE := 0.76
+const DAMAGE_NUMBER_MERGE_TIME := 0.055
+const DAMAGE_NUMBER_LIMIT := 8
+const STATUS_NUMBER_LIMIT := 2
 
 class GroundLayer:
     extends Node2D
@@ -28,12 +35,22 @@ class GroundLayer:
         if owner_fx != null:
             owner_fx._draw_ground_particles(self)
 
+class NumberLayer:
+    extends Node2D
+    var owner_fx
+    func _draw() -> void:
+        owner_fx._draw_numbers(self)
+
 func _ready() -> void:
     ground_layer = GroundLayer.new()
     ground_layer.owner_fx = self
     ground_layer.z_as_relative = false
     ground_layer.z_index = -20
     add_child(ground_layer)
+    number_layer = NumberLayer.new()
+    number_layer.owner_fx = self
+    number_layer.z_index = 1
+    add_child(number_layer)
 
 const HEAVY_IDS = ["powder", "hammer", "club", "axe"]
 const LIGHT_IDS = ["blade", "sling", "boomerang", "staff", "drone"]
@@ -58,7 +75,7 @@ const DEDUP_HIT_KINDS = ["rune_spark", "fire_splash", "shock_wrap", "pierce_cue"
 
 func add_particle(particle: Dictionary) -> void:
     var kind: String = str(particle.get("kind", ""))
-    if vfx_mode == "off" and kind != "number":
+    if vfx_mode == "off":
         return
     if vfx_mode == "minimal" and kind in DECORATIVE_KINDS:
         return
@@ -70,15 +87,22 @@ func add_particle(particle: Dictionary) -> void:
     if not _impact_weapon.is_empty() and not particle.has("weapon_id"):
         particle["weapon_id"]=_impact_weapon
     particles.append(particle)
-    var cap: int = 24 if vfx_mode == "off" else (30 if vfx_mode == "minimal" else 36)
+    var cap: int = 30 if vfx_mode == "minimal" else 36
     if particles.size() > cap:
-        # Never evict hero sky-lightning bolts or heavy elemental blasts when trimming!
-        var evict_idx: int = 0
+        var effect_count: int = 1
+        var first_effect: int = -1
+        var first_decorative: int = -1
         for idx in range(particles.size() - 1):
-            if str(particles[idx].get("kind", "")) not in PRIORITY_KINDS:
-                evict_idx = idx
-                break
-        particles.remove_at(evict_idx)
+            var existing_kind: String = str(particles[idx].get("kind", ""))
+            if existing_kind == "number":
+                continue
+            effect_count += 1
+            if first_effect < 0:
+                first_effect = idx
+            if first_decorative < 0 and existing_kind not in PRIORITY_KINDS:
+                first_decorative = idx
+        if effect_count > cap:
+            particles.remove_at(first_decorative if first_decorative >= 0 else first_effect)
     queue_redraw()
     if ground_layer != null and kind in ["quake", "thunder_blast"]:
         ground_layer.queue_redraw()
@@ -230,51 +254,44 @@ static func format_amount(amount: float) -> String:
     return str(roundi(amount)) if is_equal_approx(amount, roundf(amount)) else "%.1f" % amount
 
 func damage_number(at: Vector2, amount: float, critical: bool = false, color: Color = Color("#fffdf4")) -> void:
-    # Coalesce bursts arriving at the same contact point; combat damage is already
-    # resolved by Main. Active numbers are never evicted mid-air so they never flicker.
+    # Collect simultaneous hits before displaying the total. Once visible,
+    # the label keeps its value, position lane and lifetime.
     var nearby := 0
-    for index in range(particles.size()):
-        var particle: Dictionary = particles[index]
+    var count := 0
+    for particle in particles:
         if particle.kind != "number" or not particle.has("damage_origin"): continue
-        if particle.damage_origin.distance_to(at) > 76: continue
+        count += 1
+        var distance_squared: float = Vector2(particle.damage_origin).distance_squared_to(at)
+        if distance_squared > 76.0 * 76.0: continue
         nearby += 1
-        if particle.damage_origin.distance_to(at) <= 34 and particle.age < 0.12 and bool(particle.critical) == critical:
+        if distance_squared <= 34.0 * 34.0 and particle.age < DAMAGE_NUMBER_MERGE_TIME and bool(particle.critical) == critical:
             particle.value += amount
             particle.text = format_amount(particle.value) + ("!" if critical else "")
-            queue_redraw()
             return
-    if nearby >= 2:
-        return
-    var total_numbers := 0
-    for index in range(particles.size()):
-        if particles[index].kind == "number":
-            total_numbers += 1
-    if total_numbers >= 10:
+    if nearby >= 2 or count >= DAMAGE_NUMBER_LIMIT:
         return
     var text: String = format_amount(amount)
     if critical:
         text += "!"
         color = Color("#ffd653")
-    floating_text(at, text, color, 25 if critical else 20, amount, critical)
+    _add_number(at, text, color, 25 if critical else 20, amount, critical)
     particles.back()["damage_origin"] = at
-    particles.back()["life"] = 0.46
 
 func floating_text(at: Vector2, text: String, color: Color, size: int = 20, value: float = 0.0, critical: bool = false) -> void:
-    var total_numbers := 0
-    var oldest := -1
-    var oldest_age := -1.0
-    for index in range(particles.size()):
-        var particle: Dictionary = particles[index]
-        if particle.kind != "number":
-            continue
-        total_numbers += 1
-        if float(particle.age) > oldest_age:
-            oldest = index
-            oldest_age = float(particle.age)
-    if total_numbers >= 10 and oldest >= 0:
-        particles.remove_at(oldest)
+    var count := 0
+    for particle in particles:
+        if particle.kind == "number" and not particle.has("damage_origin"):
+            count += 1
+            if count >= STATUS_NUMBER_LIMIT:
+                return
+    _add_number(at, text, color, size, value, critical)
+
+func _add_number(at: Vector2, text: String, color: Color, size: int, value: float, critical: bool) -> void:
     number_serial += 1
-    add_particle({"at": at + Vector2((number_serial % 5 - 2) * 12, -36 - (number_serial % 3) * 10), "color": color, "size": size, "kind": "number", "age": 0.0, "life": 0.58, "text": text, "value": value, "critical": critical})
+    var offset := Vector2((number_serial % 5 - 2) * 10, -44 - (number_serial % 3) * 7)
+    particles.append({"at": at + offset, "color": color, "size": size, "kind": "number", "age": 0.0, "life": NUMBER_LIFE, "text": text, "value": value, "critical": critical})
+    if number_layer != null:
+        number_layer.queue_redraw()
 
 func impact(at: Vector2, direction: Vector2, weapon_id: String, vfx_tier: int = 0) -> void:
     _impact_weapon=weapon_id
@@ -442,11 +459,17 @@ func defeat(at: Vector2, direction: Vector2, size: float, texture: Texture2D = n
 func advance(delta: float) -> void:
     var write: int = 0
     var has_ground: bool = false
+    var has_numbers: bool = false
+    var has_particles: bool = false
     for index in range(particles.size()):
         var particle: Dictionary = particles[index]
         particle["age"] += delta
         if particle["age"] < particle["life"]:
             var pkind: String = str(particle.get("kind", ""))
+            if pkind == "number":
+                has_numbers = true
+            else:
+                has_particles = true
             if pkind == "quake" or pkind == "thunder_blast":
                 has_ground = true
             if write != index:
@@ -454,13 +477,15 @@ func advance(delta: float) -> void:
             write += 1
     if write != particles.size():
         particles.resize(write)
-    var has_particles: bool = not particles.is_empty()
     if has_particles or _had_particles or not charge_cues.is_empty():
         queue_redraw()
     _had_particles = has_particles
     if ground_layer != null and (has_ground or _had_ground_particles):
         ground_layer.queue_redraw()
     _had_ground_particles = has_ground
+    if number_layer != null and (has_numbers or _had_numbers):
+        number_layer.queue_redraw()
+    _had_numbers = has_numbers
 
 func expire_all() -> void:
     particles.clear()
@@ -468,6 +493,8 @@ func expire_all() -> void:
     queue_redraw()
     if ground_layer != null:
         ground_layer.queue_redraw()
+    if number_layer != null:
+        number_layer.queue_redraw()
 
 func set_charge_cues(cues: Array) -> void:
     charge_cues = cues
@@ -606,12 +633,33 @@ func _draw_charge_cues() -> void:
                 draw_line(p_end - Vector2(sl, 0.0), p_end + Vector2(sl, 0.0), core_c, 2.0, true)
                 draw_line(p_end - Vector2(0.0, sl), p_end + Vector2(0.0, sl), core_c, 2.0, true)
 
+func _draw_numbers(canvas) -> void:
+    for particle in particles:
+        if particle.kind != "number":
+            continue
+        var delay: float = DAMAGE_NUMBER_MERGE_TIME if particle.has("damage_origin") else 0.0
+        if particle.age < delay:
+            continue
+        var progress: float = (particle.age - delay) / (particle.life - delay)
+        var point: Vector2 = particle.at + Vector2(0.0, -42.0 * progress)
+        if _has_hero_anchor and (absf(point.x - hero_anchor.x) > 780.0 or absf(point.y - hero_anchor.y) > 540.0):
+            continue
+        var text: String = particle.text
+        var size: int = particle.size
+        point.x -= font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * 0.5
+        var color: Color = particle.color
+        color.a *= 1.0 - smoothstep(0.62, 1.0, progress)
+        canvas.draw_string_outline(font, point, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 3, Color(0.16, 0.1, 0.08, color.a))
+        canvas.draw_string(font, point, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+
 func _draw() -> void:
     _draw_charge_cues()
     for particle in particles:
+        if particle.kind == "number":
+            continue
         var progress: float = particle["age"] / particle["life"]
         var color: Color = particle["color"]
-        if particle["kind"] == "number" or particle["kind"] == "word":
+        if particle["kind"] == "word":
             color.a *= clampf((1.0 - progress) / 0.22, 0.0, 1.0)
         else:
             color.a *= 0.90 * (1.0 - progress * 0.96)
@@ -746,16 +794,6 @@ func _draw() -> void:
                     var center: Vector2 = point + burst_dir * size * (0.3 + progress * 1.25)
                     var normal: Vector2 = burst_dir.orthogonal() * (6.0 * (1.0 - progress))
                     draw_colored_polygon(PackedVector2Array([center + burst_dir * 9, center - burst_dir * 5 + normal, center - burst_dir * 5 - normal]), color)
-            "number":
-                var punch: float = 1.22 if progress < 0.09 else (1.08 if progress < 0.2 else 1.0)
-                if particle.get("critical", false):
-                    punch += 0.12 if progress < 0.2 else 0.04
-                size *= punch
-                var width: float = font.get_string_size(particle["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, int(size)).x
-                point += Vector2(-width * 0.5, -progress * 64.0)
-                var outline: Color = Color(0.16, 0.1, 0.08, color.a)
-                draw_string_outline(font, point, particle["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, int(size), 3, outline)
-                draw_string(font, point, particle["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, int(size), color)
             "blast", "cannon":
                 _draw_explosion(point, size, color, progress, false)
             "rune_blast":

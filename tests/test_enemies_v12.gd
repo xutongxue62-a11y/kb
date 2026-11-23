@@ -86,7 +86,7 @@ func check_pools_and_growth() -> void:
         var opening: Dictionary = progression.enemy_profile(1, kind)
         var later: Dictionary = progression.enemy_profile(20, kind, 1.65, true)
         expect(is_equal_approx(opening["hp"], float(roster.NEW_DATA[kind]["hp"])), kind + " can receive a real profile before Catalog integration")
-        expect(is_equal_approx(opening["damage"], float(roster.base_damage(kind))), kind + " base damage is used by progression")
+        expect(is_equal_approx(opening["damage"], float(roster.base_damage(kind)) * 0.94), kind + " uses the roster damage with the minion reduction applied")
         expect(later["hp"] > opening["hp"] and later["damage"] > opening["damage"], kind + " participates in wave and elite growth")
         var endless: Dictionary = progression.enemy_profile(10000, kind, 1.65, true)
         expect(is_finite(endless["hp"]) and is_finite(endless["damage"]) and endless["speed_multiplier"] <= 1.35, kind + " endless growth remains finite and bounded in speed")

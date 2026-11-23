@@ -60,6 +60,7 @@ func clear_push_lane(world, distance: float = 90.0) -> Dictionary:
 
 func run_checks() -> void:
     check_attack_feel()
+    check_weapon_growth()
     check_pickup_radius()
     check_staff_ward()
     check_thunder_ward()
@@ -118,6 +119,15 @@ func check_pickup_radius() -> void:
     world.wave = 9
     expect(is_equal_approx(world.pickup_magnet_radius(), float(world.stats["pickup_radius"]) + 60.0), "later waves still extend magnet range, but less than before")
     world.queue_free()
+
+func check_weapon_growth() -> void:
+    var evolution = load("res://src/weapon_evolution.gd")
+    for key in ["sling", "powder"]:
+        expect(is_equal_approx(evolution.damage_multiplier(key, 1), 1.0), key + " keeps its opening damage")
+        var old_tier_bonus: float = 1.20 if key == "sling" else 1.24
+        var old_damage: float = (1.0 + 9.0 * 0.325) * 2.75 * old_tier_bonus
+        var boost: float = evolution.damage_multiplier(key, 10) / old_damage
+        expect(boost >= 1.06 and boost <= 1.09, key + " has a modest late-game damage boost")
 
 func check_staff_ward() -> void:
     var rules = load("res://src/rules.gd")
@@ -572,10 +582,10 @@ func check_late_balance() -> void:
     var eighth: Dictionary = progression.enemy_profile(8, "hunter")
     var twentieth: Dictionary = progression.enemy_profile(20, "hunter")
     var thirtieth: Dictionary = progression.enemy_profile(30, "hunter")
-    expect(is_equal_approx(first["hp"], 5.0) and is_equal_approx(first["damage"], 1.0), "wave 1 hunter HP and damage stay at the opening baseline")
+    expect(is_equal_approx(first["hp"], 5.0) and is_equal_approx(first["damage"], 0.94), "opening hunters retain their HP and deal six percent less damage")
     var old5_hp: float = 5.0 * exp(4.0 * log(1.10) + log(1.45))
     var old5_dmg: float = (1.0 + 0.06 * 4.0) * exp(log(1.18))
-    expect(is_equal_approx(fifth["hp"], old5_hp) and is_equal_approx(fifth["damage"], old5_dmg), "wave 5 hunter growth is unchanged")
+    expect(is_equal_approx(fifth["hp"], old5_hp) and is_equal_approx(fifth["damage"], old5_dmg * 0.94), "wave 5 hunters keep the HP curve and deal six percent less damage")
     var old8_hp: float = 5.0 * exp(7.0 * log(1.10) + log(1.45))
     expect(is_equal_approx(eighth["hp"], old8_hp), "wave 8 still follows the original HP curve")
     var old20_hp: float = 5.0 * exp(19.0 * log(1.10) + 4.0 * log(1.45))
@@ -586,9 +596,11 @@ func check_late_balance() -> void:
     expect(thirtieth["hp"] > twentieth["hp"] and thirtieth["hp"] > old30_hp * 4.0 and thirtieth["hp"] < old30_hp * 8.0, "wave 30 hunter HP still ramps, but the post-20 compounding is gentler")
     var boss20: float = float(progression.enemy_profile(20, "boss", 1.75)["hp"])
     var boss30: float = float(progression.enemy_profile(30, "boss", 1.75)["hp"])
-    var previous_boss30: float = 68857.0
-    expect(is_equal_approx(boss20, 160.0 * exp(minf(27.6, 19.0 * log(1.10) + 4.0 * log(1.45) + 12.0 * log(1.06) + 4.0 * log(1.07))) * 1.75), "wave 20 Boss HP is unchanged")
-    expect(boss30 >= previous_boss30 * 2.0 and boss30 <= previous_boss30 * 3.0, "wave 30 Boss formula HP is 2-3x the previous version")
+    var baseline_boss20: float = 32.0 * twentieth["hp"] * 1.75 * 1.44
+    var baseline_boss30: float = 32.0 * thirtieth["hp"] * 1.75 * 1.84
+    expect(is_equal_approx(boss20, baseline_boss20 * 1.05) and is_equal_approx(boss30, baseline_boss30 * 1.05), "Boss formula HP rises five percent along the existing curve")
+    expect(is_equal_approx(progression.cap_boss_hp(160.0 * 1.05, 6.0), 6.0 * 58.0 * 1.05), "power-scaled Boss HP also rises five percent")
+    expect(is_equal_approx(progression.enemy_profile(1, "boss")["damage"], 1.08), "Boss damage rises eight percent")
     expect(is_equal_approx(progression.outgoing_damage_scale(1), 1.0) and is_equal_approx(progression.outgoing_damage_scale(8), 1.0), "player damage is unchanged through wave 8")
     expect(progression.outgoing_damage_scale(16) < 0.90 and is_equal_approx(progression.outgoing_damage_scale(30), 0.72), "mid-to-late outgoing player damage stays gently reduced, 0.72 at wave 30")
     expect(is_equal_approx(rules.BURN_TICK_SCALE, 0.68), "burn and residual DoT ticks scale with weapon progression")
