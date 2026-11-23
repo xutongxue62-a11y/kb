@@ -3,6 +3,7 @@ extends RefCounted
 const Catalog = preload("res://src/catalog.gd")
 const Growth = preload("res://src/growth.gd")
 const Rules = preload("res://src/rules.gd")
+const Evolution = preload("res://src/weapon_evolution.gd")
 const EnemyRoster = preload("res://src/enemy_roster.gd")
 const BASE_DAMAGE = {"hunter": 1.0, "charger": 1.25, "spitter": 1.0, "tank": 1.5, "boss": 2.0}
 
@@ -32,7 +33,7 @@ static func estimate_power(inventory: Array, levels: Dictionary, link: Variant =
         if not Catalog.WEAPONS.has(key) or suppressed.has(key):
             continue
         var data: Dictionary = Catalog.WEAPONS[key]
-        var damage: float = data["damage"] * (1.0 + (item["level"] - 1) * 0.35)
+        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item["level"]))
         if key == "powder" and not chain.is_empty():
             var partner: String = chain["weapons"][1]
             var partner_level: int = 1
@@ -55,8 +56,8 @@ static func estimate_power(inventory: Array, levels: Dictionary, link: Variant =
 
 const ADAPT_CAP: float = 1.75
 const ADAPT_FULL_WAVE: int = 28
-const BOSS_DYNAMIC_MULT: float = 46.0
-const BOSS_DYNAMIC_CAP: float = 3.2
+const BOSS_DYNAMIC_MULT: float = 58.0
+const BOSS_DYNAMIC_CAP: float = 4.8
 # A single combat hit may never remove more than this share of the player's
 # max HP (applied after armor reduction, at the hurt_player funnel).
 # Lava and other terrain DoT ticks do not pass through this cap.
@@ -88,7 +89,7 @@ const LATE_GROWTH_DEEP: int = 24
 # stay hard but are no longer effectively unkillable. Waves 1-20 keep the
 # original curve exactly. Monster damage and outgoing player damage are unchanged.
 const LATE_GROWTH_SOFTEN: int = 20
-const LATE_GROWTH_SOFT_RATE: float = 1.047
+const LATE_GROWTH_SOFT_RATE: float = 1.062
 
 static func late_hp_log(stage: int) -> float:
     var capped: int = mini(stage, LATE_GROWTH_SOFTEN)
@@ -136,8 +137,9 @@ static func enemy_profile(wave: int, kind: String, adaptive: float = 1.0, elite:
     if elite and stage > 2:
         dodge += 0.05
     var data: Dictionary = Catalog.DINOS.get(kind, EnemyRoster.BiomeEncounters.MOBS.get(kind, Catalog.DINOS["hunter"]))
+    var boss_hp_mult: float = minf(1.85, 1.0 + 0.04 * float(stage - 9)) if (kind == "boss" and stage >= 10) else 1.0
     return {
-        "hp": data["hp"] * hp_scale * (1.8 if elite else 1.0),
+        "hp": data["hp"] * hp_scale * (1.8 if elite else 1.0) * boss_hp_mult,
         "damage": float(BASE_DAMAGE.get(kind, EnemyRoster.base_damage(kind))) * damage_scale * (1.35 if elite else 1.0),
         "dodge": minf(0.30, dodge),
         "speed_multiplier": 1.0 + minf(0.35, (stage - 1) * 0.009 + milestones * 0.025),

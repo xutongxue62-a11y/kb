@@ -128,7 +128,8 @@ var _draw_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var ground_marks_layer: Node2D
 var _had_burning_fields: bool = false
 var _ground_marks_accum: float = 0.0
-var _pickup_sync_accum: float = 0.0
+var _pickups_dirty: bool = true
+var _last_pickup_view_pos: Vector2 = Vector2(INF, INF)
 var _last_pickup_count: int = -1
 var _sep_parity: int = 0
 var _armory_options_cache: Dictionary = {}
@@ -392,7 +393,8 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     _cached_stone_targets.clear()
     _had_burning_fields = false
     _ground_marks_accum = 0.0
-    _pickup_sync_accum = 0.0
+    _pickups_dirty = true
+    _last_pickup_view_pos = Vector2(INF, INF)
     _last_pickup_count = -1
     _sep_parity = 0
     _armory_options_dirty = true
@@ -700,6 +702,9 @@ func clear_run_for_title() -> void:
         armory.reset()
     if pickup_renderer != null:
         pickup_renderer.sync([], Rect2(), 0.0)
+    _pickups_dirty = true
+    _last_pickup_view_pos = Vector2(INF, INF)
+    _last_pickup_count = -1
     set_run_world_visible(false)
     position = Vector2.ZERO
     if world_camera != null:
@@ -1603,7 +1608,6 @@ func simulate(delta: float, movement: Vector2) -> void:
         _simulating = false
         return
     _ground_marks_accum += delta
-    _pickup_sync_accum += delta
     update_enemies(delta)
     if not running:
         update_hud()
@@ -2067,7 +2071,9 @@ func update_pickups(delta: float) -> void:
         # Only coins and XP gems respond to pickup magnet; blood packs and chests must be walked onto directly.
         if kind != "blood" and stone["position"].distance_squared_to(player_position) <= radius_squared:
             stone["position"] = stone["position"].move_toward(player_position, 330.0 * delta)
+            _pickups_dirty = true
         if stone["position"].distance_squared_to(player_position) < 484.0:
+            _pickups_dirty = true
             if kind == "coin":
                 coins += int(stone["value"])
                 if audio != null:
@@ -2113,6 +2119,7 @@ func update_pickups(delta: float) -> void:
                 else:
                     bucket["value"] = float(bucket.get("value", 1.0)) + LootDrops.experience_value(item)
         pickups = keep
+        _pickups_dirty = true
 
 func update_companions(delta: float) -> void:
     for attack in companions.advance(delta, player_position, combat_targets(), buff_levels, stats, prefer_elite):
@@ -3807,10 +3814,11 @@ func _draw() -> void:
         draw_string(demo_font, Vector2(360, 185), demo_caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color("#64513a"))
         draw_string(demo_font, Vector2(325, 715), "同一角色的身体、双手、双脚独立运动", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color("#766449"))
     draw_link_shapes()
-    if pickup_renderer != null and (_pickup_sync_accum >= 0.05 or pickups.size() != _last_pickup_count):
-        _pickup_sync_accum = 0.0
+    if pickup_renderer != null and (_pickups_dirty or pickups.size() != _last_pickup_count or player_position.distance_squared_to(_last_pickup_view_pos) >= 2500.0):
+        _pickups_dirty = false
         _last_pickup_count = pickups.size()
-        pickup_renderer.sync(pickups, visible_world_rect().grow(40.0), elapsed)
+        _last_pickup_view_pos = player_position
+        pickup_renderer.sync(pickups, visible_world_rect().grow(96.0), elapsed)
     for chest in chest_marks:
         chest["age"] = float(chest.get("age", 0.0))
         draw_chest(chest["position"], chest["age"])

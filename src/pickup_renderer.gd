@@ -57,7 +57,7 @@ func _pack_scale(drop: Dictionary) -> float:
         return 1.08
     return 0.92
 
-func sync(drops: Array,bounds: Rect2,elapsed: float) -> void:
+func sync(drops: Array,bounds: Rect2,_elapsed: float) -> void:
     var items: Dictionary={"coin":[],"xp":[],"blood":[]}
     for drop in drops:
         if not bounds.has_point(drop.position):
@@ -77,6 +77,5 @@ func sync(drops: Array,bounds: Rect2,elapsed: float) -> void:
         for i in range(points.size()):
             var drop: Dictionary=points[i]
             var point: Vector2=drop.position
-            var bob: float=sin(elapsed*4.0+point.x)*1.6
             var scale: float=_pack_scale(drop)
-            mesh.set_instance_transform_2d(i,Transform2D(0.0,Vector2(scale,scale),0.0,point+Vector2(0,-2+bob)))
+            mesh.set_instance_transform_2d(i,Transform2D(0.0,Vector2(scale,scale),0.0,point+Vector2(0,-2.0)))

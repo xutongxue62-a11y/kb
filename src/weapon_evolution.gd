@@ -36,35 +36,35 @@ const RUNE_NOVA_RADIUS: float = 110.0
 
 static func stage_damage_bonus(level: int) -> float:
     if level >= 10:
-        return 3.15
+        return 2.35
     if level >= 9:
-        return 2.75
-    if level >= 8:
-        return 2.40
-    if level >= 7:
         return 2.10
+    if level >= 8:
+        return 1.90
+    if level >= 7:
+        return 1.72
     if level >= 6:
-        return 1.85
+        return 1.56
     if level >= 5:
-        return 1.65
+        return 1.42
     if level >= 4:
-        return 1.35
+        return 1.22
     if level >= 3:
-        return 1.25
+        return 1.15
     return 1.0
 
 static func damage_multiplier(key: String, level: int) -> float:
     var lvl: int = maxi(1, level)
-    var base: float = 1.0 + float(lvl - 1) * 0.35
+    var base: float = 1.0 + float(lvl - 1) * 0.30
     var mult: float = base * stage_damage_bonus(lvl)
     if key in MELEE_IDS:
-        mult *= (1.22 if lvl >= 5 else 1.15)
+        mult *= (1.12 if lvl >= 5 else 1.06)
     elif key == "sling":
-        mult *= (1.22 if lvl >= 5 else (1.10 if lvl >= 3 else 1.0))
+        mult *= (1.15 if lvl >= 5 else (1.06 if lvl >= 3 else 1.0))
     elif key == "powder":
-        mult *= (1.25 if lvl >= 5 else (1.12 if lvl >= 3 else 1.0))
+        mult *= (1.18 if lvl >= 5 else (1.08 if lvl >= 3 else 1.0))
     elif lvl >= 5 and key in ["firepot", "staff"]:
-        mult *= 1.28
+        mult *= 1.18
     return mult
 
 static func sky_lightning_unlocked(level: int) -> bool:
