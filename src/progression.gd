@@ -62,7 +62,7 @@ const BOSS_DYNAMIC_CAP: float = 4.8
 # max HP (applied after armor reduction, at the hurt_player funnel).
 # Lava and other terrain DoT ticks do not pass through this cap.
 const HIT_CAP_RATIO: float = 0.70
-const BOSS_HIT_CAP_RATIO: float = HIT_CAP_RATIO
+const BOSS_HIT_CAP_RATIO: float = 0.35
 
 static func cap_boss_hp(formula_hp: float, power: float) -> float:
     var dynamic_hp: float = power * BOSS_DYNAMIC_MULT
@@ -128,7 +128,10 @@ static func enemy_profile(wave: int, kind: String, adaptive: float = 1.0, elite:
     var milestones: int = stage / 5
     var hp_scale: float = exp(minf(27.6, (stage - 1) * log(1.10) + milestones * log(1.45) + late_hp_log(stage))) * clampf(adaptive, 1.0, ADAPT_CAP)
     var milestone_log: float = minf(float(milestones), 3.0) * log(1.18) + maxf(0.0, float(milestones) - 3.0) * log(1.10)
-    var damage_scale: float = minf(1000000.0, (1.0 + 0.06 * (stage - 1)) * exp(minf(14.0, milestone_log + late_damage_log(stage))))
+    var damage_log: float = late_damage_log(stage)
+    var damage_scale: float = minf(1000000.0, (1.0 + 0.06 * (stage - 1)) * exp(minf(14.0, milestone_log + damage_log)))
+    if kind == "boss":
+        damage_scale = minf(1000000.0, (0.50 + 0.03 * (stage - 1)) * exp(minf(14.0, milestone_log * 0.55 + damage_log * 0.55)))
     var dodge: float = minf(0.22, maxf(0, stage - 2) * 0.006 + milestones * 0.012) if stage > 2 else 0.0
     if kind in ["tank", "boss", "armored", "basaltroller"]:
         dodge *= 0.35

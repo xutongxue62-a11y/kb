@@ -355,9 +355,11 @@ static func draw_attack(canvas, enemy: Dictionary) -> bool:
     var reach: float = attack.reach
     var width: float = attack.width
     var phase: float = 1.0 - clampf(float(enemy.timer) / float(attack.tell), 0.0, 1.0)
+    var is_boss: bool = str(enemy.get("kind", "")) == "boss"
     var pigment: Color = attack.paint
-    var edge := Color(pigment.lerp(Color("#f6d59c"), 0.62), lerpf(0.68, 0.98, phase))
-    var wash := Color(pigment.lerp(Color("#f6d59c"), 0.24), lerpf(0.19, 0.39, phase))
+    var edge := Color("#ff4136", lerpf(0.82, 1.0, phase)) if is_boss else Color(pigment.lerp(Color("#f6d59c"), 0.62), lerpf(0.68, 0.98, phase))
+    var wash := Color("#e02b24", lerpf(0.18, 0.36, phase)) if is_boss else Color(pigment.lerp(Color("#f6d59c"), 0.24), lerpf(0.19, 0.39, phase))
+    var charge_fill := Color("#ff5b36", lerpf(0.16, 0.42, phase))
     if Tactics.draw_tell(canvas,attack,edge,wash,phase):
         return true
     match str(attack.shape):
@@ -368,9 +370,13 @@ static func draw_attack(canvas, enemy: Dictionary) -> bool:
             var end: Vector2 = origin + direction * reach
             var polygon := PackedVector2Array([origin - normal * width, end - normal * width, end + normal * width, origin + normal * width])
             canvas.draw_colored_polygon(polygon, wash)
+            if is_boss and phase > 0.03:
+                var fill_end: Vector2 = origin + direction * (reach * clampf(phase, 0.04, 1.0))
+                var charge_poly := PackedVector2Array([origin - normal * width, fill_end - normal * width, fill_end + normal * width, origin + normal * width])
+                canvas.draw_colored_polygon(charge_poly, charge_fill)
             polygon.append(polygon[0])
             canvas.draw_polyline(polygon, Color("#402b2a", edge.a * 0.72), 5.0, true)
-            canvas.draw_polyline(polygon, edge, 2.4, true)
+            canvas.draw_polyline(polygon, edge, 3.2 if is_boss else 2.4, true)
             for offset in range(18, int(reach) - 8, 24):
                 for side in [-1.0, 1.0]:
                     var mark: Vector2 = origin + direction * offset + normal * width * side * 0.79
@@ -384,17 +390,27 @@ static func draw_attack(canvas, enemy: Dictionary) -> bool:
             var region: PackedVector2Array = rim.duplicate()
             region.insert(0, origin)
             canvas.draw_colored_polygon(region, wash)
-            canvas.draw_line(origin, rim[0], edge, 2.0, true)
-            canvas.draw_line(origin, rim[-1], edge, 2.0, true)
+            if is_boss:
+                var inner_rim: PackedVector2Array = _sector(origin, reach * clampf(phase, 0.10, 1.0), start, 2.0 * width, 18)
+                inner_rim.insert(0, origin)
+                canvas.draw_colored_polygon(inner_rim, charge_fill)
+                canvas.draw_polyline(rim, edge, 3.2, true)
+            canvas.draw_line(origin, rim[0], edge, 2.6 if is_boss else 2.0, true)
+            canvas.draw_line(origin, rim[-1], edge, 2.6 if is_boss else 2.0, true)
             for point in rim:
                 canvas.draw_circle(point, 2.7, edge, true, -1.0, true)
         "ring":
             # Concentric outlines keep the inner safe area visible.
             canvas.draw_arc(origin, (reach + width) * 0.5, 0.0, TAU, 36, wash, reach - width, true)
-            canvas.draw_arc(origin, width, 0.0, TAU, 36, edge, 2.0, true)
-            canvas.draw_arc(origin, reach, 0.0, TAU, 36, edge, 3.0, true)
+            canvas.draw_arc(origin, width, 0.0, TAU, 36, edge, 3.0 if is_boss else 2.0, true)
+            canvas.draw_arc(origin, reach, 0.0, TAU, 36, edge, 4.0 if is_boss else 3.0, true)
+            if is_boss:
+                canvas.draw_arc(origin, width + (reach - width) * phase, 0.0, TAU, 36, charge_fill, 4.0, true)
         _:
             canvas.draw_circle(origin, reach, wash, true, -1.0, true)
+            if is_boss:
+                canvas.draw_circle(origin, reach * clampf(phase, 0.08, 1.0), charge_fill, true, -1.0, true)
+                canvas.draw_arc(origin, reach, 0.0, TAU, 36, edge, 3.5, true)
             for point in _sector(origin, reach, 0.0, TAU, 26):
                 canvas.draw_circle(point, 2.5, edge, true, -1.0, true)
     return true

@@ -3762,9 +3762,10 @@ func hurt_player(direction: Vector2, damage: float = 1.0, from_boss: bool = fals
         effects.floating_text(player_position, "闪避", Color("#9ce7f0"), 22)
         return
     var amount: float = damage * (1.0 - stats["reduction"])
-    # Cap every combat hit (contact, projectiles, quakes, elites, Boss).
+    # Cap every combat hit (Boss hits at 35% max HP so a Boss never 2-shots; regular hits at 70%).
     # Terrain DoT stays on update_terrain_damage and is intentionally uncapped.
-    amount = minf(amount, Progression.HIT_CAP_RATIO * float(stats["max_hp"]))
+    var hit_cap: float = Progression.BOSS_HIT_CAP_RATIO if from_boss else Progression.HIT_CAP_RATIO
+    amount = minf(amount, hit_cap * float(stats["max_hp"]))
     player_hp = maxf(1.0 if (training_mode and training_godmode) else 0.0, player_hp - amount)
     invulnerable = 0.7
     hero.hurt()
