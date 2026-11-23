@@ -231,7 +231,16 @@ static func cast(h) -> void:
     count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     if shown == h.selected_character:
         label(h, body, "✓ 已选择", Rect2(216, 454, 220, 38), 24, RED, true)
-    label(h, body, str(profile.get("name", "原始人")), Rect2(620, 28, 500, 88), 58, INK, true)
+    label(h, body, str(profile.get("name", "原始人")), Rect2(620, 28, 288, 72), 58, INK, true)
+    var progress: Dictionary = h.character_best_wave if h.get("character_best_wave") != null else {}
+    if not Catalog.is_character_unlocked(shown, progress):
+        var preview_unlock: bool = Catalog.shows_preview_unlock(shown, progress)
+        var requirement: Label = label(h, body, Catalog.unlock_requirement_text(shown), Rect2(620, 103, 486, 24), 16, Color("#506071") if preview_unlock else RED)
+        requirement.name = "UnlockCondition" if preview_unlock else "UnlockNote"
+        if preview_unlock:
+            var badge: Label = label(h, body, "试玩提前解锁", Rect2(914, 41, 192, 32), 20, RED, true)
+            badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+            badge.name = "UnlockNote"
     label(h, body, "初始武器", Rect2(620, 132, 400, 32), 21, INK, true)
     weapon(h, body, Vector2(664, 212), starter, 76)
     label(h, body, weapon_name, Rect2(730, 168, 370, 50), 34, INK, true)
@@ -241,29 +250,14 @@ static func cast(h) -> void:
     line(body, Vector2(620, 281), 486, Color(INK, 0.6))
     label(h, body, "角色能力 / 技能", Rect2(620, 288, 486, 32), 22, INK, true)
     var y: float = 325
+    var skill_ink: Color = RED
     for skill in profile.get("skills", []):
-        label(h, body, str(skill.get("name", "")), Rect2(626, y, 470, 28), 20, INK, true)
+        label(h, body, str(skill.get("name", "")), Rect2(626, y, 470, 28), 20, skill_ink, true)
         var detail: Label = label(h, body, str(skill.get("description", "")), Rect2(626, y + 31, 470, 34), 15, Color("#506071"))
         detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        skill_ink = INK
         y += 68
     KeyBindings.attach_to_button(button(h, h.overlay, "Back", "← 返回首页", Rect2(52, 705, 258, 52), func(): h.close_cast_to_title(), false, 21), "cancel")
-    var progress: Dictionary = h.character_best_wave if h.get("character_best_wave") != null else {}
-    var unlocked: bool = Catalog.is_character_unlocked(shown, progress)
-    var note: String = ""
-    if Catalog.shows_preview_unlock(shown, progress):
-        note = "试玩提前解锁"
-    elif not unlocked:
-        note = Catalog.unlock_requirement_text(shown)
-    if not note.is_empty():
-        var note_y: float = y + 4.0
-        if Catalog.shows_preview_unlock(shown, progress):
-            var condition: Label = label(h, body, Catalog.unlock_requirement_text(shown), Rect2(626, note_y, 470, 24), 16, Color("#506071"))
-            condition.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-            condition.name = "UnlockCondition"
-            note_y += 24
-        var note_label: Label = label(h, body, note, Rect2(626, note_y, 470, 30), 22, RED, true)
-        note_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-        note_label.name = "UnlockNote"
     for id in Catalog.CHARACTER_ORDER:
         var entry: Dictionary = Catalog.character(id)
         var key: String = str(entry.get("confirm_button", "StartSling"))

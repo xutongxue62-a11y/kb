@@ -12,7 +12,7 @@ const WEAPONS = {
     "sling": {"name": "弹弓", "kind": "ranged", "damage": 2.5, "cooldown": 0.30, "range": 360.0, "speed": 620.0, "size": 33.0, "color": Color("#b88b5b"), "description": "2.5 石弹 · 快速连射\n安全射程，自动瞄准"},
     "powder": {"name": "木质火药筒", "kind": "ranged", "damage": 13.0, "cooldown": 1.37, "range": POWDER_RANGE, "speed": 330.0, "size": 43.0, "color": Color("#d48a52"), "description": "13.0 重炮 · 范围高爆\n装填较慢，范围轰炸"},
     "staff": {"name": "魔法杖", "kind": "ranged", "damage": 1.6, "cooldown": 0.72, "range": 300.0, "speed": 450.0, "size": 42.0, "color": Color("#8db49b"), "description": "每弹 1.6 · 三枚符能\n纯粹伤害，5级展开符阵轰击"},
-    "spear": {"name": "骨矛", "kind": "special", "damage": 7.4, "cooldown": 0.52, "range": 185.0, "speed": 600.0, "size": 58.0, "color": Color("#edddb3"), "description": "定向贯刺 · 一线穿敌\n保持距离，刺出收回"},
+    "spear": {"name": "骨矛", "kind": "special", "damage": 7.4, "cooldown": 0.54, "range": 185.0, "speed": 600.0, "size": 58.0, "color": Color("#edddb3"), "description": "定向贯刺 · 一线穿敌\n保持距离，刺出收回"},
     "hammer": {"name": "石槌", "kind": "special", "damage": 20.0, "cooldown": 2.00, "range": 250.0, "speed": 500.0, "size": 50.0, "color": Color("#b5a98c"), "description": "跃空重砸 · 超重震击\n间隔较长，飞跃重砸大片敌群"},
     "boomerang": {"name": "回旋骨镖", "kind": "special", "damage": 3.6, "cooldown": 0.76, "range": 300.0, "speed": 540.0, "size": 42.0, "color": Color("#ebcc87"), "description": "掷出再返回身边\n往返各可命中一次"},
     "totem": {"name": "雷鸣图腾", "kind": "special", "damage": 3.4, "cooldown": 0.68, "range": 320.0, "speed": 600.0, "size": 48.0, "color": Color("#78bac3"), "description": "连锁雷击 · 最多三敌\n3级起短暂麻痹，同敌一生仅一次"},
@@ -87,12 +87,12 @@ const CHARACTERS = {
         "weapon_label": "弹弓",
         "confirm_button": "StartSling",
         "skills": [
-            {"id": "quick_learner", "name": "学得快", "description": "经验 +25%，拾取范围 +40。"},
-            {"id": "double_growth", "name": "举一反三", "description": "角色每升三级可拿两份成长，优先各选一份武器和属性。"}
+            {"id": "double_growth", "name": "举一反三", "description": "角色每升三级可拿两份成长，优先各选一份武器和属性。"},
+            {"id": "quick_learner", "name": "学得快", "description": "经验 +10%，拾取范围 +12。"}
         ],
         "modifiers": {
-            "xp_multiplier": 1.25,
-            "pickup_radius": 40.0
+            "xp_multiplier": 1.10,
+            "pickup_radius": 12.0
         }
     },
     "chief": {
@@ -104,13 +104,12 @@ const CHARACTERS = {
         "weapon_label": "骨矛",
         "confirm_button": "StartSpear",
         "skills": [
-            {"id": "reach", "name": "部族号令", "description": "射程 +20%，攻速 +12%，弹道额外穿透 1 敌。"},
-            {"id": "bone_banner", "name": "骨旗夹击", "description": "骨矛命中立旗 3 秒，旗随出矛协击，伤害为 60%。立旗冷却 8 秒。"}
+            {"id": "bone_banner", "name": "骨旗夹击", "description": "骨矛命中立旗 3 秒，旗随出矛协击，伤害为 60%。立旗冷却 8 秒。"},
+            {"id": "reach", "name": "部族号令", "description": "射程 +8%，攻速 +4%。"}
         ],
         "modifiers": {
-            "range_multiplier": 1.20,
-            "attack_speed_bonus": 0.12,
-            "pierce": 1
+            "range_multiplier": 1.08,
+            "attack_speed_bonus": 0.04
         }
     },
     "barbarian": {
@@ -122,15 +121,12 @@ const CHARACTERS = {
         "weapon_label": "木棒",
         "confirm_button": "StartClub",
         "skills": [
-            {"id": "tough", "name": "蛮力厚皮", "description": "伤害 +18%，生命 +2，减伤 12%，近身伤害再提高 20%。"},
-            {"id": "rage_counter", "name": "以伤换势", "description": "受敌方伤害两次后，下一次近战引发震荡，减伤 50% 持续 1 秒。冷却 8 秒。"}
+            {"id": "rage_counter", "name": "以伤换势", "description": "受敌方伤害两次后，下一次近战引发震荡，减伤 50% 持续 1 秒。冷却 8 秒。"},
+            {"id": "tough", "name": "厚皮", "description": "生命 +1，减伤 6%。"}
         ],
         "modifiers": {
-            "damage_multiplier": 1.18,
-            "max_hp": 2.0,
-            "reduction": 0.12,
-            "close_damage_bonus": 0.20,
-            "close_damage_range": 140.0
+            "max_hp": 1.0,
+            "reduction": 0.06
         }
     },
     "hunter": {
@@ -144,12 +140,9 @@ const CHARACTERS = {
         "exclusive_weapon": "bonebow",
         "weapon_blurb": "自动瞄准 · 贯穿直射",
         "skills": [
-            {"id": "piercing_shot", "name": "穿林骨箭", "description": "骨弩穿透 5 敌，射程 +20%。攻速 +8%。"},
-            {"id": "hunt_mark", "name": "追猎弱点", "description": "骨弩三次命中标记同一敌人，下一发伤害 +80%。每个目标冷却 4 秒。"}
-        ],
-        "modifiers": {
-            "attack_speed_bonus": 0.08
-        }
+            {"id": "hunt_mark", "name": "追猎弱点", "description": "骨弩三次命中标记同一敌人，下一发伤害 +80%。每个目标冷却 4 秒。"},
+            {"id": "piercing_shot", "name": "穿林骨箭", "description": "骨弩穿透 5 敌，射程 +12%。"}
+        ]
     },
     "shaman": {
         "id": "shaman",
@@ -162,12 +155,9 @@ const CHARACTERS = {
         "exclusive_weapon": "staff",
         "weapon_blurb": "自动瞄准 · 符能散射",
         "skills": [
-            {"id": "five_runes", "name": "五芒符阵", "description": "魔法杖发射 5 枚略带追踪的强化符弹。经验 +10%。"},
-            {"id": "rune_echo", "name": "回响符印", "description": "每第三轮法杖齐射留下符印，下一轮从符印补射 55% 伤害的符弹。"}
-        ],
-        "modifiers": {
-            "xp_multiplier": 1.10
-        }
+            {"id": "rune_echo", "name": "回响符印", "description": "每第三轮法杖齐射留下符印，下一轮从符印补射 55% 伤害的符弹。"},
+            {"id": "five_runes", "name": "五芒符阵", "description": "魔法杖发射 5 枚略带追踪的符弹。"}
+        ]
     },
     "firekeeper": {
         "id": "firekeeper",
@@ -180,12 +170,11 @@ const CHARACTERS = {
         "exclusive_weapon": "firepot",
         "weapon_blurb": "自动瞄准 · 定点火场",
         "skills": [
-            {"id": "living_ember", "name": "薪火更盛", "description": "火种壶火场更大、更久，灼伤更高。生命 +1，减伤 6%。"},
-            {"id": "living_fire", "name": "活火", "description": "重叠的火种壶火场合成追敌火带，持续 2 秒。冷却 6 秒。"}
+            {"id": "living_fire", "name": "活火", "description": "重叠的火种壶火场合成追敌火带，持续 2 秒。冷却 6 秒。"},
+            {"id": "living_ember", "name": "薪火更盛", "description": "火种壶火场更大、更久。生命 +1。"}
         ],
         "modifiers": {
-            "max_hp": 1.0,
-            "reduction": 0.06
+            "max_hp": 1.0
         }
     },
     "priest": {
@@ -199,12 +188,9 @@ const CHARACTERS = {
         "exclusive_weapon": "totem",
         "weapon_blurb": "自动瞄准 · 连锁雷击",
         "skills": [
-            {"id": "sky_chain", "name": "连天之雷", "description": "雷鸣图腾连锁 5 敌，衰减更小。拾取范围 +24。"},
-            {"id": "lightning_altar", "name": "雷坛回路", "description": "累计六次雷击命中立坛。下一轮图腾放电回击一名目标，伤害为 65%。"}
-        ],
-        "modifiers": {
-            "pickup_radius": 24.0
-        }
+            {"id": "lightning_altar", "name": "雷坛回路", "description": "累计六次雷击命中立坛。下一轮图腾放电回击一名目标，伤害为 65%。"},
+            {"id": "sky_chain", "name": "连天之雷", "description": "雷鸣图腾连锁 5 敌，跳跃衰减稍低。"}
+        ]
     }
 }
 
@@ -269,13 +255,13 @@ static func exclusive_bonus(character_id: String, weapon_id: String) -> Dictiona
         return {}
     match weapon_id:
         "bonebow":
-            return {"pierce_limit": 5, "range_multiplier": 1.20}
+            return {"pierce_limit": 5, "range_multiplier": 1.12}
         "staff":
-            return {"shot_count": 5, "damage_multiplier": 1.25, "homing": 1.6}
+            return {"shot_count": 5, "homing": 1.6}
         "firepot":
-            return {"area_multiplier": 1.25, "life_multiplier": 1.35, "damage_multiplier": 1.25}
+            return {"area_multiplier": 1.15, "life_multiplier": 1.35}
         "totem":
-            return {"chain_count": 5, "decay": 0.85}
+            return {"chain_count": 5, "decay": 0.80}
         _:
             return {}
 
@@ -288,7 +274,7 @@ static func apply_character_modifiers(stats: Dictionary, character_id: String) -
     stats["range_multiplier"] = float(mods.get("range_multiplier", 1.0))
     stats["attack_speed"] = float(stats.get("attack_speed", 1.0)) + float(mods.get("attack_speed_bonus", 0.0))
     stats["damage_multiplier"] = float(stats.get("damage_multiplier", 1.0)) * float(mods.get("damage_multiplier", 1.0))
-    stats["reduction"] = float(stats.get("reduction", 0.0)) + float(mods.get("reduction", 0.0))
+    stats["reduction"] = 1.0 - (1.0 - float(stats.get("reduction", 0.0))) * (1.0 - float(mods.get("reduction", 0.0)))
     stats["max_hp"] = float(stats.get("max_hp", 8.0)) + float(mods.get("max_hp", 0.0))
     stats["pierce"] = int(stats.get("pierce", 0)) + int(mods.get("pierce", 0))
     stats["xp_multiplier"] = float(stats.get("xp_multiplier", 1.0)) * float(mods.get("xp_multiplier", 1.0))

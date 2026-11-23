@@ -85,7 +85,7 @@ func check_attack_feel() -> void:
         "sling": [2.5, 0.30],
         "powder": [13.0, 1.37],
         "staff": [1.6, 0.72],
-        "spear": [7.4, 0.52],
+        "spear": [7.4, 0.54],
         "hammer": [20.0, 2.00],
         "boomerang": [3.6, 0.76],
         "totem": [3.4, 0.68],

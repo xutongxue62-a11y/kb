@@ -3023,7 +3023,7 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
                 var shot_damage: float = damage*(1.0 if count==3 else 0.85)
                 if not staff_bonus.is_empty():
                     count = maxi(count, int(staff_bonus.get("shot_count", count)))
-                    shot_damage = damage * float(staff_bonus.get("damage_multiplier", 1.25))
+                    shot_damage = damage
                 var echo_origin: Vector2 = talents.staff_echo(self, muzzle)
                 var echo_direction: Vector2 = echo_origin.direction_to(target.position) if echo_origin.is_finite() else Vector2.ZERO
                 for index in range(count):

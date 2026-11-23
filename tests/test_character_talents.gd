@@ -91,7 +91,7 @@ func check_hits(world) -> void:
     world.invulnerable = 0.0
     var player_before: float = world.player_hp
     world.hurt_player(Vector2.ZERO, 2.0)
-    expect(is_equal_approx(player_before - world.player_hp, 0.88), "the counter grants half damage for a second")
+    expect(is_equal_approx(player_before - world.player_hp, 0.94), "the counter grants half damage for a second")
 
 func check_weapon_actions(world) -> void:
     prepare(world, "shaman", "staff")
@@ -129,3 +129,9 @@ func check_weapon_actions(world) -> void:
     world.update_armory(0.1)
     world.update_armory(0.1)
     expect(state.fires.size() == 1 and state.fires[0].get("living_fire", false) and state.fires[0].position.x > world.player_position.x + 10, "overlapping firekeeper flames merge and move toward the enemy")
+    prepare(world, "firekeeper", "firepot")
+    target(world)
+    for frame in range(150):
+        world.update_armory(1.0 / 60.0)
+    var active_fires: Array = world.armory.states["firepot"].fires
+    expect(active_fires.any(func(fire): return fire.get("living_fire", false)), "two ordinary level-one throws can activate live fire without a damage or haste buff")

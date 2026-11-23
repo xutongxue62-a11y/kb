@@ -46,6 +46,9 @@ func readable_ink(node: Label) -> bool:
         return false
     return color.r * 0.3 + color.g * 0.59 + color.b * 0.11 < 0.55
 
+func inside_paper(control: Control, sheet: Control) -> bool:
+    return control != null and sheet != null and sheet.get_global_rect().grow(-24.0).encloses(control.get_global_rect())
+
 func enemy(id: int, point: Vector2, radius: float = 8.0) -> Dictionary:
     return {"id": id, "position": point, "hp": 1000.0, "radius": radius}
 
@@ -64,6 +67,7 @@ func run_checks() -> void:
     check_catalog()
     check_unlock_rules()
     check_exclusive_weapons()
+    check_spear_interval()
     await check_staff_exclusive()
     await check_select_and_progress()
     Catalog.PREVIEW_CHARACTER_UNLOCK = preview_was
@@ -93,10 +97,12 @@ func check_catalog() -> void:
         var requirement: Dictionary = Catalog.CHARACTER_UNLOCKS[id]
         expect(str(requirement.get("required_character", "")) == row[1] and int(requirement.get("required_wave", 0)) == int(row[2]), "%s unlock requirement is stored" % id)
         expect(Catalog.unlock_requirement_text(id).contains(Catalog.character(row[1]).name) and Catalog.unlock_requirement_text(id).contains(str(row[2])), "%s unlock text names the required hunter and wave" % id)
-    var barbarian: Dictionary = Catalog.character("barbarian").get("modifiers", {})
-    expect(float(Catalog.character("hunter").get("modifiers", {}).get("attack_speed_bonus", 0.0)) < 0.12, "hunter general haste stays below the chieftain")
-    expect(float(Catalog.character("firekeeper").get("modifiers", {}).get("damage_multiplier", 1.0)) <= 1.0, "firekeeper has no general damage bonus above the barbarian")
-    expect(float(Catalog.character("firekeeper").get("modifiers", {}).get("reduction", 0.0)) < float(barbarian.get("reduction", 0.0)), "firekeeper mitigation stays below the barbarian")
+    for id in Catalog.CHARACTER_ORDER:
+        var stats: Dictionary = Catalog.apply_character_modifiers(Main.Growth.stats({}), id)
+        expect(is_equal_approx(stats.damage_multiplier, 1.0) and is_zero_approx(stats.close_damage_bonus), id + " relies on talent triggers for bonus damage")
+        expect(stats.attack_speed <= 1.04 and stats.reduction <= 0.061, id + " has only small unconditional combat bonuses")
+    var heavy_armor: Dictionary = Catalog.apply_character_modifiers(Main.Growth.stats({"armor":100}), "barbarian")
+    expect(heavy_armor.reduction <= 1.0, "a passive reduction bonus cannot make stacked armor heal from hits")
     expect(Catalog.exclusive_bonus("hunter", "staff").is_empty() and Catalog.exclusive_bonus("caveman", "bonebow").is_empty(), "mastery only applies to the matching hunter and weapon")
 
 func check_unlock_rules() -> void:
@@ -150,7 +156,7 @@ func check_exclusive_weapons() -> void:
     expect(hits(base_reach, 20).is_empty(), "another hunter holding the bonebow keeps the default range")
     armory.reset()
     var hunter_reach: Array = simulate_weapon(armory, views, "bonebow", 0.9, far, {"attack_speed": 1.0, "character_id": "hunter"})
-    expect(not hits(hunter_reach, 20).is_empty(), "the hunter bonebow reaches 20% farther")
+    expect(not hits(hunter_reach, 20).is_empty(), "the hunter bonebow still has a small exclusive reach increase")
 
     armory.reset()
     var pot_target: Array = [enemy(1, Vector2(150, 0))]
@@ -163,9 +169,9 @@ func check_exclusive_weapons() -> void:
     var mastered: Dictionary = armory.states.get("firepot", {}).get("fires", [{}])[0] if not armory.states.get("firepot", {}).get("fires", []).is_empty() else {}
     expect(not mastered.is_empty(), "the firekeeper pot still lands a field")
     if not mastered.is_empty():
-        expect(is_equal_approx(float(mastered.get("radius", 0.0)), 56.0 * 1.25), "the firekeeper field is larger")
+        expect(is_equal_approx(float(mastered.get("radius", 0.0)), 56.0 * 1.15), "the firekeeper field is slightly larger")
         expect(is_equal_approx(float(mastered.get("life", 0.0)), 1.15 * 1.35), "the firekeeper field lasts longer")
-        expect(is_equal_approx(float(mastered.get("damage", 0.0)), base_damage * 1.25), "the firekeeper field burns harder")
+        expect(is_equal_approx(float(mastered.get("damage", 0.0)), base_damage), "the firekeeper ordinary fire does not gain automatic damage")
 
     var chain: Array = [enemy(1, Vector2(90, 0), 20.0), enemy(2, Vector2(140, 0), 20.0), enemy(3, Vector2(190, 0), 20.0), enemy(4, Vector2(240, 0), 20.0), enemy(5, Vector2(290, 0), 20.0)]
     armory.reset()
@@ -177,8 +183,22 @@ func check_exclusive_weapons() -> void:
     var priest_hits: Array = hits(priest_totem)
     expect(priest_hits.size() == 5, "the priest totem chains through five enemies")
     if priest_hits.size() >= 2 and base_hits.size() >= 2:
-        expect(is_equal_approx(priest_hits[1]["damage"] / priest_hits[0]["damage"], 0.85), "priest chain decay is weaker")
+        expect(is_equal_approx(priest_hits[1]["damage"] / priest_hits[0]["damage"], 0.80), "the priest keeps a modest chain decay advantage")
         expect(is_equal_approx(base_hits[1]["damage"] / base_hits[0]["damage"], 0.75), "non-priest chain decay stays at the default")
+    armory.queue_free()
+
+func check_spear_interval() -> void:
+    var armory = load("res://src/armory.gd").new()
+    root.add_child(armory)
+    var view := Sprite2D.new()
+    armory.add_child(view)
+    var stats: Dictionary = Catalog.apply_character_modifiers(Main.Growth.stats({}), "chief")
+    var casts: Array[float] = []
+    for step in range(200):
+        for event in armory.advance(1.0 / 240.0, Vector2.ZERO, [enemy(1, Vector2(90, 0))], [{"id":"spear","level":1}], stats, false, {"spear":view}):
+            if event.type == "flash":
+                casts.append(step / 240.0)
+    expect(casts.size() == 2 and absf(casts[1] - casts[0] - 0.54 / 1.04) < 0.005, "an unbuffed chief's real spear casts are about 0.52 seconds apart")
     armory.queue_free()
 
 func check_staff_exclusive() -> void:
@@ -194,7 +214,7 @@ func check_staff_exclusive() -> void:
     var shaman_shots: Array = shaman.projectiles.filter(func(shot): return str(shot.get("kind", "")) == "staff")
     expect(shaman_shots.size() == 5, "a shaman staff volley launches five runes")
     if not shaman_shots.is_empty():
-        expect(is_equal_approx(float(shaman_shots[0].get("damage", 0.0)), Catalog.WEAPONS["staff"]["damage"] * 0.92 * 1.25), "shaman staff runes deal the exclusive damage bonus")
+        expect(is_equal_approx(float(shaman_shots[0].get("damage", 0.0)), Catalog.WEAPONS["staff"]["damage"] * 0.92), "the shaman gets the distinctive volley without an automatic per-rune multiplier")
         expect(is_equal_approx(float(shaman_shots[0].get("homing", 0.0)), 1.6), "shaman staff runes carry slight tracking")
     shaman.queue_free()
     await process_frame
@@ -242,6 +262,17 @@ func check_select_and_progress() -> void:
     expect(preview_note != null and preview_condition != null, "preview mode shows both the preview mark and the official condition")
     expect(under_paper(preview_note) and under_paper(preview_condition), "preview unlock labels sit inside the parchment, not on the tear")
     expect(readable_ink(preview_note) and readable_ink(preview_condition), "preview unlock labels use dark ink with contrast on the parchment")
+    for character in ["hunter", "shaman", "firekeeper", "priest"]:
+        hud.preview_character = character
+        hud.show_cast("ui_open", true)
+        await process_frame
+        var sheet: Control = find(hud.overlay, "HanddrawnPaper") as Control
+        var badge: Label = find(hud.overlay, "UnlockNote") as Label
+        var requirement: Label = find(hud.overlay, "UnlockCondition") as Label
+        expect(inside_paper(badge, sheet) and inside_paper(requirement, sheet) and badge.get_global_rect().position.y < sheet.get_global_rect().get_center().y, character + " keeps both preview labels inside the upper parchment margin")
+    hud.preview_character = "hunter"
+    hud.show_cast("ui_open", true)
+    await process_frame
     expect(preview_text.contains("用原始人到达第 5 关解锁"), "preview mode still shows the official hunter condition")
     var confirm: BaseButton = find(hud.overlay, "StartBonebow")
     expect(confirm != null and confirm.visible and not confirm.disabled, "preview mode still allows confirming a formally locked hunter")

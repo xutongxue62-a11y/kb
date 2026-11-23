@@ -201,11 +201,11 @@ static func advance_firepots(state: Dictionary, dt: float, targets: Array, event
 static func merge_overlapping_fires(state: Dictionary, fires: Array) -> void:
     for index in range(fires.size()):
         var first: Dictionary = fires[index]
-        if first.age < 0.0 or first.get("living_fire", false):
+        if first.get("living_fire", false):
             continue
         for other in range(index + 1, fires.size()):
             var second: Dictionary = fires[other]
-            if second.age < 0.0 or second.get("living_fire", false):
+            if (first.age < 0.0 and second.age < 0.0) or second.get("living_fire", false):
                 continue
             if Vector2(first.position).distance_to(second.position) > float(first.radius) + float(second.radius):
                 continue
