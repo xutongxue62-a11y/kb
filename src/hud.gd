@@ -35,6 +35,7 @@ signal replace_cancelled
 signal next_round_requested
 signal save_requested
 signal continue_requested
+signal save_slot_start_requested(slot: int)
 signal home_requested
 signal settings_changed(autosave: bool)
 signal music_changed(enabled: bool)
@@ -149,6 +150,8 @@ var cast_sheet_snapshot: Texture2D
 var cast_keep_static: bool = false
 var suppress_next_transition: bool = false
 var save_summary: Dictionary = {}
+var save_slots: Array[Dictionary] = []
+var save_slot_selected: int = 1
 var input_lock_until: int = 0
 var launch_committed: bool = false
 var departure_label: Label
@@ -321,7 +324,7 @@ func play_transition(screen_name: String, _sfx: String = "") -> void:
     if first_page or previous_screen == screen_name or previous_screen.is_empty():
         return
     var mode: String = "fade"
-    if previous_screen in ["settings", "help", "continue", "keybindings"]:
+    if previous_screen in ["settings", "help", "continue", "keybindings", "new_save"]:
         mode = "fade"
     elif screen_name == "cast" and previous_screen in ["title", "start"]:
         mode = "chronicle_enter"
@@ -1502,10 +1505,11 @@ func configure_save(available: bool, autosave: bool, note: String = "", summary:
         resume.tooltip_text = save_note
     var confirmation: BaseButton = overlay.find_child("ConfirmContinue", true, false) as BaseButton
     if confirmation != null:
-        confirmation.disabled = not available
+        var can_continue: bool = available and (save_slots.is_empty() or (not summary.is_empty() and not summary.get("finished", false)))
+        confirmation.disabled = not can_continue
         var preview: Control = overlay.find_child("SavePreview", true, false) as Control
         if preview != null:
-            preview.visible = available
+            preview.visible = can_continue
     if is_instance_valid(save_note_label):
         save_note_label.text = save_note
         if screen == "continue":
@@ -1953,7 +1957,7 @@ func page_turn(previous: Texture2D, effect: String = "compose", sound: bool = tr
     veil.play(previous, effect)
 
 func remember_modal_origin() -> void:
-    if screen not in ["settings", "help", "continue", "keybindings"]:
+    if screen not in ["settings", "help", "continue", "keybindings", "new_save"]:
         front_return_screen = screen
         modal_snapshot = snapshot_ui()
 
@@ -2011,11 +2015,44 @@ func show_continue() -> void:
     if not save_available:
         return
     remember_modal_origin()
+    if not save_slots.is_empty():
+        for index in range(save_slots.size()):
+            if not save_slot_state(save_slot_selected).get("finished", true):
+                break
+            if not save_slots[index].get("finished", true):
+                save_slot_selected = index + 1
+                break
+        save_summary = save_slot_state(save_slot_selected)
+    show_save_picker("continue", true)
+    play_ui("ui_open")
+
+func show_new_save_picker() -> void:
+    remember_modal_origin()
+    for index in range(save_slots.size()):
+        if save_slots[index].is_empty():
+            save_slot_selected = index + 1
+            break
+    show_save_picker("new_save", true)
+    play_ui("ui_open")
+
+func save_slot_state(slot: int) -> Dictionary:
+    return save_slots[slot - 1] if slot >= 1 and slot <= save_slots.size() else {}
+
+func select_save_slot(slot: int) -> void:
+    if screen not in ["continue", "new_save"] or slot < 1 or slot > 3 or slot == save_slot_selected:
+        return
+    save_slot_selected = slot
+    save_summary = save_slot_state(slot)
+    show_save_picker(screen, false)
+
+func show_save_picker(page: String, animate: bool) -> void:
     reset_overlay()
     set_battle_visible(false)
-    screen = "continue"
-    FrontUI.continued(self)
-    play_ui("ui_open")
+    screen = page
+    if page == "new_save":
+        FrontUI.new_save(self, animate)
+    else:
+        FrontUI.continued(self, animate)
 
 func displayed_character() -> String:
     var id: String = preview_character if not preview_character.is_empty() else selected_character
@@ -2069,7 +2106,7 @@ func handle_front_key(code: int) -> bool:
             show_settings(settings_in_run)
             return true
         return not bind_listen_action.is_empty()
-    if screen in ["settings", "continue", "help"] and KeyBindings.matches_code(code, "cancel"):
+    if screen in ["settings", "continue", "help", "new_save"] and KeyBindings.matches_code(code, "cancel"):
         close_front_modal()
         return true
     if screen == "help_confirm":

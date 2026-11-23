@@ -131,9 +131,12 @@ func run_checks() -> void:
 
     hud.show_cast()
     await press(hud.overlay, "StartSling")
+    expect(hud.screen == "new_save" and not world.running, "character confirmation opens the slot picker before starting the run")
+    await press(hud.overlay, "ConfirmNewSave")
     world.simulate(3.0, Vector2.ZERO)
     world.finish_run(false)
     await press(hud.overlay, "StartSling")
+    await press(hud.overlay, "ConfirmNewSave")
     expect(world.running and world.departure_left > 0, "a finished UI-started run can start again from defeat")
     world.go_home()
 

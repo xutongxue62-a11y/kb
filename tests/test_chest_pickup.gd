@@ -179,7 +179,8 @@ func check_elite_guarantee(world: Node) -> void:
         if index % 2 == 1:
             world.hatch_enemy(enemy, false)
             expect(enemy.view.elite and enemy.view.shell.is_empty(), "hatched elite keeps the elite visual state")
-            expect(enemy.view.frames.modulate == enemy.view.ELITE_TINT, "whole-body animation frames turn red as soon as the elite hatches")
+            var outline: ShaderMaterial = enemy.view.frames.material
+            expect(enemy.view.frames.modulate == Color.WHITE and outline != null and outline.get_shader_parameter("team_color") == Color("#e31b28"), "hatched elite frames keep original colors with a red silhouette shader")
         world.hurt_enemy(enemy, 100000.0, "powder", true, Vector2.ZERO)
         var dropped: bool = world.chest_marks.size() == 1
         expect(not prior_miss or dropped, "an elite kill after a miss always drops a chest")

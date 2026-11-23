@@ -207,8 +207,10 @@ func test_continue_panel(world) -> void:
     for index in range(6):
         inventory.append({"id": Catalog.IDS[index], "level": index % 5 + 1})
     var character_id: String = Catalog.CHARACTER_ORDER[1]
-    world.hud.save_summary = {"starting_weapon": "sling", "inventory": inventory, "player_hp": 6.5, "coins": 44, "wave": 3, "player_level": 2, "buff_levels": {}, "character_id": character_id}
-    world.hud.save_available = true
+    var state: Dictionary = world.SessionState.capture(world)
+    state.merge({"starting_weapon": "sling", "inventory": inventory, "player_hp": 6.5, "coins": 44, "wave": 3, "player_level": 2, "buff_levels": {}, "character_id": character_id}, true)
+    expect(world.save_store.write_run(state).ok, "the six-weapon preview uses a real saved run")
+    world.refresh_save_status()
     world.hud.show_continue()
     await process_frame
     await process_frame

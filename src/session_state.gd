@@ -2,6 +2,7 @@ extends RefCounted
 
 const Catalog = preload("res://src/catalog.gd")
 const Growth = preload("res://src/growth.gd")
+const Economy = preload("res://src/economy.gd")
 const Progression = preload("res://src/progression.gd")
 const LootDrops = preload("res://src/loot_drops.gd")
 const BiomeEncounters = preload("res://src/biome_encounters.gd")
@@ -176,6 +177,8 @@ static func apply(world: Node, state: Dictionary) -> bool:
         var restored_offer := {"id":str(offer.get("id","")),"price":int(offer.get("price",0)),"sold":bool(offer.get("sold",false))}
         if offer.has("probability"): restored_offer["probability"] = float(offer["probability"])
         if offer.has("level"): restored_offer["level"] = clampi(int(offer["level"]), 1, Growth.MAX_WEAPON_LEVEL)
+        if not restored_offer.sold and Catalog.WEAPONS.has(restored_offer.id):
+            restored_offer["price"] = Economy.price_weapon_offer(restored_offer, world.inventory, world.wave)
         world.shop_stock.append(restored_offer)
     world.rng.state = str(state.get("rng_state",world.rng.state)).to_int()
     world.invulnerable = 1.0

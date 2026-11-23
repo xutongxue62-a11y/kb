@@ -287,7 +287,7 @@ static func cast(h) -> void:
     h.cast_sheet_snapshot = null
     h.cast_keep_static = false
 
-static func modal(h, rect: Rect2):
+static func modal(h, rect: Rect2, animate: bool = true):
     h.present_backdrop("arena")
     h.overlay.color = Color(0.04, 0.09, 0.17, 0.64)
     if h.modal_snapshot != null:
@@ -314,7 +314,7 @@ static func modal(h, rect: Rect2):
         dim.color = Color(0.02, 0.045, 0.09, 0.46)
         dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
         h.overlay.add_child(dim)
-    return paper(h, rect)
+    return paper(h, rect, animate)
 
 static func volume_slider(h, node_name: String, kind: String, value: float, rect: Rect2) -> HSlider:
     var slider := HSlider.new()
@@ -488,19 +488,47 @@ static func settings(h, in_run: bool) -> void:
         button(h,body,"OpenKeyBindings","改按键",Rect2(246,640,180,54),func():h.show_key_bindings(in_run),false,22)
     button(h,body,"Back","完成",Rect2(540,640,180,54),func():h.close_front_modal(),true,25)
 
-static func continued(h) -> void:
-    var sheet = modal(h, Rect2(230, 91, 820, 618))
+static func save_slot_tabs(h, body: Control, top: float) -> void:
+    for slot in range(1, 4):
+        var state: Dictionary = h.save_slot_state(slot)
+        var status: String = "空档" if state.is_empty() else ("已结束" if state.get("finished", false) else "第 %d 关" % int(state.get("wave", 1)))
+        button(h, body, "SaveSlot%d" % slot, "存档 %d · %s" % [slot, status], Rect2(48 + (slot - 1) * 248, top, 228, 44),
+            func(): h.select_save_slot(slot), slot == h.save_slot_selected, 19)
+
+static func new_save(h, animate: bool) -> void:
+    var sheet = modal(h, Rect2(230, 174, 820, 452), animate)
+    var body: Control = sheet.content
+    label(h, body, "选择存档位", Rect2(48, 28, 610, 62), 41, INK, true)
+    button(h, body, "CloseModal", "×", Rect2(720, 24, 52, 48), func(): h.close_front_modal(), false, 30)
+    line(body, Vector2(48, 103), 724, RED)
+    save_slot_tabs(h, body, 126)
+    var state: Dictionary = h.save_slot_state(h.save_slot_selected)
+    var occupied: bool = not state.is_empty() and not state.get("finished", false)
+    var hint: String = "此档已有第 %d 关的旅程。开始后，新旅程将覆盖这个档位。" % int(state.get("wave", 1)) if occupied else "新旅程将使用存档 %d。" % h.save_slot_selected
+    var hint_label: Label = label(h, body, hint, Rect2(48, 196, 724, 90), 23, RED if occupied else INK)
+    hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    button(h, body, "Back", "← 返回", Rect2(48, 340, 178, 54), func(): h.close_front_modal(), false, 22)
+    button(h, body, "ConfirmNewSave", "覆盖此档并开始" if occupied else "开始新旅程", Rect2(418, 338, 354, 58),
+        func(): h.save_slot_start_requested.emit(h.save_slot_selected), true, 25)
+
+static func continued(h, animate: bool = true) -> void:
+    var sheet = modal(h, Rect2(230, 91, 820, 618), animate)
     var body: Control = sheet.content
     label(h, body, "继续存档", Rect2(48, 25, 610, 75), 49, INK, true)
     button(h, body, "CloseModal", "×", Rect2(720, 24, 52, 48), func(): h.close_front_modal(), false, 30)
     line(body, Vector2(48, 112), 724, RED)
+    save_slot_tabs(h, body, 125)
     var preview := Control.new()
     preview.name = "SavePreview"
     preview.size = Vector2(820, 450)
     preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
     body.add_child(preview)
-    label(h, preview, "上次的旅程", Rect2(48, 136, 700, 44), 27, INK, true)
     var state: Dictionary = h.save_summary
+    var can_continue: bool = h.save_slots.is_empty() or (not state.is_empty() and not state.get("finished", false))
+    preview.visible = can_continue
+    if not can_continue:
+        var empty: Label = label(h, body, "这个档位还没有旅程" if state.is_empty() else "这个档位的旅程已结束", Rect2(48, 225, 724, 80), 28, INK, true)
+        empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     var starter: String = str(state.get("starting_weapon", "sling"))
     if not Catalog.WEAPONS.has(starter):
         starter = "sling"
@@ -538,10 +566,11 @@ static func continued(h) -> void:
     coins.name = "SaveCoins"
     var level: Label = label(h, preview, "等级 %d" % int(state.get("player_level", 1)), Rect2(610, 405, 158, 34), 22)
     level.name = "SaveLevel"
-    h.save_note_label = label(h, body, "从上次保存的位置继续。", Rect2(48, 458, 724, 50), 19, Color("#5c625e"))
+    h.save_note_label = label(h, body, "从此档上次保存的位置继续。" if can_continue else "", Rect2(48, 458, 724, 50), 19, Color("#5c625e"))
     h.save_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     button(h, body, "Back", "← 返回", Rect2(48, 536, 178, 54), func(): h.close_front_modal(), false, 22)
-    button(h, body, "ConfirmContinue", "→  继续旅程", Rect2(418, 532, 354, 58), func(): h.continue_requested.emit(), true, 26)
+    var confirm: Button = button(h, body, "ConfirmContinue", "→  继续旅程", Rect2(418, 532, 354, 58), func(): h.continue_requested.emit(), true, 26)
+    confirm.disabled = not can_continue
 
 static func help_page(h, page: String, in_run: bool) -> void:
     var sheet = modal(h, Rect2(146, 72, 988, 656))

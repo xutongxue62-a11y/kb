@@ -1,6 +1,7 @@
 extends RefCounted
 
 const VERSION: int = 1
+const RUN_SLOT_COUNT: int = 3
 const Catalog = preload("res://src/catalog.gd")
 const BiomeEncounters = preload("res://src/biome_encounters.gd")
 const MAX_SAFE_INTEGER: int = 9007199254740991
@@ -29,23 +30,31 @@ var _storage_dir: String
 func _init(storage_dir: String = "user://saves") -> void:
     _storage_dir = storage_dir
 
-func write_run(state: Variant) -> Dictionary:
+func _run_stem(slot: int) -> String:
+    return "run" if slot == 1 else "run_slot_%d" % slot
+
+func write_run(state: Variant, slot: int = 1) -> Dictionary:
+    if slot < 1 or slot > RUN_SLOT_COUNT:
+        return _failure("存档位无效")
     var validation_error: String = _validate_run(state)
     if not validation_error.is_empty():
         return _failure(validation_error)
-    return _write_document("run.json", state)
+    return _write_document(_run_stem(slot) + ".json", state, "run")
 
-func read_run() -> Dictionary:
-    var result: Dictionary = _read_document("run.json", "run")
+func read_run(slot: int = 1) -> Dictionary:
+    if slot < 1 or slot > RUN_SLOT_COUNT:
+        return {"ok": false, "state": {}, "error": "存档位无效", "recovered": false}
+    var stem: String = _run_stem(slot)
+    var result: Dictionary = _read_document(stem + ".json", "run")
     if result["ok"]:
         return {"ok": true, "state": result["data"], "error": "", "recovered": false}
-    var backup: Dictionary = _read_document("run.backup.json", "run")
+    var backup: Dictionary = _read_document(stem + ".backup.json", "run")
     if backup["ok"]:
         return {"ok": true, "state": backup["data"], "error": "", "recovered": true}
     return {"ok": false, "state": {}, "error": result["error"] + "；" + backup["error"], "recovered": false}
 
-func has_run() -> bool:
-    var result: Dictionary = read_run()
+func has_run(slot: int = 1) -> bool:
+    var result: Dictionary = read_run(slot)
     return result["ok"] and not result["state"].get("finished", true)
 
 func read_settings() -> Dictionary:
@@ -70,7 +79,7 @@ func write_settings(settings: Variant) -> Dictionary:
         payload["autosave"] = true
     if not payload.has("music_enabled"):
         payload["music_enabled"] = true
-    return _write_document("settings.json", payload)
+    return _write_document("settings.json", payload, "settings")
 
 func _validate_run(state: Variant) -> String:
     if typeof(state) != TYPE_DICTIONARY:
@@ -390,7 +399,7 @@ func _read_document(file_name: String, kind: String) -> Dictionary:
         return _failure("%s：%s" % [file_name, validation_error])
     return {"ok": true, "data": json.data, "text": body, "error": ""}
 
-func _write_document(file_name: String, data: Dictionary) -> Dictionary:
+func _write_document(file_name: String, data: Dictionary, kind: String) -> Dictionary:
     if _storage_dir.strip_edges().is_empty():
         return _failure("存档目录为空")
     var body: String = JSON.stringify(data, "\t", true, true)
@@ -407,7 +416,7 @@ func _write_document(file_name: String, data: Dictionary) -> Dictionary:
         return result
     # Keep the primary in place until both the new file and its backup are flushed.
     # Only a validated primary may replace the previous valid backup.
-    var previous: Dictionary = _read_document(file_name, "run" if file_name == "run.json" else "settings")
+    var previous: Dictionary = _read_document(file_name, kind)
     if previous["ok"]:
         var backup: String = directory.path_join(file_name.get_basename() + ".backup.json")
         var backup_temporary: String = backup + ".tmp"

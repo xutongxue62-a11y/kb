@@ -38,6 +38,12 @@ static func price(key: String, stage: int, level: int = 0) -> int:
 static func reroll_price(stage: int, rerolls: int) -> int:
     return 10 + maxi(0, stage) / 2 + 8 * maxi(0, rerolls)
 
+static func price_weapon_offer(offer: Dictionary, inventory: Array, stage: int) -> int:
+    var key: String = str(offer["id"])
+    var owned: int = Growth.item_level(key, inventory, {})
+    var target: int = clampi(owned + 1 if owned > 0 else int(offer.get("level", 1)), 1, Growth.MAX_WEAPON_LEVEL)
+    return price(key, stage, target) + 3 + (target + 3 if owned > 0 else 0)
+
 static func stock(inventory: Array, levels: Dictionary, stage: int, random: RandomNumberGenerator, guarantee_upgrades: bool = false) -> Array:
     var upgrades: Array = []
     if guarantee_upgrades:
@@ -45,8 +51,8 @@ static func stock(inventory: Array, levels: Dictionary, stage: int, random: Rand
         for item in inventory:
             if Catalog.WEAPONS.has(item["id"]) and int(item["level"]) < Growth.MAX_WEAPON_LEVEL:
                 eligible.append(item["id"])
-        while upgrades.size() < 2 and not eligible.is_empty():
-            upgrades.append(eligible.pop_at(random.randi_range(0, eligible.size() - 1)))
+        if not eligible.is_empty():
+            upgrades.append(eligible[random.randi_range(0, eligible.size() - 1)])
     var choices: Array = Growth.weighted_choices(inventory, levels, random, 6 - upgrades.size(), true, upgrades)
     for key in upgrades:
         # Keep the last slot available for the guaranteed Boss-adjacent heal.
@@ -54,13 +60,12 @@ static func stock(inventory: Array, levels: Dictionary, stage: int, random: Rand
     var result: Array = []
     for key in choices:
         var owned: int = Growth.item_level(key, inventory, levels)
-        var offered: int = owned
-        if Catalog.WEAPONS.has(key) and owned <= 0:
-            offered = Growth.roll_new_weapon_level(random, stage)
-        var offer := {"id": key, "price": price(key, stage, offered if owned <= 0 else owned + 1), "sold": false,
+        var offer := {"id": key, "price": price(key, stage, owned + 1 if owned > 0 else 0), "sold": false,
             "probability": Growth.draw_probability(key, inventory, levels, true)}
-        if Catalog.WEAPONS.has(key) and owned <= 0:
-            offer["level"] = offered
+        if Catalog.WEAPONS.has(key):
+            if owned <= 0:
+                offer["level"] = Growth.roll_new_weapon_level(random, stage, 0.5 if stage <= 10 else 1.0)
+            offer["price"] = price_weapon_offer(offer, inventory, stage)
         result.append(offer)
     # Boss-adjacent camps always stock a heal: the camp right before a boss
     # wave (stage 4, 9, 14, ...) and the camp right after one (5, 10, 15, ...).

@@ -175,8 +175,10 @@ static func new_weapon_level_chance(stage: int, level: int) -> float:
         total += float(weight)
     return float(weights[level - 1]) / total if total > 0.0 else 0.0
 
-static func roll_new_weapon_level(random: RandomNumberGenerator, stage: int) -> int:
+static func roll_new_weapon_level(random: RandomNumberGenerator, stage: int, top_tier_weight: float = 1.0) -> int:
     var weights: Array = new_weapon_level_weights(stage)
+    weights[8] *= top_tier_weight
+    weights[9] *= top_tier_weight
     var total: float = 0.0
     for weight in weights:
         total += float(weight)

@@ -194,7 +194,7 @@ func check_staff_exclusive() -> void:
     var shaman_shots: Array = shaman.projectiles.filter(func(shot): return str(shot.get("kind", "")) == "staff")
     expect(shaman_shots.size() == 5, "a shaman staff volley launches five runes")
     if not shaman_shots.is_empty():
-        expect(is_equal_approx(float(shaman_shots[0].get("damage", 0.0)), Catalog.WEAPONS["staff"]["damage"] * 1.25), "shaman staff runes deal the exclusive damage bonus")
+        expect(is_equal_approx(float(shaman_shots[0].get("damage", 0.0)), Catalog.WEAPONS["staff"]["damage"] * 0.92 * 1.25), "shaman staff runes deal the exclusive damage bonus")
         expect(is_equal_approx(float(shaman_shots[0].get("homing", 0.0)), 1.6), "shaman staff runes carry slight tracking")
     shaman.queue_free()
     await process_frame
@@ -213,15 +213,15 @@ func check_staff_exclusive() -> void:
     var other_shots: Array = other.projectiles.filter(func(shot): return str(shot.get("kind", "")) == "staff")
     expect(other_shots.size() == 3, "a non-shaman staff still launches three runes")
     if not other_shots.is_empty():
-        expect(is_equal_approx(float(other_shots[0].get("damage", 0.0)), Catalog.WEAPONS["staff"]["damage"]), "a non-shaman staff keeps the default rune damage")
+        expect(is_equal_approx(float(other_shots[0].get("damage", 0.0)), Catalog.WEAPONS["staff"]["damage"] * 0.92), "a non-shaman staff keeps the default rune damage")
         expect(is_equal_approx(float(other_shots[0].get("homing", 0.0)), 0.0), "a non-shaman staff does not gain exclusive tracking")
     other.queue_free()
     await process_frame
 
 func check_select_and_progress() -> void:
     var world = make_world("select_")
-    if world.hud.start_requested.is_connected(world.begin_departure):
-        world.hud.start_requested.disconnect(world.begin_departure)
+    if world.hud.start_requested.is_connected(world.show_departure_slot_picker):
+        world.hud.start_requested.disconnect(world.show_departure_slot_picker)
     var hud = world.hud
     var events: Array = []
     hud.starter_selected.connect(func(key: String): events.append(["starter", key]))

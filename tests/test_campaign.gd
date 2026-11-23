@@ -190,6 +190,7 @@ func run_checks() -> void:
     world.finish_run(false)
     expect(not world.save_store.has_run() and not world.continue_game(),"death records the end of a run even when automatic progress saving is disabled")
     check_shop_refresh_guarantee(world)
+    check_slot_selection(world)
     world.queue_free()
     await process_frame
     finish()
@@ -215,13 +216,47 @@ func check_shop_refresh_guarantee(world: Node) -> void:
     world.reroll_shop()
     var ids: Array = world.shop_stock.map(func(offer): return offer.id)
     var available: Array = ids.filter(func(id): return owned.has(id))
-    expect(ids.size() == 6 and available.size() >= 2 and available[0] != available[1], "the sixth paid refresh guarantees two distinct upgrades across camps and save/load")
+    expect(ids.size() == 6 and available.size() >= 1, "the sixth paid refresh guarantees an owned upgrade across camps and save/load")
     var almost_maxed: Array = world.inventory.duplicate(true)
     for index in range(1, almost_maxed.size()):
         almost_maxed[index].level = world.Growth.MAX_WEAPON_LEVEL
     var stock: Array = world.Economy.stock(almost_maxed, {}, 4, world.rng, true)
     var boss_camp_ids: Array = stock.map(func(offer): return offer.id)
     expect(boss_camp_ids.has("heal") and boss_camp_ids.filter(func(id): return owned.has(id)) == [almost_maxed[0].id], "the only available upgrade and the Boss-camp heal both survive the guarantee")
+    var early_price: int = world.Economy.price_weapon_offer({"id":"powder", "level":9}, [], 9)
+    var upgrade_price: int = world.Economy.price_weapon_offer({"id":"powder"}, [{"id":"powder", "level":8}], 9)
+    expect(early_price == 176 and upgrade_price == 188, "a Lv.9 purchase and a Lv.8-to-9 upgrade both charge their higher intended prices")
+    var old_camp: Dictionary = world.SessionState.capture(world)
+    old_camp.wave = 9
+    old_camp.shop_stock = [{"id":"club", "level":9, "price":84, "sold":false}]
+    expect(world.save_store.write_run(old_camp).ok and world.continue_game() and world.shop_stock[0].level == 9 and world.shop_stock[0].price == 176, "continuing an older camp preserves its Lv.9 roll and corrects its price")
+
+func check_slot_selection(world: Node) -> void:
+    if not world.hud.has_method("select_save_slot"):
+        expect(false, "the continue menu can select any of the three save slots")
+        return
+    var state: Dictionary = world.SessionState.capture(world)
+    for slot in [1, 2, 3]:
+        state.wave = slot + 3
+        state.coins = slot * 100
+        expect(world.save_store.write_run(state, slot).ok, "slot %d accepts its own campaign" % slot)
+    world.go_home()
+    world.refresh_save_status()
+    world.hud.show_continue()
+    world.hud.select_save_slot(3)
+    expect(world.hud.save_summary.coins == 300 and world.hud.overlay.find_child("SaveSlot3", true, false) != null, "the third tab previews its own saved progress")
+    world.hud.continue_requested.emit()
+    expect(world.active_save_slot == 3 and world.wave == 6 and world.coins == 300, "continuing the third slot restores and binds that run")
+    world.coins = 333
+    expect(world.save_game() and world.save_store.read_run(3).state.coins == 333 and world.save_store.read_run(1).state.coins == 100, "manual saving updates only the active slot")
+    world.go_home()
+    world.show_departure_slot_picker()
+    world.hud.select_save_slot(2)
+    var action: Button = world.hud.overlay.find_child("ConfirmNewSave", true, false)
+    expect(action != null and "覆盖" in action.text and world.save_store.read_run(2).state.coins == 200, "selecting an occupied slot requires explicit replacement and leaves it alone")
+    if action != null:
+        action.pressed.emit()
+    expect(world.active_save_slot == 2 and world.wave == 1 and world.save_store.read_run(1).state.coins == 100, "explicit new-run confirmation targets only the chosen slot")
 
 func finish() -> void:
     print("CAMPAIGN RESULT: %d checks, %d failures" % [checks, failures])

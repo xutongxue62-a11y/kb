@@ -4,8 +4,6 @@ const CreatureFrames = preload("res://src/creature_frames.gd")
 const BOSS_ATLAS = preload("res://assets/encounters/bosses.png")
 const MOB_ATLAS = preload("res://assets/encounters/creatures.png")
 const GAIT_PADDING := 56
-const ELITE_TINT := Color("#ff7473")
-const ELITE_SHELL := Color("#c14d48")
 static var isolated_art: Dictionary = {}
 
 const ENCOUNTER_ART := {
@@ -40,7 +38,6 @@ var elite: bool = false:
     set(value):
         elite = value
         _update_outline()
-        _update_tint()
         queue_redraw()
 var asset_library
 var display_width: float = 60.0
@@ -88,6 +85,8 @@ func setup(library, creature_kind: String, size: float, is_elite: bool) -> void:
 func _update_outline() -> void:
     if sprite != null:
         sprite.material = asset_library.team_material("dinosaurs", kind, "elite" if elite else "enemy", (2.2 if elite else 1.2) / base_scale.x)
+    if frames != null:
+        frames.set_elite_outline(asset_library.team_shader if elite else null)
 
 func set_encounter_art(form: String) -> void:
     var key: String = form if ENCOUNTER_ART.has(form) else form.trim_suffix("_dark")
@@ -164,8 +163,7 @@ func animate(velocity: Vector2, delta: float, state: String = "walk", travelled:
     _update_tint()
 
 func _update_tint() -> void:
-    var base_color: Color = ELITE_TINT if elite else encounter_tint
-    var tint: Color = base_color.lerp(Color("#f49b8b"), hit_time * 2.4)
+    var tint: Color = encounter_tint.lerp(Color("#f49b8b"), hit_time * 2.4)
     if frames != null:
         frames.modulate = tint
     if sprite != null:
@@ -194,12 +192,10 @@ func _draw_egg() -> void:
     var inner: PackedVector2Array = PackedVector2Array()
     for point in pts:
         inner.append(origin + (point - origin) * 0.88)
-    draw_colored_polygon(inner, ELITE_SHELL if elite else Color("#f3e0b8"))
-    draw_colored_polygon(_egg_highlight(origin, radius), Color("#ffc3a8", 0.8) if elite else Color("#fff6df", 0.7))
+    draw_colored_polygon(inner, Color("#f3e0b8"))
+    draw_colored_polygon(_egg_highlight(origin, radius), Color("#fff6df", 0.7))
     for spot in [Vector2(-7, -4), Vector2(6, 3), Vector2(-2, 8), Vector2(8, -7), Vector2(-8, 4)]:
         var color: Color = Color("#c45b3a") if int(absf(spot.x) + absf(spot.y)) % 2 == 0 else Color("#6d7f55")
-        if elite:
-            color = Color("#752e29")
         draw_circle(origin + spot * (radius / 16.0), maxf(2.2, radius * 0.13), color)
         draw_circle(origin + spot * (radius / 16.0) + Vector2(-0.6, -0.6), maxf(0.8, radius * 0.05), Color("#fff6df", 0.45))
     if amount > 0.0:
@@ -259,7 +255,7 @@ func _draw() -> void:
         return
     if elite or encounter_art.ends_with("_dark"):
         var spot := Vector2(0, display_width * 0.30)
-        var color := Color("#ff685a") if elite else Color("#71394d")
+        var color := Color("#ead5ac") if elite else Color("#71394d")
         for x in [-1.0, 0.0, 1.0]:
             var mark: Vector2 = spot + Vector2(x * 7.0, absf(x) * 2.0)
             draw_line(mark + Vector2(-2.0, 4.0), mark + Vector2(2.0, -3.0), Color("#36271f"), 5.0, true)

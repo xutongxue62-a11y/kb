@@ -68,6 +68,7 @@ var heal_display: float = 0.0
 var impact_strength: float = 0.0
 var enemy_adaptation: float = 1.0
 var save_store
+var active_save_slot: int = 1
 var settings: Dictionary = {"autosave":true}
 var restoring: bool = false
 var armory
@@ -278,7 +279,8 @@ func _ready() -> void:
 
     add_child(hud)
     hud.setup(library)
-    hud.start_requested.connect(begin_departure)
+    hud.start_requested.connect(show_departure_slot_picker)
+    hud.save_slot_start_requested.connect(start_in_save_slot)
     hud.formation_requested.connect(switch_formation)
     hud.combo_requested.connect(toggle_link_pack)
     hud.elite_requested.connect(switch_elite)
@@ -566,13 +568,33 @@ func clear_weapons() -> void:
 
 func refresh_save_status(note: String = "") -> void:
     if hud != null and save_store != null:
-        var result: Dictionary = save_store.read_run()
-        var summary: Dictionary = result.get("state", {}) if result.get("ok", false) else {}
-        var available: bool = result.get("ok", false) and not summary.get("finished", true)
+        var slots: Array[Dictionary] = []
+        for slot in range(1, SaveStore.RUN_SLOT_COUNT + 1):
+            var result: Dictionary = save_store.read_run(slot)
+            slots.append(result.get("state", {}) if result.get("ok", false) else {})
+        hud.save_slots = slots
+        if hud.screen != "continue" and hud.screen != "new_save":
+            hud.save_slot_selected = active_save_slot
+        var summary: Dictionary = slots[hud.save_slot_selected - 1]
+        var available: bool = slots.any(func(state): return not bool(state.get("finished", true)))
         hud.configure_save(available, bool(settings.get("autosave", true)), note, summary)
         if not note.is_empty() and running and hud.screen == "combat":
             combo_message = note
             combo_message_time = 3.0
+
+func show_departure_slot_picker(trial: bool = false) -> void:
+    if trial:
+        begin_departure(true)
+        return
+    if departure_left <= 0.0:
+        refresh_save_status()
+        hud.show_new_save_picker()
+
+func start_in_save_slot(slot: int) -> void:
+    if slot < 1 or slot > SaveStore.RUN_SLOT_COUNT or departure_left > 0.0:
+        return
+    active_save_slot = slot
+    begin_departure()
 
 func begin_departure(trial: bool = false) -> void:
     if departure_left > 0.0:
@@ -600,7 +622,7 @@ func begin_continue() -> void:
     if departure_left > 0.0:
         return
     var previous: Texture2D = hud.snapshot_departure_previous() if hud.has_method("snapshot_departure_previous") else hud.snapshot_ui()
-    if not continue_game():
+    if not continue_game(hud.save_slot_selected):
         if hud.has_method("restore_front_chrome"):
             hud.restore_front_chrome()
         return
@@ -614,7 +636,7 @@ func save_game(finished: bool = false) -> bool:
     if restoring or trial_mode or demo or animation_demo or (not running and not finished):
         refresh_save_status("试用/演示不会覆盖正常存档" if trial_mode or demo else "当前没有可保存的战斗")
         return false
-    var result: Dictionary = save_store.write_run(SessionState.capture(self, finished))
+    var result: Dictionary = save_store.write_run(SessionState.capture(self, finished), active_save_slot)
     var note: String = "保存失败：" + str(result.get("error", "未知错误"))
     if result.get("ok", false):
         # A finished run is sealed, not continuable; saying 已保存 here made
@@ -622,7 +644,7 @@ func save_game(finished: bool = false) -> bool:
         # Leftover gems on the ground are discarded at wave end, so the toast
         # only shows coins already in the wallet.
         var shown_coins: int = coins
-        note = "本局已结束 · 战绩已记录" if finished else "已保存 · 第%d关 · %d金币" % [wave, shown_coins]
+        note = "本局已结束 · 战绩已记录" if finished else "已保存到存档 %d · 第%d关 · %d金币" % [active_save_slot, wave, shown_coins]
     refresh_save_status(note)
     return result.get("ok",false)
 
@@ -630,8 +652,9 @@ func auto_save() -> void:
     if settings.get("autosave",true) and not restoring and running and not trial_mode and not training_mode and not demo and not animation_demo:
         save_game()
 
-func continue_game() -> bool:
-    var result: Dictionary = save_store.read_run()
+func continue_game(slot: int = 0) -> bool:
+    var selected: int = active_save_slot if slot == 0 else slot
+    var result: Dictionary = save_store.read_run(selected)
     if not result.get("ok",false) or result.get("state",{}).get("finished",true):
         refresh_save_status("没有有效的未结束存档")
         return false
@@ -639,6 +662,7 @@ func continue_game() -> bool:
     var accepted: bool = SessionState.apply(self,result["state"])
     restoring = false
     if accepted:
+        active_save_slot = selected
         if hud != null and Catalog.CHARACTERS.has(character_id):
             hud.selected_character = character_id
             hud.preview_character = character_id

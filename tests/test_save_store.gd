@@ -30,6 +30,7 @@ func _initialize() -> void:
         finish()
         return
     check_round_trip()
+    check_run_slots()
     check_finished_run()
     check_invalid_writes()
     check_settings()
@@ -71,6 +72,27 @@ func sample_state() -> Dictionary:
         "shop": {"open": true, "offers": [{"id": "axe", "sold": true}]},
         "future_field": {"nested": [null, true, "保留额外信息", 0.125]}
     }
+
+func check_run_slots() -> void:
+    var store = make_store("slots")
+    var legacy := sample_state()
+    expect(store.write_run(legacy).ok, "existing default writes still use the first slot")
+    if not save_store_script.get_script_constant_map().has("RUN_SLOT_COUNT"):
+        expect(false, "save storage supports three independent run slots")
+        return
+    for slot in [2, 3]:
+        var other := sample_state()
+        other.wave = slot * 10
+        expect(store.write_run(other, slot).ok, "each extra slot can be written independently")
+    expect(read_text("slots", "run.json") != "" and store.read_run(1).state.wave == legacy.wave, "slot one reads the existing run.json without moving it")
+    expect(store.read_run(2).state.wave == 20 and store.read_run(3).state.wave == 30, "continuing any slot returns its own wave")
+    var finished := sample_state()
+    finished.finished = true
+    expect(store.write_run(finished, 2).ok and not store.has_run(2) and store.has_run(1) and store.has_run(3), "ending one run leaves both other slots playable")
+    write_raw("slots", "run_slot_2.json", "{broken")
+    var recovered: Dictionary = store.read_run(2)
+    expect(recovered.ok and recovered.recovered and recovered.state.wave == 20 and store.read_run(3).state.wave == 30, "a damaged second slot recovers only from its own backup")
+    expect(not store.write_run(legacy, 0).ok and not store.write_run(legacy, 4).ok and not store.read_run(4).ok, "slot indices outside 1 through 3 are rejected")
 
 func check_round_trip() -> void:
     var store = make_store("round_trip")

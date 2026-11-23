@@ -95,10 +95,31 @@ static func select_frame(phase: float, moving: bool, action: String, time: float
         return mini(WALK_FRAMES - 1, int(fposmod(phase, TAU) / TAU * WALK_FRAMES))
     return 0
 
+func set_elite_outline(shader: Shader) -> void:
+    if shader == null:
+        material = null
+    elif material == null:
+        var outline := ShaderMaterial.new()
+        outline.shader = shader
+        outline.set_shader_parameter("team_color", Color("#e31b28"))
+        material = outline
+    queue_redraw()
+
 func _draw() -> void:
-    if ready_to_draw:
-        if displayed_clip.is_empty():
-            draw_texture_rect_region(atlas, draw_rects[frame], sample_rects[frame])
-        else:
-            var pair: Array = attacks[displayed_clip][frame]
-            draw_texture_rect_region(atlas, pair[1], pair[0])
+    if not ready_to_draw:
+        return
+    var pair: Array = [sample_rects[frame], draw_rects[frame]] if displayed_clip.is_empty() else attacks[displayed_clip][frame]
+    var sample: Rect2 = pair[0]
+    var bounds: Rect2 = pair[1]
+    var outline: ShaderMaterial = material as ShaderMaterial
+    if outline != null:
+        var texture_size: Vector2 = atlas.get_size()
+        var start: Vector2 = sample.position / texture_size
+        var end: Vector2 = sample.end / texture_size
+        var pixels_to_world: float = bounds.size.x / sample.size.x
+        outline.set_shader_parameter("region_bounds", Vector4(start.x, start.y, end.x, end.y))
+        outline.set_shader_parameter("outline_width", 2.0 / pixels_to_world)
+        # Atlas cells have three transparent pixels on each side for the outline.
+        sample = sample.grow(3.0)
+        bounds = bounds.grow(3.0 * pixels_to_world)
+    draw_texture_rect_region(atlas, bounds, sample)
