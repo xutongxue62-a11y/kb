@@ -80,6 +80,7 @@ var boss_pending: bool = false
 var shop_open: bool = false
 var shop_stock: Array = []
 var shop_rerolls: int = 0
+var shop_refresh_progress: int = 0
 var wave_closing: bool = false
 var closing_absorb_left: float = 0.0
 var training_mode: bool = false
@@ -157,6 +158,7 @@ class ChestLayer:
 var player_position: Vector2 = Vector2(640, 401)
 var player_hp: float = 8.0
 var invulnerable: float = 0.0
+var regen_ready_at: float = 0.0
 var dodge_left: float = 0.0
 var dodge_cooldown: float = 0.0
 var dodge_direction: Vector2 = Vector2.RIGHT
@@ -424,6 +426,9 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     boss_clear_left = 0.0
     boss_pending = false
     shop_open = false
+    shop_rerolls = 0
+    shop_refresh_progress = 0
+    regen_ready_at = 0.0
     shop_stock.clear()
     wave_closing = false
     wave_buffer = 0.0
@@ -1619,12 +1624,6 @@ func simulate(delta: float, movement: Vector2) -> void:
     effects.advance(delta)
     impact_strength = move_toward(impact_strength, 0.0, delta * 16.0)
     world_camera.offset = Vector2(sin(elapsed * 81.0), cos(elapsed * 73.0)) * impact_strength
-    var healed: float = minf(stats["max_hp"] - player_hp, stats["regen"] * delta)
-    player_hp += maxf(0.0, healed)
-    heal_display += maxf(0.0, healed)
-    if heal_display >= 0.5:
-        effects.floating_text(player_position, "+%.1f" % heal_display, Color("#9bf1a8"))
-        heal_display = 0.0
     update_terrain_damage(delta,terrain_exposure)
     if not running:
         update_hud()
@@ -1654,6 +1653,13 @@ func simulate(delta: float, movement: Vector2) -> void:
         else:
             enemy["view"].queue_free()
     enemies = living
+    var recovery_time: float = clampf(elapsed - regen_ready_at, 0.0, delta)
+    var healed: float = maxf(0.0, minf(stats["max_hp"] - player_hp, stats["regen"] * recovery_time))
+    player_hp += healed
+    heal_display += healed
+    if heal_display >= 0.5:
+        effects.floating_text(player_position, "+%.1f" % heal_display, Color("#9bf1a8"))
+        heal_display = 0.0
     update_pickups(delta)
     update_chests(delta)
     if not training_mode and ((boss_round and boss_defeated and boss_clear_left <= 0.000001) or (not boss_round and wave_elapsed >= WAVE_SECONDS - 0.000001)):
@@ -1955,7 +1961,8 @@ func reroll_shop() -> void:
         return
     coins -= cost
     shop_rerolls += 1
-    shop_stock = Economy.stock(inventory,buff_levels,wave,rng)
+    shop_refresh_progress = (shop_refresh_progress + 1) % Economy.SHOP_GUARANTEE_INTERVAL
+    shop_stock = Economy.stock(inventory, buff_levels, wave, rng, shop_refresh_progress == 0)
     show_current_shop(false)
     update_hud()
     auto_save()
@@ -3455,7 +3462,7 @@ func explode_powder(projectile: Dictionary) -> void:
     var burst_kind: String = "rune_blast" if enchanted else ("fire_blast" if fire_cannon else ("thunder_blast" if thunder_cannon else "blast"))
     var burst_color: Color = BattleVisuals.staff_tint(Evolution.tier(staff_lvl)) if enchanted else (BattleVisuals.fire_tint(Evolution.tier(fire_lvl)) if fire_cannon else ((Color("#ff3a2e") if thunder_is_red else Color("#eef6ff")) if thunder_cannon else Color("#ffad40")))
     var dmg_mult: float = (1.30 if Evolution.tier(staff_lvl) >= 2 else 1.15) if enchanted else (Rules.red_lightning_multiplier(weapon_level("totem")) if thunder_is_red else 1.0)
-    damage_area(point, (85.0 if enchanted else 63.0) * stats["area_multiplier"], projectile["damage"] * dmg_mult, "powder", true, burst_color, burst_kind, 1 if thunder_is_red else (-1 if not thunder_cannon else 0))
+    damage_area(point, (105.0 if enchanted else 85.0) * stats["area_multiplier"], projectile["damage"] * dmg_mult, "powder", true, burst_color, burst_kind, 1 if thunder_is_red else (-1 if not thunder_cannon else 0))
     audio.play("blast", 0.0, 0.88)
     var stage: int=Evolution.tier(weapon_level("powder"))
     if (stage>=1 and not enchanted and not fire_cannon and not thunder_cannon) or fire_cannon:
@@ -3747,6 +3754,7 @@ func update_terrain_damage(delta: float, player_exposure: float = -1.0) -> void:
         var amount: float = map_view.lava_damage_at(player_position) * exposure
         if amount > 0.0:
             player_hp = maxf(0.0,player_hp-amount)
+            regen_ready_at = elapsed + Growth.REGEN_DAMAGE_DELAY
             hero.hurt()
             hurt_flash = maxf(hurt_flash, 0.4)
             if player_hp <= 0.0:
@@ -3767,6 +3775,8 @@ func hurt_player(direction: Vector2, damage: float = 1.0) -> void:
         return
     var amount: float = damage * (1.0 - stats["reduction"])
     amount = minf(amount, Progression.HIT_CAP_RATIO * float(stats["max_hp"]))
+    if amount > 0.0:
+        regen_ready_at = elapsed + Growth.REGEN_DAMAGE_DELAY
     player_hp = maxf(1.0 if (training_mode and training_godmode) else 0.0, player_hp - amount)
     invulnerable = 0.7
     hero.hurt()

@@ -112,8 +112,10 @@ static func draw_probability(key: String, inventory: Array, levels: Dictionary, 
 static func probability_text(key: String, inventory: Array, levels: Dictionary, include_heal: bool = false) -> String:
     return "首抽率 %.1f%%" % (100.0 * draw_probability(key, inventory, levels, include_heal))
 
-static func weighted_choices(inventory: Array, levels: Dictionary, random: RandomNumberGenerator, count: int = 3, include_heal: bool = false) -> Array:
+static func weighted_choices(inventory: Array, levels: Dictionary, random: RandomNumberGenerator, count: int = 3, include_heal: bool = false, excluded: Array = []) -> Array:
     var pool: Array = candidate_pool(inventory, levels, include_heal)
+    for key in excluded:
+        pool.erase(key)
     var result: Array = []
     while result.size() < count and not pool.is_empty():
         var total: float = 0.0
@@ -145,6 +147,7 @@ static func xp_needed_for(level: int) -> int:
 # Batch 3: cap raised to 7 and the high end cut again — direct Lv.5+ draws are
 # now rare at every stage, and Lv.6/7 are jackpots rather than a plan.
 const MAX_WEAPON_LEVEL: int = 10
+const REGEN_DAMAGE_DELAY: float = 3.0
 const MAX_NEW_WEAPON_LEVEL: int = 10
 # Stage-band weights for Lv.1 .. Lv.10. Rows stay positive so every level can appear.
 const NEW_WEAPON_LEVEL_WEIGHTS := {

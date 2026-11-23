@@ -189,9 +189,39 @@ func run_checks() -> void:
     world.save_game()
     world.finish_run(false)
     expect(not world.save_store.has_run() and not world.continue_game(),"death records the end of a run even when automatic progress saving is disabled")
+    check_shop_refresh_guarantee(world)
     world.queue_free()
     await process_frame
     finish()
+
+func check_shop_refresh_guarantee(world: Node) -> void:
+    world.start_run(false)
+    world.set_autosave(false)
+    for key in ["powder", "axe", "totem", "hammer", "staff"]:
+        world.grant_weapon(key, 9)
+    var owned: Array = world.Catalog.inventory_ids(world.inventory)
+    world.end_round()
+    world.rng.seed = 9044
+    world.coins = 1000
+    for index in range(5):
+        world.reroll_shop()
+    world.leave_shop()
+    world.end_round()
+    world.coins = 0
+    world.reroll_shop()
+    world.coins = 1000
+    world.save_game()
+    expect(world.continue_game(), "camp refresh progress can be restored from a real save")
+    world.reroll_shop()
+    var ids: Array = world.shop_stock.map(func(offer): return offer.id)
+    var available: Array = ids.filter(func(id): return owned.has(id))
+    expect(ids.size() == 6 and available.size() >= 2 and available[0] != available[1], "the sixth paid refresh guarantees two distinct upgrades across camps and save/load")
+    var almost_maxed: Array = world.inventory.duplicate(true)
+    for index in range(1, almost_maxed.size()):
+        almost_maxed[index].level = world.Growth.MAX_WEAPON_LEVEL
+    var stock: Array = world.Economy.stock(almost_maxed, {}, 4, world.rng, true)
+    var boss_camp_ids: Array = stock.map(func(offer): return offer.id)
+    expect(boss_camp_ids.has("heal") and boss_camp_ids.filter(func(id): return owned.has(id)) == [almost_maxed[0].id], "the only available upgrade and the Boss-camp heal both survive the guarantee")
 
 func finish() -> void:
     print("CAMPAIGN RESULT: %d checks, %d failures" % [checks, failures])

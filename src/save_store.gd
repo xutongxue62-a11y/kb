@@ -11,6 +11,7 @@ const MAX_COLLECTION_SIZE: int = 10000
 const MAX_PICKUPS: int = 50000
 const WEAPON_IDS: Array = Catalog.IDS
 const Growth = preload("res://src/growth.gd")
+const Economy = preload("res://src/economy.gd")
 # Build validation from the public catalog so UI/runtime/save caps cannot diverge.
 static var BUFF_MAX_LEVELS: Dictionary = _buff_max_levels()
 
@@ -115,6 +116,12 @@ func _validate_run(state: Variant) -> String:
     return _validate_optional_run_fields(state)
 
 func _validate_optional_run_fields(state: Dictionary) -> String:
+    if state.has("shop_rerolls") and not _integer_in_range(state["shop_rerolls"], 0, MAX_SAFE_INTEGER):
+        return "存档商店刷新次数无效"
+    if state.has("shop_refresh_progress") and not _integer_in_range(state["shop_refresh_progress"], 0, Economy.SHOP_GUARANTEE_INTERVAL - 1):
+        return "存档商店刷新进度无效"
+    if state.has("regen_delay_left") and not _number_in_range(state["regen_delay_left"], 0.0, Growth.REGEN_DAMAGE_DELAY):
+        return "存档生命恢复等待时间无效"
     if state.has("chest_queue") and not _integer_in_range(state["chest_queue"], 0, MAX_PROGRESS):
         return "存档宝箱奖励数量无效"
     if state.has("chest_marks"):

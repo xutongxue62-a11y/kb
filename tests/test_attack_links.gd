@@ -170,7 +170,7 @@ func check_named_host_combat_effects(world: Node) -> void:
         world.grant_weapon("totem", level)
         world.select_link("thunder_hammer")
         var rank: int = world.Evolution.tier(level)
-        var expected: float = 1.22 + (level - 1) * 0.013 + [0.0, 0.08, 0.18][rank]
+        var expected: float = 1.24 + (level - 1) * 0.013 + [0.0, 0.08, 0.18][rank]
         expect(world.has_active_link("thunder_hammer") and is_equal_approx(world.enchant_damage_multiplier("hammer"), expected), "thunder hammer uses the totem's exact enchant growth at Lv.%d" % level)
         _clear_combat(world)
         world.stats["crit_chance"] = 0.0
@@ -186,6 +186,20 @@ func check_named_host_combat_effects(world: Node) -> void:
         var jump_damage: float = Catalog.WEAPONS["totem"]["damage"] * world.Evolution.damage_multiplier("totem", level) * 0.58
         jump_damage *= float(Catalog.exclusive_bonus(world.character_id, "totem").get("damage_multiplier", 1.0))
         expect(is_equal_approx(1000.0 - target.hp, 21.6 * expected + jump_damage), "the real bolt at Totem Lv.%d applies the enchant multiplier and its usual jump" % level)
+    for rank in range(3):
+        var rune: float = world.Rules.enchant_damage_bonus([Catalog.LINKS["rune_shell"]], "powder", rank, rank, rank)
+        var fire: float = world.Rules.enchant_damage_bonus([Catalog.LINKS["fire_cannon"]], "powder", rank, rank, rank)
+        var thunder: float = world.Rules.enchant_damage_bonus([Catalog.LINKS["thunder_shell"]], "powder", rank, rank, rank)
+        expect(rune > fire and fire > thunder and thunder > [1.22, 1.30, 1.40][rank], "all three cannon enchant tiers rise in the requested order")
+    world.start_run(false)
+    _clear_combat(world)
+    world.stats["area_multiplier"] = 1.0
+    world.spawn_enemy("tank", world.player_position + Vector2(130.0, 0.0))
+    var outside_old_blast: Dictionary = world.enemies.back()
+    outside_old_blast.position = world.player_position + Vector2(75.0 + outside_old_blast.radius, 0.0)
+    var hp_before: float = outside_old_blast.hp
+    world.explode_powder({"position":world.player_position, "damage":13.0})
+    expect(outside_old_blast.hp < hp_before, "a normal shell damages enemies beyond the old explosion radius")
 
 func check_ranged_torso_clearance(world: Node) -> void:
     world.start_run(true)

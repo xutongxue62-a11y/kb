@@ -305,15 +305,15 @@ static func red_lightning_multiplier(totem_level: int) -> float:
 static func thunder_hammer_enchant_multiplier(totem_level: int) -> float:
     var rank: int = maxi(1, totem_level)
     var awakening_bonus: float = 0.18 if rank >= 5 else (0.08 if rank >= 3 else 0.0)
-    return 1.22 + (rank - 1) * 0.013 + awakening_bonus
+    return 1.24 + (rank - 1) * 0.013 + awakening_bonus
 
 static func enchant_damage_bonus(links: Array, host_id: String, fire_tier: int, rune_tier: int, thunder_tier: int) -> float:
     if host_is_fire_enchanted(links, host_id):
-        return 1.40 if fire_tier >= 2 else (1.30 if fire_tier >= 1 else 1.22)
+        return 1.54 if fire_tier >= 2 else (1.38 if fire_tier >= 1 else 1.27)
     if host_is_rune_enchanted(links, host_id):
-        return 1.40 if rune_tier >= 2 else (1.30 if rune_tier >= 1 else 1.22)
+        return 1.60 if rune_tier >= 2 else (1.44 if rune_tier >= 1 else 1.31)
     if host_is_thunder_enchanted(links, host_id):
-        return 1.40 if thunder_tier >= 2 else (1.30 if thunder_tier >= 1 else 1.22)
+        return 1.44 if thunder_tier >= 2 else (1.33 if thunder_tier >= 1 else 1.24)
     return 1.0
 
 static func attack_speed_scale(weapon_id: String) -> float:
@@ -346,8 +346,8 @@ static func powder_attack_range(links: Array) -> float:
     var reach: float = -1.0
     for recipe in links:
         if recipe.get("weapons", []).has("powder"):
-            reach = maxf(reach, float(recipe.get("range", 290.0)))
-    return 290.0 if reach < 0.0 else reach
+            reach = maxf(reach, float(recipe.get("range", Catalog.POWDER_RANGE)))
+    return Catalog.POWDER_RANGE if reach < 0.0 else reach
 
 static func host_enchant_kinds(links: Array, weapon_id: String) -> Array:
     var kinds: Array = []

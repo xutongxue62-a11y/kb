@@ -61,6 +61,7 @@ func clear_push_lane(world, distance: float = 90.0) -> Dictionary:
 func run_checks() -> void:
     check_attack_feel()
     check_weapon_growth()
+    check_regen_recovery()
     check_pickup_radius()
     check_staff_ward()
     check_thunder_ward()
@@ -82,7 +83,7 @@ func check_attack_feel() -> void:
         "axe": [13.5, 0.62],
         "blade": [5.5, 0.12],
         "sling": [2.6, 0.30],
-        "powder": [9.0, 1.45],
+        "powder": [13.0, 1.25],
         "staff": [1.6, 0.72],
         "spear": [7.4, 0.52],
         "hammer": [20.0, 2.00],
@@ -122,14 +123,35 @@ func check_pickup_radius() -> void:
 
 func check_weapon_growth() -> void:
     var evolution = load("res://src/weapon_evolution.gd")
+    var post_awakening := [1.70, 1.95, 2.55, 3.25, 4.15, 5.35]
+    for level in range(5, 11):
+        expect(is_equal_approx(evolution.stage_damage_bonus(level), post_awakening[level - 5]), "all weapons use the new Lv.%d stage multiplier" % level)
     for key in ["sling", "powder"]:
         expect(is_equal_approx(evolution.damage_multiplier(key, 1), 1.0), key + " keeps its opening damage")
-        var rate: float = 0.365 if key == "sling" else 0.360
+        var rate: float = 0.365 if key == "sling" else 0.450
         for level in [2, 4, 7, 10]:
             var skill_tier: int = evolution.tier(level)
             var bonus: float = [1.0, 1.09, 1.20][skill_tier] if key == "sling" else [1.0, 1.11, 1.24][skill_tier]
             var expected: float = (1.0 + (level - 1) * rate) * evolution.stage_damage_bonus(level) * bonus
             expect(is_equal_approx(evolution.damage_multiplier(key, level), expected), "%s uses its new per-level growth at Lv.%d" % [key, level])
+
+func check_regen_recovery() -> void:
+    var world = prepare_world("regen_recovery")
+    clear_field(world)
+    world.apply_buff("regen")
+    world.invulnerable = 0.0
+    world.stats["dodge"] = 0.0
+    world.hurt_player(Vector2.ZERO, 1.0)
+    var after_hit: float = world.player_hp
+    world.simulate(2.0, Vector2.ZERO)
+    expect(is_equal_approx(world.player_hp, after_hit), "natural regeneration waits after real damage")
+    world.hurt_player(Vector2.ZERO, 1.0)
+    after_hit = world.player_hp
+    world.simulate(2.9, Vector2.ZERO)
+    expect(is_equal_approx(world.player_hp, after_hit), "a second hit restarts the three-second wait")
+    world.simulate(0.2, Vector2.ZERO)
+    expect(is_equal_approx(world.player_hp, after_hit + 0.1 * float(world.stats["regen"])), "the frame crossing three seconds heals only the time past the threshold")
+    world.queue_free()
 
 func check_staff_ward() -> void:
     var rules = load("res://src/rules.gd")

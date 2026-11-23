@@ -63,6 +63,7 @@ func sample_state() -> Dictionary:
         "coins": 17, "xp": 7.5, "player_level": 4, "finished": false,
         "elapsed": 121.5, "wave_elapsed": 1.5, "player_position": [640.0, 401.0],
         "shop_open": true, "boss_round": true, "boss_defeated": false, "collapsed": false, "prefer_elite": true,
+        "shop_rerolls": 2, "shop_refresh_progress": 5, "regen_delay_left": 1.75,
         "enemy_adaptation": 1.25, "rng_state": "-9223372036854775808", "xp_needed": 14,
         "shop_stock": [{"id": "axe", "price": 8, "sold": true}, {"id": "power", "price": 10, "sold": false}, {"id": "heal", "price": 5, "sold": false}],
         "enemies": [{"id": 1, "kind": "hunter", "hp": 3.25, "max_hp": 5.0, "position": [520.0, 300.0], "elite": false, "attack_cycle": 0}],
@@ -86,6 +87,7 @@ func check_round_trip() -> void:
     expect(restored["inventory"].size() == 2 and restored["inventory"][0]["id"] == "sling" and restored["inventory"][0]["level"] == 2 and restored["inventory"][1]["id"] == "hammer" and restored["buff_levels"]["pierce"] == 2, "original/new weapons and Buff levels round-trip")
     expect(restored["enemies"][0]["hp"] == 3.25 and restored["enemies"][0]["position"] == [520.0, 300.0] and restored["elapsed"] == 121.5 and restored["player_position"] == [640.0, 401.0], "encoded positions, encounter HP and time are preserved")
     expect(restored["shop"] == {"open": true, "offers": [{"id": "axe", "sold": true}]} and restored["future_field"] == {"nested": [null, true, "保留额外信息", 0.125]}, "shop sold state and unknown nested JSON fields are preserved")
+    expect(restored["shop_rerolls"] == 2 and restored["shop_refresh_progress"] == 5 and restored["regen_delay_left"] == 1.75, "refresh counters and recovery time survive a round trip")
     expect(store.has_run(), "an unfinished valid save can be continued")
     expect(state == sample_state(), "writing does not mutate the caller's nested state")
     var json: JSON = JSON.new()
@@ -113,14 +115,15 @@ func check_invalid_writes() -> void:
         ["coins", NAN], ["coins", 9007199254740992], ["xp", -0.1], ["xp", INF],
         ["player_hp", -1.0], ["player_hp", NAN], ["player_hp", 0.0], ["finished", 1],
         ["inventory", {}], ["inventory", []], ["inventory", ["sling"]],
-        ["inventory", [{"id": "club", "level": 0}]], ["inventory", [{"id": "club", "level": 8}]],
+        ["inventory", [{"id": "club", "level": 0}]], ["inventory", [{"id": "club", "level": 11}]],
         ["inventory", [{"id": "club", "level": 1.5}]], ["inventory", [{"id": "unknown", "level": 1}]],
         ["inventory", [{"id": "club"}]], ["inventory", [{"level": 1}]],
         ["inventory", [{"id": "club", "level": 1}, {"id": "club", "level": 2}]],
         ["inventory", [{"id": "club", "level": 1}, {"id": "axe", "level": 1}, {"id": "blade", "level": 1}, {"id": "sling", "level": 1}, {"id": "powder", "level": 1}, {"id": "staff", "level": 1}, {"id": "spear", "level": 1}]],
         ["buff_levels", []], ["buff_levels", {"power": 1000}], ["buff_levels", {"pierce": 1000}],
         ["buff_levels", {"vitality": -1}], ["buff_levels", {"power": 1.5}], ["buff_levels", {"unknown": 1}],
-        ["future_field", Vector2(1, 2)], ["future_field", {"deep": [INF]}], ["future_field", {1: "non-string key"}]
+        ["future_field", Vector2(1, 2)], ["future_field", {"deep": [INF]}], ["future_field", {1: "non-string key"}],
+        ["shop_rerolls", -1], ["shop_refresh_progress", 6], ["regen_delay_left", 3.1]
     ]
     for index in range(cases.size()):
         var state: Dictionary = sample_state()

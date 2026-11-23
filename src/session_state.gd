@@ -72,7 +72,8 @@ static func capture(world: Node, finished: bool = false) -> Dictionary:
         "link_ids":world.active_link_ids(),
         "enemy_adaptation":world.enemy_adaptation, "enemy_serial":world.enemy_serial, "enemies":enemies, "pickups":drops,
         "boss_round":world.boss_round, "boss_defeated":world.boss_defeated, "boss_clear_left":world.boss_clear_left, "shop_open":world.shop_open,
-        "shop_stock":world.shop_stock.duplicate(true), "rng_state":str(world.rng.state),
+        "shop_stock":world.shop_stock.duplicate(true), "shop_rerolls":world.shop_rerolls, "shop_refresh_progress":world.shop_refresh_progress,
+        "regen_delay_left":clampf(world.regen_ready_at - world.elapsed, 0.0, Growth.REGEN_DAMAGE_DELAY), "rng_state":str(world.rng.state),
         "pack_result_positions":_capture_result_positions(world)
     }
 
@@ -86,6 +87,7 @@ static func apply(world: Node, state: Dictionary) -> bool:
     world.map_view.restore_terrain(state.get("terrain_state",{}))
     world.wave_elapsed = maxf(0.0,float(state.get("wave_elapsed",0.0)))
     world.elapsed = maxf(0.0,float(state.get("elapsed",0.0)))
+    world.regen_ready_at = world.elapsed + clampf(float(state.get("regen_delay_left", 0.0)), 0.0, Growth.REGEN_DAMAGE_DELAY)
     world.enemy_adaptation = clampf(float(state.get("enemy_adaptation",1.0)),1.0,1.75)
     world.set_start_weapon(str(state.get("starting_weapon","sling")))
     world.character_id = Catalog.resolve_character_id(str(state.get("character_id","")), world.starting_weapon)
@@ -165,6 +167,8 @@ static func apply(world: Node, state: Dictionary) -> bool:
     world.wave_closing = bool(state.get("wave_closing",false))
     world.wave_buffer = clampf(float(state.get("wave_buffer",0.0)),0.0,world.WAVE_BUFFER) if world.wave_closing else 0.0
     world.shop_open = bool(state.get("shop_open",false))
+    world.shop_rerolls = int(state.get("shop_rerolls", 0))
+    world.shop_refresh_progress = int(state.get("shop_refresh_progress", 0))
     world.shop_stock.clear()
     for offer in state.get("shop_stock",[]):
         var restored_offer := {"id":str(offer.get("id","")),"price":int(offer.get("price",0)),"sold":bool(offer.get("sold",false))}

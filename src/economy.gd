@@ -2,6 +2,7 @@ extends RefCounted
 
 const Catalog = preload("res://src/catalog.gd")
 const Growth = preload("res://src/growth.gd")
+const SHOP_GUARANTEE_INTERVAL: int = 6
 
 # Shop prices follow relative strength. 蛮力 costs more than 猎手直觉.
 # Batch 3 (Juniper: gold overflows mid-run): everything costs more, and the
@@ -37,9 +38,21 @@ static func price(key: String, stage: int, level: int = 0) -> int:
 static func reroll_price(stage: int, rerolls: int) -> int:
     return 10 + maxi(0, stage) / 2 + 8 * maxi(0, rerolls)
 
-static func stock(inventory: Array, levels: Dictionary, stage: int, random: RandomNumberGenerator) -> Array:
+static func stock(inventory: Array, levels: Dictionary, stage: int, random: RandomNumberGenerator, guarantee_upgrades: bool = false) -> Array:
+    var upgrades: Array = []
+    if guarantee_upgrades:
+        var eligible: Array = []
+        for item in inventory:
+            if Catalog.WEAPONS.has(item["id"]) and int(item["level"]) < Growth.MAX_WEAPON_LEVEL:
+                eligible.append(item["id"])
+        while upgrades.size() < 2 and not eligible.is_empty():
+            upgrades.append(eligible.pop_at(random.randi_range(0, eligible.size() - 1)))
+    var choices: Array = Growth.weighted_choices(inventory, levels, random, 6 - upgrades.size(), true, upgrades)
+    for key in upgrades:
+        # Keep the last slot available for the guaranteed Boss-adjacent heal.
+        choices.insert(random.randi_range(0, maxi(0, choices.size() - 1)), key)
     var result: Array = []
-    for key in Growth.weighted_choices(inventory, levels, random, 6, true):
+    for key in choices:
         var owned: int = Growth.item_level(key, inventory, levels)
         var offered: int = owned
         if Catalog.WEAPONS.has(key) and owned <= 0:
