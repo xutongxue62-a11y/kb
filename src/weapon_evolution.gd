@@ -57,14 +57,18 @@ static func damage_multiplier(key: String, level: int) -> float:
     var lvl: int = maxi(1, level)
     var base: float = 1.0 + float(lvl - 1) * 0.325
     var mult: float = base * stage_damage_bonus(lvl)
-    if key in MELEE_IDS:
+    if key == "hammer":
+        mult *= (1.13 if lvl >= 5 else 1.08)
+    elif key in MELEE_IDS:
         mult *= (1.16 if lvl >= 5 else 1.10)
     elif key == "sling":
-        mult *= (1.26 if lvl >= 5 else (1.12 if lvl >= 3 else 1.0))
+        mult *= (1.20 if lvl >= 5 else (1.09 if lvl >= 3 else 1.0))
     elif key == "powder":
-        mult *= (1.22 if lvl >= 5 else (1.10 if lvl >= 3 else 1.0))
+        mult *= (1.24 if lvl >= 5 else (1.11 if lvl >= 3 else 1.0))
     elif lvl >= 5 and key in ["firepot", "staff"]:
         mult *= 1.23
+    elif lvl >= 5:
+        mult *= 1.06
     return mult
 
 static func sky_lightning_unlocked(level: int) -> bool:

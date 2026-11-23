@@ -304,11 +304,11 @@ static func red_lightning_multiplier(totem_level: int) -> float:
 
 static func enchant_damage_bonus(links: Array, host_id: String, fire_tier: int, rune_tier: int, thunder_tier: int) -> float:
     if host_is_fire_enchanted(links, host_id):
-        return 1.35 if fire_tier >= 2 else (1.26 if fire_tier >= 1 else 1.18)
+        return 1.40 if fire_tier >= 2 else (1.30 if fire_tier >= 1 else 1.22)
     if host_is_rune_enchanted(links, host_id):
-        return 1.35 if rune_tier >= 2 else (1.26 if rune_tier >= 1 else 1.18)
+        return 1.40 if rune_tier >= 2 else (1.30 if rune_tier >= 1 else 1.22)
     if host_is_thunder_enchanted(links, host_id):
-        return 1.35 if thunder_tier >= 2 else (1.26 if thunder_tier >= 1 else 1.18)
+        return 1.40 if thunder_tier >= 2 else (1.30 if thunder_tier >= 1 else 1.22)
     return 1.0
 
 static func attack_speed_scale(weapon_id: String) -> float:
