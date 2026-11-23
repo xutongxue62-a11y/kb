@@ -13,6 +13,7 @@ func run_checks() -> void:
     world.save_store = load("res://src/save_store.gd").new("res://runtime/tests/chest_" + str(Time.get_ticks_usec()))
     root.add_child(world)
     world.set_physics_process(false)
+    world.settings["seen_link_recipes"] = world.Catalog.LINK_ORDER.duplicate()
     world.force_elite_chests = true
     world.start_run(false)
     world.clear_enemies()
@@ -93,9 +94,10 @@ func run_checks() -> void:
     var legacy: Dictionary = saved.duplicate(true)
     legacy.erase("chest_marks")
     legacy.erase("chest_queue")
+    legacy.erase("elite_chest_due")
     expect(world.save_store.write_run(legacy)["ok"], "old saves without chest fields remain valid")
     world.offer_elite_chest(world.player_position)
-    expect(world.continue_game() and world.chest_marks.is_empty() and world.chest_queue == 0, "loading old save defaults chest fields to empty")
+    expect(world.continue_game() and world.chest_marks.is_empty() and world.chest_queue == 0 and not world.elite_chest_due, "loading old save defaults chest fields to empty")
     for bad in [-1, 0.5, "1"]:
         saved["chest_queue"] = bad
         expect(not world.save_store.write_run(saved)["ok"], "invalid chest queue rejected: " + str(bad))
@@ -150,7 +152,49 @@ func run_checks() -> void:
         world.spawn_clock = 999.0
         world.simulate(0.01, Vector2.ZERO)
         expect(world.chest_marks.is_empty() and world.upgrade_pending and world.upgrade_reason == "chest", "restored edge chest can actually be collected: " + str(fixture[0]))
+    check_elite_guarantee(world)
     world.queue_free()
     await process_frame
     print("CHEST_PICKUP RESULT: %d checks, %d failures" % [checks, failures])
     quit(1 if failures else 0)
+
+func check_elite_guarantee(world: Node) -> void:
+    world.start_run(false)
+    world.force_elite_chests = false
+    world.rng.seed = 22119
+    world.settings.autosave = false
+    world.wave = 4
+    var prior_miss: bool = false
+    var checked_save: bool = false
+    var natural_drops: int = 0
+    var chance_misses: int = 0
+    for index in range(24):
+        world.chest_marks.clear()
+        world.wave_elapsed = 29.9
+        world.elite_budget = 1
+        world.spawn_enemy("hunter", world.player_position + Vector2(140.0, 0.0), true, "egg")
+        var enemy: Dictionary = world.enemies.back()
+        var ordinary: Dictionary = world.Progression.enemy_profile(4, "hunter", world.enemy_adaptation)
+        expect(enemy.elite and enemy.view.elite and is_equal_approx(enemy.max_hp, 2.0 * ordinary.hp), "red elite eggs start with twice the ordinary HP")
+        if index % 2 == 1:
+            world.hatch_enemy(enemy, false)
+            expect(enemy.view.elite and enemy.view.shell.is_empty(), "hatched elite keeps the elite visual state")
+            expect(enemy.view.frames.modulate == enemy.view.ELITE_TINT, "whole-body animation frames turn red as soon as the elite hatches")
+        world.hurt_enemy(enemy, 100000.0, "powder", true, Vector2.ZERO)
+        var dropped: bool = world.chest_marks.size() == 1
+        expect(not prior_miss or dropped, "an elite kill after a miss always drops a chest")
+        if not prior_miss and dropped:
+            natural_drops += 1
+        if not dropped:
+            chance_misses += 1
+        prior_miss = not dropped
+        world.clear_enemies()
+        if prior_miss and not checked_save:
+            world.spawn_enemy("hunter", world.player_position + Vector2(140.0, 0.0))
+            world.hurt_enemy(world.enemies.back(), 100000.0, "powder", true, Vector2.ZERO)
+            expect(world.chest_marks.is_empty(), "an ordinary kill cannot use the elite guarantee")
+            world.clear_enemies()
+            expect(world.save_game() and world.continue_game(), "a missed drop can be saved between elite kills")
+            expect(world.elite_chest_due, "loading keeps the next elite chest guaranteed")
+            checked_save = true
+    expect(checked_save and natural_drops > 0 and chance_misses > 0, "actual elite kills exercise both random results and the guarantee")

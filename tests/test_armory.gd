@@ -35,7 +35,7 @@ func run_checks() -> void:
     for index in range(32):
         events.append_array(armory.advance(1.0/60.0,Vector2.ZERO,enemies,[{"id":"hammer","level":1}],stats,false,views))
     var areas: Array = events.filter(func(event):return event["type"]=="area")
-    expect(areas.size()==1 and areas[0]["radius"]>=70 and is_equal_approx(areas[0]["damage"], 21.6),"hammer produces one delayed area smash with actual starting damage")
+    expect(areas.size()==1 and areas[0]["radius"]>=70 and is_equal_approx(areas[0]["damage"], 21.6 * 0.92),"hammer produces one delayed area smash with actual starting damage")
     var hammer_damage: Array[float] = []
     for thunder in [false, true]:
         armory.reset()

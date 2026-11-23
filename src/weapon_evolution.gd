@@ -36,22 +36,22 @@ const RUNE_NOVA_RADIUS: float = 110.0
 
 static func stage_damage_bonus(level: int) -> float:
     if level >= 10:
-        return 5.35
+        return 4.92
     if level >= 9:
-        return 4.15
+        return 3.82
     if level >= 8:
-        return 3.25
+        return 3.00
     if level >= 7:
-        return 2.55
+        return 2.35
     if level >= 6:
-        return 1.95
+        return 1.80
     if level >= 5:
-        return 1.70
+        return 1.56
     if level >= 4:
-        return 1.28
+        return 1.18
     if level >= 3:
-        return 1.20
-    return 1.0
+        return 1.10
+    return 0.92
 
 static func damage_multiplier(key: String, level: int) -> float:
     var lvl: int = maxi(1, level)

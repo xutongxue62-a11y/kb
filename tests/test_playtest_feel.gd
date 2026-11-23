@@ -82,8 +82,8 @@ func check_attack_feel() -> void:
         "club": [7.5, 0.32],
         "axe": [13.5, 0.62],
         "blade": [5.5, 0.12],
-        "sling": [2.6, 0.30],
-        "powder": [13.0, 1.25],
+        "sling": [2.5, 0.30],
+        "powder": [13.0, 1.37],
         "staff": [1.6, 0.72],
         "spear": [7.4, 0.52],
         "hammer": [20.0, 2.00],
@@ -123,11 +123,11 @@ func check_pickup_radius() -> void:
 
 func check_weapon_growth() -> void:
     var evolution = load("res://src/weapon_evolution.gd")
-    var post_awakening := [1.70, 1.95, 2.55, 3.25, 4.15, 5.35]
-    for level in range(5, 11):
-        expect(is_equal_approx(evolution.stage_damage_bonus(level), post_awakening[level - 5]), "all weapons use the new Lv.%d stage multiplier" % level)
+    var stage_growth := [0.92, 0.92, 1.10, 1.18, 1.56, 1.80, 2.35, 3.00, 3.82, 4.92]
+    for level in range(1, 11):
+        expect(is_equal_approx(evolution.stage_damage_bonus(level), stage_growth[level - 1]), "all weapons use the adjusted Lv.%d stage multiplier" % level)
     for key in ["sling", "powder"]:
-        expect(is_equal_approx(evolution.damage_multiplier(key, 1), 1.0), key + " keeps its opening damage")
+        expect(is_equal_approx(evolution.damage_multiplier(key, 1), 0.92), key + " uses the adjusted opening multiplier")
         var rate: float = 0.365 if key == "sling" else 0.450
         for level in [2, 4, 7, 10]:
             var skill_tier: int = evolution.tier(level)

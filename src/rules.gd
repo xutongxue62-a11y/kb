@@ -304,16 +304,16 @@ static func red_lightning_multiplier(totem_level: int) -> float:
 
 static func thunder_hammer_enchant_multiplier(totem_level: int) -> float:
     var rank: int = maxi(1, totem_level)
-    var awakening_bonus: float = 0.18 if rank >= 5 else (0.08 if rank >= 3 else 0.0)
-    return 1.24 + (rank - 1) * 0.013 + awakening_bonus
+    var awakening_bonus: float = 0.15 if rank >= 5 else (0.07 if rank >= 3 else 0.0)
+    return 1.21 + (rank - 1) * 0.011 + awakening_bonus
 
 static func enchant_damage_bonus(links: Array, host_id: String, fire_tier: int, rune_tier: int, thunder_tier: int) -> float:
     if host_is_fire_enchanted(links, host_id):
-        return 1.54 if fire_tier >= 2 else (1.38 if fire_tier >= 1 else 1.27)
+        return 1.46 if fire_tier >= 2 else (1.33 if fire_tier >= 1 else 1.23)
     if host_is_rune_enchanted(links, host_id):
-        return 1.60 if rune_tier >= 2 else (1.44 if rune_tier >= 1 else 1.31)
+        return 1.51 if rune_tier >= 2 else (1.38 if rune_tier >= 1 else 1.27)
     if host_is_thunder_enchanted(links, host_id):
-        return 1.44 if thunder_tier >= 2 else (1.33 if thunder_tier >= 1 else 1.24)
+        return 1.38 if thunder_tier >= 2 else (1.28 if thunder_tier >= 1 else 1.21)
     return 1.0
 
 static func attack_speed_scale(weapon_id: String) -> float:

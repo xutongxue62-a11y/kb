@@ -150,7 +150,7 @@ static func enemy_profile(wave: int, kind: String, adaptive: float = 1.0, elite:
     if kind == "boss":
         boss_hp_mult *= boss_health_growth(stage)
     return {
-        "hp": data["hp"] * hp_scale * (1.8 if elite else 1.0) * boss_hp_mult,
+        "hp": data["hp"] * hp_scale * (2.0 if elite else 1.0) * boss_hp_mult,
         "damage": float(BASE_DAMAGE.get(kind, EnemyRoster.base_damage(kind))) * damage_scale * (1.35 if elite else 1.0),
         "dodge": minf(0.30, dodge),
         "speed_multiplier": 1.0 + minf(0.35, (stage - 1) * 0.009 + milestones * 0.025),

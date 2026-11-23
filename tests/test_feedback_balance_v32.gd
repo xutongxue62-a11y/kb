@@ -94,7 +94,7 @@ func _test_weapon_levels() -> void:
         expect(seen.has(level), "a late roller can produce Lv.%d" % level)
 
 func _test_chests_and_targets() -> void:
-    expect(is_equal_approx(LootRules.ELITE_CHEST_CHANCE, 0.6), "elite chests drop less often than the old guaranteed rate")
+    expect(is_equal_approx(LootRules.ELITE_CHEST_CHANCE, 0.5), "a non-guaranteed elite chest has an even chance to drop")
     var living := {"id": 1, "kind": "hunter", "state": "chase", "hp": 4.0, "position": Vector2(80, 0), "stone": false}
     var egg := {"id": 2, "kind": "egg_dino", "state": "egg", "hp": 4.0, "position": Vector2(40, 0), "stone": false}
     var stone := {"id": 3, "kind": "stone", "state": "idle", "hp": 8.0, "position": Vector2(20, 0), "stone": true}
@@ -201,7 +201,7 @@ func _test_world_behavior() -> void:
         expect(evol.damage_multiplier(key, 10) > evol.damage_multiplier(key, 7) and evol.damage_multiplier(key, 7) > evol.damage_multiplier(key, 5), key + " gains damage through its late levels")
     expect(world.Growth.MAX_WEAPON_LEVEL == 10 and evol.damage_multiplier("hammer", 10) > evol.damage_multiplier("hammer", 7), "weapon level cap is 10 and late upgrades keep scaling cleanly")
     var fire_link := [{"id": "fire_cannon", "kind": "fire_enchant", "weapons": ["firepot", "powder"]}]
-    expect(world.Rules.enchant_damage_bonus(fire_link, "powder", 0, 0, 0) >= 1.28 and world.Rules.enchant_damage_bonus(fire_link, "powder", 2, 0, 0) >= 1.50, "enchanted weapons gain balanced direct-hit damage amplification")
+    expect(is_equal_approx(world.Rules.enchant_damage_bonus(fire_link, "powder", 0, 0, 0), 1.23) and is_equal_approx(world.Rules.enchant_damage_bonus(fire_link, "powder", 2, 0, 0), 1.46), "fire enchant retains a rising direct-hit bonus at the reduced rates")
     world.start_run(false)
     world.stats["crit_chance"] = 0.0
     world.stats["crit_multiplier"] = 2.0

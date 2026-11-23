@@ -189,6 +189,7 @@ var prefer_elite: bool = false
 var trial_mode: bool = false
 var debug_cheats: bool = false
 var force_elite_chests: bool = false
+var elite_chest_due: bool = false
 var hurt_flash: float = 0.0
 var music_volume: float = 1.0
 var sfx_volume: float = 1.0
@@ -475,6 +476,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     upgrade_offer_levels.clear()
     replace_pending.clear()
     chest_queue = 0
+    elite_chest_due = false
     chest_marks.clear()
     player_position = Vector2(640, 401)
     player_hp = stats["max_hp"]
@@ -3679,8 +3681,11 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
             effects.defeat(enemy["position"], direction, enemy["view"].display_width, enemy["view"].sprite.texture, enemy["view"].body_dimensions)
         if audio != null:
             audio.play("boss_defeat" if boss else "enemy_death", -5.0 if boss else -8.0)
-        if (not boss) and bool(enemy.get("elite", false)) and (force_elite_chests or rng.randf() < LootRules.ELITE_CHEST_CHANCE):
-            offer_elite_chest(enemy["position"])
+        if not boss and enemy.elite and not demo and not animation_demo:
+            var drops_chest: bool = force_elite_chests or elite_chest_due or rng.randf() < LootRules.ELITE_CHEST_CHANCE
+            elite_chest_due = not drops_chest
+            if drops_chest:
+                offer_elite_chest(enemy.position)
     if not from_combo and not neutral:
         evolution_melee_hit(enemy,damage,weapon_id,direction)
 

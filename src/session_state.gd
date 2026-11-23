@@ -61,7 +61,8 @@ static func capture(world: Node, finished: bool = false) -> Dictionary:
     # A visible, unchosen chest reward is still owed when saving mid-choice.
     var owed_chests: int = world.chest_queue + int(world.upgrade_pending and world.upgrade_reason == "chest")
     return {
-        "chest_marks":chests, "chest_queue":owed_chests,"terrain_state":world.map_view.capture_terrain(),
+        "chest_marks":chests, "chest_queue":owed_chests, "elite_chest_due":world.elite_chest_due,
+        "terrain_state":world.map_view.capture_terrain(),
         "wave_closing":world.wave_closing,"wave_buffer":world.wave_buffer,"boss_pending":world.boss_pending,
         "version":1, "finished":finished, "wave":world.wave, "wave_elapsed":world.wave_elapsed, "elapsed":world.elapsed,
         "player_hp":world.player_hp, "player_position":point(world.player_position), "coins":world.coins,
@@ -160,6 +161,7 @@ static func apply(world: Node, state: Dictionary) -> bool:
     for chest in state.get("chest_marks", []):
         world.chest_marks.append({"position":world.reachable_chest_position(vector(chest["position"])), "age":float(chest.get("age", 0.0))})
     world.chest_queue = int(state.get("chest_queue", 0))
+    world.elite_chest_due = bool(state.get("elite_chest_due", false))
     world.boss_round = bool(state.get("boss_round",world.wave % 5 == 0))
     world.boss_defeated = bool(state.get("boss_defeated",false))
     world.boss_clear_left = clampf(float(state.get("boss_clear_left", 0.0)), 0.0, world.BOSS_CLEAR_SECONDS) if world.boss_defeated else 0.0

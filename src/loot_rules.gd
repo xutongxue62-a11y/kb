@@ -5,7 +5,7 @@ extends RefCounted
 const LOOT_SCALE: float = 0.75
 const BLOOD_PACK_CHANCE: float = 0.03
 const BLOOD_PACK_HEAL: float = 2.0
-const ELITE_CHEST_CHANCE: float = 0.6
+const ELITE_CHEST_CHANCE: float = 0.5
 const BANDS={
     "hunter":[1,2,1,2], "charger":[2,4,2,3], "spitter":[2,3,2,3],
     "tank":[3,6,3,5], "raptor":[2,4,2,3], "thrower":[3,5,2,4],
