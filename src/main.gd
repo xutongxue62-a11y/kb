@@ -128,6 +128,8 @@ var _draw_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var ground_marks_layer: Node2D
 var _had_burning_fields: bool = false
 var _ground_marks_accum: float = 0.0
+var chest_layer: Node2D
+var _had_chests: bool = false
 var _pickups_dirty: bool = true
 var _last_pickup_view_pos: Vector2 = Vector2(INF, INF)
 var _last_pickup_count: int = -1
@@ -145,6 +147,13 @@ class GroundMarksLayer:
     func _draw() -> void:
         if owner_world != null:
             owner_world.draw_burning_fields(self)
+
+class ChestLayer:
+    extends Node2D
+    var owner_world
+    func _draw() -> void:
+        if owner_world != null:
+            owner_world._draw_chests(self)
 var player_position: Vector2 = Vector2(640, 401)
 var player_hp: float = 8.0
 var invulnerable: float = 0.0
@@ -238,8 +247,14 @@ func _ready() -> void:
     weapons_layer.z_index = 0
     add_child(weapons_layer)
     pickup_renderer = PickupRenderer.new()
-    pickup_renderer.z_index = 1
+    pickup_renderer.z_as_relative = false
+    pickup_renderer.z_index = -5
     add_child(pickup_renderer)
+    chest_layer = ChestLayer.new()
+    chest_layer.owner_world = self
+    chest_layer.z_as_relative = false
+    chest_layer.z_index = -4
+    add_child(chest_layer)
     effects = Effects.new()
     if DisplayServer.get_name()!="headless": Effects.CombatArt.warm()
     effects.z_index = 35
@@ -393,6 +408,9 @@ func start_run(trial: bool = false, preset: String = "") -> void:
     _cached_stone_targets.clear()
     _had_burning_fields = false
     _ground_marks_accum = 0.0
+    _had_chests = false
+    if chest_layer != null:
+        chest_layer.queue_redraw()
     _pickups_dirty = true
     _last_pickup_view_pos = Vector2(INF, INF)
     _last_pickup_count = -1
@@ -676,6 +694,8 @@ func set_run_world_visible(value: bool) -> void:
         ground_marks_layer.visible = value
     if pickup_renderer != null:
         pickup_renderer.visible = value
+    if chest_layer != null:
+        chest_layer.visible = value
     if effects != null:
         effects.visible = value
     if weapons_layer != null:
@@ -711,6 +731,9 @@ func clear_run_for_title() -> void:
         world_camera.offset = Vector2.ZERO
     if ground_marks_layer != null:
         ground_marks_layer.queue_redraw()
+    _had_chests = false
+    if chest_layer != null:
+        chest_layer.queue_redraw()
     queue_redraw()
 
 func _notification(what: int) -> void:
@@ -2978,27 +3001,32 @@ func apply_weapon_glows(delta: float) -> void:
         view.modulate = rest.lerp(lit, t)
         view.scale = view.get_meta("base_scale") * (1.0 + 0.10 * t + charge_scale)
 
-func draw_chest(point: Vector2, age: float) -> void:
+func _draw_chests(canvas: Node2D) -> void:
+    for chest in chest_marks:
+        chest["age"] = float(chest.get("age", 0.0))
+        draw_chest(canvas, chest["position"], chest["age"])
+
+func draw_chest(canvas: CanvasItem, point: Vector2, age: float) -> void:
     var bob: float = sin(elapsed * 3.4 + point.x) * 2.0
     var at: Vector2 = point + Vector2(0, bob - 6.0)
     var pulse: float = 1.0 + 0.04 * sin(elapsed * 5.0)
     var body: Rect2 = Rect2(at.x - 16.0 * pulse, at.y - 8.0, 32.0 * pulse, 20.0)
-    draw_rect(Rect2(body.position.x + 2, body.position.y + 3, body.size.x, body.size.y), Color(0.12, 0.08, 0.05, 0.22), true)
-    draw_rect(body, Color("#8b5a2b"), true)
-    draw_rect(body, Color("#2a221c"), false, 2.4)
-    draw_rect(Rect2(body.position.x + 3, body.position.y + 3, body.size.x - 6, 5), Color("#d7b07a"), true)
+    canvas.draw_rect(Rect2(body.position.x + 2, body.position.y + 3, body.size.x, body.size.y), Color(0.12, 0.08, 0.05, 0.22), true)
+    canvas.draw_rect(body, Color("#8b5a2b"), true)
+    canvas.draw_rect(body, Color("#2a221c"), false, 2.4)
+    canvas.draw_rect(Rect2(body.position.x + 3, body.position.y + 3, body.size.x - 6, 5), Color("#d7b07a"), true)
     var lid: PackedVector2Array = PackedVector2Array([
         Vector2(body.position.x - 2, body.position.y + 2),
         Vector2(body.position.x + body.size.x * 0.5, body.position.y - 10.0 * pulse),
         Vector2(body.end.x + 2, body.position.y + 2)
     ])
-    draw_colored_polygon(lid, Color("#a46a34"))
+    canvas.draw_colored_polygon(lid, Color("#a46a34"))
     var rim: PackedVector2Array = lid.duplicate()
     rim.append(lid[0])
-    draw_polyline(rim, Color("#2a221c"), 2.2, true)
-    draw_circle(Vector2(body.position.x + body.size.x * 0.5, body.position.y + 8), 3.6, Color("#2a221c"))
-    draw_circle(Vector2(body.position.x + body.size.x * 0.5, body.position.y + 8), 2.4, Color("#e2b85d"))
-    draw_arc(at + Vector2(0, -4), 26.0 + sin(age * 6.0) * 2.0, 0.0, TAU, 24, Color("#e2b85d", 0.55), 1.6, true)
+    canvas.draw_polyline(rim, Color("#2a221c"), 2.2, true)
+    canvas.draw_circle(Vector2(body.position.x + body.size.x * 0.5, body.position.y + 8), 3.6, Color("#2a221c"))
+    canvas.draw_circle(Vector2(body.position.x + body.size.x * 0.5, body.position.y + 8), 2.4, Color("#e2b85d"))
+    canvas.draw_arc(at + Vector2(0, -4), 26.0 + sin(age * 6.0) * 2.0, 0.0, TAU, 24, Color("#e2b85d", 0.55), 1.6, true)
 
 func weapon_level(key: String) -> int:
     for item in inventory:
@@ -3819,9 +3847,11 @@ func _draw() -> void:
         _last_pickup_count = pickups.size()
         _last_pickup_view_pos = player_position
         pickup_renderer.sync(pickups, visible_world_rect().grow(96.0), elapsed)
-    for chest in chest_marks:
-        chest["age"] = float(chest.get("age", 0.0))
-        draw_chest(chest["position"], chest["age"])
+    if chest_layer != null:
+        var has_chests: bool = not chest_marks.is_empty()
+        if has_chests or _had_chests:
+            chest_layer.queue_redraw()
+        _had_chests = has_chests
     for enemy in enemies:
         if enemy["hp"] <= 0.0:
             continue
