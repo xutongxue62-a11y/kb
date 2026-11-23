@@ -240,11 +240,12 @@ static func cast(h) -> void:
     label(h, body, blurb, Rect2(730, 223, 388, 34), 20)
     line(body, Vector2(620, 281), 486, Color(INK, 0.6))
     label(h, body, "角色能力 / 技能", Rect2(620, 288, 486, 32), 22, INK, true)
-    var y: float = 318
+    var y: float = 325
     for skill in profile.get("skills", []):
-        label(h, body, str(skill.get("name", "")), Rect2(626, y, 470, 28), 22, INK, true)
-        label(h, body, str(skill.get("description", "")), Rect2(626, y + 28, 470, 28), 16, Color("#506071"))
-        y += 62
+        label(h, body, str(skill.get("name", "")), Rect2(626, y, 470, 28), 20, INK, true)
+        var detail: Label = label(h, body, str(skill.get("description", "")), Rect2(626, y + 31, 470, 34), 15, Color("#506071"))
+        detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        y += 68
     KeyBindings.attach_to_button(button(h, h.overlay, "Back", "← 返回首页", Rect2(52, 705, 258, 52), func(): h.close_cast_to_title(), false, 21), "cancel")
     var progress: Dictionary = h.character_best_wave if h.get("character_best_wave") != null else {}
     var unlocked: bool = Catalog.is_character_unlocked(shown, progress)
@@ -254,7 +255,7 @@ static func cast(h) -> void:
     elif not unlocked:
         note = Catalog.unlock_requirement_text(shown)
     if not note.is_empty():
-        var note_y: float = minf(y + 10.0, 448.0)
+        var note_y: float = y + 4.0
         if Catalog.shows_preview_unlock(shown, progress):
             var condition: Label = label(h, body, Catalog.unlock_requirement_text(shown), Rect2(626, note_y, 470, 24), 16, Color("#506071"))
             condition.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT

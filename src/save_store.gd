@@ -125,6 +125,15 @@ func _validate_run(state: Variant) -> String:
     return _validate_optional_run_fields(state)
 
 func _validate_optional_run_fields(state: Dictionary) -> String:
+    if state.has("talent_growth_offers"):
+        var offers: Variant = state["talent_growth_offers"]
+        if typeof(offers) != TYPE_ARRAY or offers.size() > 2:
+            return "存档天赋奖励数量无效"
+        for offer in offers:
+            if typeof(offer) != TYPE_DICTIONARY or typeof(offer.get("id")) != TYPE_STRING or (not Catalog.WEAPONS.has(offer.id) and not Growth.BUFFS.has(offer.id)):
+                return "存档天赋奖励无效"
+            if offer.has("level") and not _integer_in_range(offer.level, 1, Growth.MAX_WEAPON_LEVEL):
+                return "存档天赋奖励等级无效"
     if state.has("shop_rerolls") and not _integer_in_range(state["shop_rerolls"], 0, MAX_SAFE_INTEGER):
         return "存档商店刷新次数无效"
     if state.has("shop_refresh_progress") and not _integer_in_range(state["shop_refresh_progress"], 0, Economy.SHOP_GUARANTEE_INTERVAL - 1):

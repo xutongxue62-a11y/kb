@@ -87,8 +87,8 @@ const CHARACTERS = {
         "weapon_label": "弹弓",
         "confirm_button": "StartSling",
         "skills": [
-            {"id": "quick_learner", "name": "学得快", "description": "经验 +25%，升级更快，成长来得更勤。"},
-            {"id": "scavenger", "name": "拾荒手", "description": "拾取范围 +40，掉落更容易收齐。"}
+            {"id": "quick_learner", "name": "学得快", "description": "经验 +25%，拾取范围 +40。"},
+            {"id": "double_growth", "name": "举一反三", "description": "角色每升三级可拿两份成长，优先各选一份武器和属性。"}
         ],
         "modifiers": {
             "xp_multiplier": 1.25,
@@ -104,8 +104,8 @@ const CHARACTERS = {
         "weapon_label": "骨矛",
         "confirm_button": "StartSpear",
         "skills": [
-            {"id": "reach", "name": "枪阵延伸", "description": "武器攻击距离 +20%，骨矛更好先手贯刺。"},
-            {"id": "command", "name": "部族号令", "description": "攻速 +12%，弹道额外穿透 1 名敌人。"}
+            {"id": "reach", "name": "部族号令", "description": "射程 +20%，攻速 +12%，弹道额外穿透 1 敌。"},
+            {"id": "bone_banner", "name": "骨旗夹击", "description": "骨矛命中立旗 3 秒，旗随出矛协击，伤害为 60%。立旗冷却 8 秒。"}
         ],
         "modifiers": {
             "range_multiplier": 1.20,
@@ -122,8 +122,8 @@ const CHARACTERS = {
         "weapon_label": "木棒",
         "confirm_button": "StartClub",
         "skills": [
-            {"id": "tough", "name": "蛮力厚皮", "description": "伤害 +18%，生命 +2，受伤减免 12%。"},
-            {"id": "slam", "name": "近身猛击", "description": "靠近敌人 140 距离内，伤害再提高 20%。"}
+            {"id": "tough", "name": "蛮力厚皮", "description": "伤害 +18%，生命 +2，减伤 12%，近身伤害再提高 20%。"},
+            {"id": "rage_counter", "name": "以伤换势", "description": "受敌方伤害两次后，下一次近战引发震荡，减伤 50% 持续 1 秒。冷却 8 秒。"}
         ],
         "modifiers": {
             "damage_multiplier": 1.18,
@@ -144,8 +144,8 @@ const CHARACTERS = {
         "exclusive_weapon": "bonebow",
         "weapon_blurb": "自动瞄准 · 贯穿直射",
         "skills": [
-            {"id": "piercing_shot", "name": "穿林骨箭", "description": "持有骨弩时，穿透从 3 提升到 5，射程提高 20%。"},
-            {"id": "keen_eye", "name": "猎手锐目", "description": "攻速 +8%，更快抓住射击空档。"}
+            {"id": "piercing_shot", "name": "穿林骨箭", "description": "骨弩穿透 5 敌，射程 +20%。攻速 +8%。"},
+            {"id": "hunt_mark", "name": "追猎弱点", "description": "骨弩三次命中标记同一敌人，下一发伤害 +80%。每个目标冷却 4 秒。"}
         ],
         "modifiers": {
             "attack_speed_bonus": 0.08
@@ -162,8 +162,8 @@ const CHARACTERS = {
         "exclusive_weapon": "staff",
         "weapon_blurb": "自动瞄准 · 符能散射",
         "skills": [
-            {"id": "five_runes", "name": "五芒符阵", "description": "持有魔法杖时，符能从 3 枚增至 5 枚，伤害更高，弹道会轻微追踪。"},
-            {"id": "ritual_study", "name": "巫祭勤修", "description": "经验 +10%，成长来得稍快一些。"}
+            {"id": "five_runes", "name": "五芒符阵", "description": "魔法杖发射 5 枚略带追踪的强化符弹。经验 +10%。"},
+            {"id": "rune_echo", "name": "回响符印", "description": "每第三轮法杖齐射留下符印，下一轮从符印补射 55% 伤害的符弹。"}
         ],
         "modifiers": {
             "xp_multiplier": 1.10
@@ -180,8 +180,8 @@ const CHARACTERS = {
         "exclusive_weapon": "firepot",
         "weapon_blurb": "自动瞄准 · 定点火场",
         "skills": [
-            {"id": "living_ember", "name": "薪火更盛", "description": "持有火种壶时，火场更大、更久，灼伤更高。"},
-            {"id": "ashen_hide", "name": "灰烬护身", "description": "生命 +1，受伤减免 6%。"}
+            {"id": "living_ember", "name": "薪火更盛", "description": "火种壶火场更大、更久，灼伤更高。生命 +1，减伤 6%。"},
+            {"id": "living_fire", "name": "活火", "description": "重叠的火种壶火场合成追敌火带，持续 2 秒。冷却 6 秒。"}
         ],
         "modifiers": {
             "max_hp": 1.0,
@@ -199,8 +199,8 @@ const CHARACTERS = {
         "exclusive_weapon": "totem",
         "weapon_blurb": "自动瞄准 · 连锁雷击",
         "skills": [
-            {"id": "sky_chain", "name": "连天之雷", "description": "持有雷鸣图腾时，连锁从 3 提升到 5，伤害衰减更小。"},
-            {"id": "ward_chant", "name": "祭坛低诵", "description": "拾取范围 +24，掉落更容易收齐。"}
+            {"id": "sky_chain", "name": "连天之雷", "description": "雷鸣图腾连锁 5 敌，衰减更小。拾取范围 +24。"},
+            {"id": "lightning_altar", "name": "雷坛回路", "description": "累计六次雷击命中立坛。下一轮图腾放电回击一名目标，伤害为 65%。"}
         ],
         "modifiers": {
             "pickup_radius": 24.0

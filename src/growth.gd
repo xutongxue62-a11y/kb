@@ -28,30 +28,33 @@ const STAGE_CLEAR_HP: float = 1.0
 static func stage_hp_bonus(stages_cleared: int) -> float:
     return STAGE_CLEAR_HP * float(maxi(0, stages_cleared))
 
+static func effective_stacks(level: int, base_cap: int = 999) -> float:
+    return float(mini(level, base_cap)) + 0.10 * clampi(level - 6, 0, 4)
+
 static func stats(levels: Dictionary, stages_cleared: int = 0) -> Dictionary:
 
     levels = levels.duplicate()
     for key in BUFFS:
-        levels[key] = clampi(int(levels.get(key, 0)), 0, int(BUFFS[key]["max_level"]))
+        levels[key] = effective_stacks(clampi(int(levels.get(key, 0)), 0, int(BUFFS[key]["max_level"])))
     return {
-        "damage_multiplier": 1.0 + 0.15 * int(levels.get("power", 0)),
-        "crit_chance": minf(0.95, 0.05 + 0.05 * int(levels.get("crit_chance", 0))),
-        "crit_multiplier": 1.5 + 0.28 * int(levels.get("crit_power", 0)),
-        "attack_speed": 1.0 + 0.09 * int(levels.get("haste", 0)),
-        "speed": 220.0 * (1.0 + 0.09 * int(levels.get("speed", 0))),
+        "damage_multiplier": 1.0 + 0.15 * levels["power"],
+        "crit_chance": minf(0.95, 0.05 + 0.05 * levels["crit_chance"]),
+        "crit_multiplier": 1.5 + 0.28 * levels["crit_power"],
+        "attack_speed": 1.0 + 0.09 * levels["haste"],
+        "speed": 220.0 * (1.0 + 0.09 * levels["speed"]),
         # Layers are uncapped now, so reduction and dodge stack multiplicatively:
         # each layer removes its share of what is left, never reaching 100%.
-        "reduction": 1.0 - pow(0.95, int(levels.get("armor", 0))),
-        "max_hp": BASE_MAX_HP + VITALITY_HP * float(int(levels.get("vitality", 0))) + stage_hp_bonus(stages_cleared),
-        "regen": 0.11 * int(levels.get("regen", 0)),
-        "dodge": 1.0 - pow(0.95, int(levels.get("dodge", 0))),
-        "hit_radius": 1.5 * int(levels.get("accuracy", 0)),
-        "bullet_speed": 1.0 + 0.07 * int(levels.get("accuracy", 0)),
-        "homing": 1.3 * int(levels.get("accuracy", 0)),
-        "dodge_ignore": 0.03 * int(levels.get("accuracy", 0)),
-        "pickup_radius": 100.0 + 26.0 * int(levels.get("explorer", 0)),
-        "xp_multiplier": 1.0 + 0.13 * int(levels.get("explorer", 0)),
-        "area_multiplier": minf(1.9, 1.0 + 0.05 * int(levels.get("area", 0))),
+        "reduction": 1.0 - pow(0.95, levels["armor"]),
+        "max_hp": BASE_MAX_HP + VITALITY_HP * levels["vitality"] + stage_hp_bonus(stages_cleared),
+        "regen": 0.11 * levels["regen"],
+        "dodge": 1.0 - pow(0.95, levels["dodge"]),
+        "hit_radius": 1.5 * levels["accuracy"],
+        "bullet_speed": 1.0 + 0.07 * levels["accuracy"],
+        "homing": 1.3 * levels["accuracy"],
+        "dodge_ignore": 0.03 * levels["accuracy"],
+        "pickup_radius": 100.0 + 26.0 * levels["explorer"],
+        "xp_multiplier": 1.0 + 0.13 * levels["explorer"],
+        "area_multiplier": minf(1.9, 1.0 + 0.05 * levels["area"]),
         "pierce": int(levels.get("pierce", 0)),
         "ricochet": int(levels.get("ricochet", 0)),
         "range_multiplier": 1.0,

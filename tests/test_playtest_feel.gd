@@ -133,6 +133,8 @@ func check_weapon_growth() -> void:
             var skill_tier: int = evolution.tier(level)
             var bonus: float = [1.0, 1.09, 1.20][skill_tier] if key == "sling" else [1.0, 1.11, 1.24][skill_tier]
             var expected: float = (1.0 + (level - 1) * rate) * evolution.stage_damage_bonus(level) * bonus
+            if level >= 7:
+                expected *= 1.0 + (level - 4) * 0.01
             expect(is_equal_approx(evolution.damage_multiplier(key, level), expected), "%s uses its new per-level growth at Lv.%d" % [key, level])
 
 func check_regen_recovery() -> void:

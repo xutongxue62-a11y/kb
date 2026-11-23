@@ -50,7 +50,8 @@ func advance(delta: float, hero: Vector2, enemies: Array, inventory: Array, stat
         state["cooldown"] = maxf(0.0,state["cooldown"]-delta*weapon_haste)
         state["age"] += delta * weapon_haste
         var target: Dictionary = Rules.choose_target(hero,reach,enemies,prefer_elite)
-        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item.get("level", 1)))
+        var keep_hammer_growth: bool = key == "hammer" and bool(stats.get("hammer_thunder", false))
+        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item.get("level", 1)), keep_hammer_growth)
         damage *= float(stats.get("enchant_mults", {}).get(key, 1.0))
         if key == "totem":
             events.append_array(try_sky_lightning(state, item, hero, enemies, damage, delta * haste))

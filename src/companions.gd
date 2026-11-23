@@ -1,5 +1,6 @@
 extends Node2D
 const Rules = preload("res://src/rules.gd")
+const Growth = preload("res://src/growth.gd")
 const SupportArt = preload("res://src/support_art.gd")
 const SupportRig = preload("res://src/support_rig.gd")
 const PET_LEASH := 320.0
@@ -22,7 +23,7 @@ func advance(delta: float, hero: Vector2, enemies: Array, levels: Dictionary, st
     var attacks: Array = []
     var haste := clampf(float(stats.get("attack_speed", 1.0)), 0.25, 4.6)
     for key in ["pet", "drone"]:
-        var level := clampi(int(levels.get(key, 0)), 0, 6)
+        var level := clampi(int(levels.get(key, 0)), 0, 10)
         if level == 0:
             states.erase(key)
             continue
@@ -80,8 +81,9 @@ func advance(delta: float, hero: Vector2, enemies: Array, levels: Dictionary, st
         if key == "pet" and next.distance_to(target["position"]) > float(target["radius"]) + PET_BITE: continue
         state["attack"] = 0.20
         state["aim"] = (target["position"] - next).normalized()
-        state["cooldown"] = maxf(MIN_COOLDOWN, (0.65 if key == "pet" else 0.8) / ((1.0 + (level - 1) * 0.14) * haste))
-        attacks.append({"kind": key, "enemy": target, "position": next, "damage": (7.0 if key == "pet" else 5.0) * (1.0 + (level - 1) * 0.42)})
+        var growth: float = Growth.effective_stacks(level, 6) - 1.0
+        state["cooldown"] = maxf(MIN_COOLDOWN, (0.65 if key == "pet" else 0.8) / ((1.0 + growth * 0.14) * haste))
+        attacks.append({"kind": key, "enemy": target, "position": next, "damage": (7.0 if key == "pet" else 5.0) * (1.0 + growth * 0.42)})
     queue_redraw()
     return attacks
 

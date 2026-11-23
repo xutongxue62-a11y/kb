@@ -61,8 +61,15 @@ static func capture(world: Node, finished: bool = false) -> Dictionary:
         chests.append({"position":point(chest["position"]), "age":chest.get("age", 0.0)})
     # A visible, unchosen chest reward is still owed when saving mid-choice.
     var owed_chests: int = world.chest_queue + int(world.upgrade_pending and world.upgrade_reason == "chest")
+    var talent_offers: Array = []
+    if world.upgrade_pending and world.upgrade_reason == "talent":
+        for key in world.upgrade_choices:
+            var offer := {"id": key}
+            if world.upgrade_offer_levels.has(key):
+                offer["level"] = world.upgrade_offer_levels[key]
+            talent_offers.append(offer)
     return {
-        "chest_marks":chests, "chest_queue":owed_chests, "elite_chest_due":world.elite_chest_due,
+        "chest_marks":chests, "chest_queue":owed_chests, "elite_chest_due":world.elite_chest_due, "talent_growth_offers":talent_offers,
         "terrain_state":world.map_view.capture_terrain(),
         "wave_closing":world.wave_closing,"wave_buffer":world.wave_buffer,"boss_pending":world.boss_pending,
         "version":1, "finished":finished, "wave":world.wave, "wave_elapsed":world.wave_elapsed, "elapsed":world.elapsed,
@@ -202,6 +209,7 @@ static func apply(world: Node, state: Dictionary) -> bool:
             world.set_loadout_visible(false)
     else:
         world.hud.hide_menu()
+        world.restore_talent_growth(state.get("talent_growth_offers", []))
     if "pack_result_positions" in world:
         world.pack_result_positions = _restore_result_positions(state.get("pack_result_positions", {}))
     return true

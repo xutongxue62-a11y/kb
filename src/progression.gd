@@ -33,7 +33,8 @@ static func estimate_power(inventory: Array, levels: Dictionary, link: Variant =
         if not Catalog.WEAPONS.has(key) or suppressed.has(key):
             continue
         var data: Dictionary = Catalog.WEAPONS[key]
-        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item["level"]))
+        var keep_hammer_growth: bool = key == "hammer" and Rules.host_is_thunder_enchanted(links, key)
+        var damage: float = data["damage"] * Evolution.damage_multiplier(key, int(item["level"]), keep_hammer_growth)
         if key == "powder" and not chain.is_empty():
             var partner: String = chain["weapons"][1]
             var partner_level: int = 1
@@ -49,7 +50,7 @@ static func estimate_power(inventory: Array, levels: Dictionary, link: Variant =
             var penalty: float = Rules.weapon_cooldown_multiplier(key, links)
             total += damage * shots / (data["cooldown"] * penalty) * (1.2 if key == "powder" and Rules.host_is_rune_enchanted(links, "powder") else 1.0)
     for key in ["pet", "drone"]:
-        var level: int = int(levels.get(key, 0))
+        var level: float = Growth.effective_stacks(clampi(int(levels.get(key, 0)), 0, 10), 6)
         if level > 0:
             total += (3.8 if key == "pet" else 2.8) * (1.0 + (level - 1) * 0.45) * (1.0 + (level - 1) * 0.18) / (0.95 if key == "pet" else 1.15) * (0.7 if key == "pet" else 0.9)
     return maxf(0.1, total * stats["attack_speed"] * stats["damage_multiplier"] * (1.0 + stats["crit_chance"] * (stats["crit_multiplier"] - 1.0)))

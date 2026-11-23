@@ -16,6 +16,7 @@ const Progression = preload("res://src/progression.gd")
 const Economy = preload("res://src/economy.gd")
 const SessionState = preload("res://src/session_state.gd")
 const SaveStore = preload("res://src/save_store.gd")
+const CharacterTalents = preload("res://src/character_talents.gd")
 const KeyBindings = preload("res://src/key_bindings.gd")
 const Armory = preload("res://src/armory.gd")
 const WorldMap = preload("res://src/world_map.gd")
@@ -68,6 +69,7 @@ var heal_display: float = 0.0
 var impact_strength: float = 0.0
 var enemy_adaptation: float = 1.0
 var save_store
+var talents = CharacterTalents.new()
 var active_save_slot: int = 1
 var settings: Dictionary = {"autosave":true}
 var restoring: bool = false
@@ -393,6 +395,7 @@ func start_run(trial: bool = false, preset: String = "") -> void:
             return
     set_run_world_visible(true)
     map_view.reset_terrain()
+    talents = CharacterTalents.new()
     dodge_left = 0.0
     dodge_cooldown = 0.0
     dodge_direction = Vector2.RIGHT
@@ -626,7 +629,7 @@ func begin_continue() -> void:
         if hud.has_method("restore_front_chrome"):
             hud.restore_front_chrome()
         return
-    if not shop_open:
+    if not shop_open and not upgrade_pending:
         departure_left = 2.4
         hud.show_departure(departure_left)
     hud.page_turn(previous, "burn")
@@ -1291,13 +1294,43 @@ func present_upgrade(reason: String = "xp") -> void:
         player_hp = minf(stats["max_hp"], player_hp + 2.0)
         try_present_chest()
         return
+    if reason == "xp" and has_double_growth():
+        var first_is_weapon: bool = Catalog.WEAPONS.has(upgrade_choices[0])
+        if upgrade_choices.all(func(key): return Catalog.WEAPONS.has(key) == first_is_weapon):
+            var excluded: Array = Growth.candidate_pool(inventory, buff_levels).filter(func(key): return Catalog.WEAPONS.has(key) == first_is_weapon)
+            var opposite: Array = Growth.weighted_choices(inventory, buff_levels, rng, 1, false, excluded)
+            if not opposite.is_empty():
+                upgrade_choices[upgrade_choices.size() - 1] = opposite[0]
     close_link_pack()
     upgrade_reason = reason
     upgrade_pending = true
     _fill_offer_levels(upgrade_choices)
     audio.set_paused(true)
-    hud.show_choices(upgrade_choices, inventory, buff_levels, reason, wave, upgrade_offer_levels)
+    show_current_growth()
     update_hud()
+
+func has_double_growth() -> bool:
+    return character_id == "caveman" and (player_level + 1) % 3 == 0
+
+func show_current_growth() -> void:
+    var label_reason: String = "xp_bonus" if upgrade_reason == "xp" and has_double_growth() else upgrade_reason
+    hud.show_choices(upgrade_choices, inventory, buff_levels, label_reason, wave, upgrade_offer_levels)
+
+func restore_talent_growth(offers: Array) -> void:
+    if offers.is_empty() or shop_open or character_id != "caveman" or player_level % 3 != 0:
+        return
+    var pool: Array = Growth.candidate_pool(inventory, buff_levels)
+    for offer in offers:
+        var key: String = str(offer.id)
+        if pool.has(key) and not upgrade_choices.has(key):
+            upgrade_choices.append(key)
+            if offer.has("level"):
+                upgrade_offer_levels[key] = int(offer.level)
+    if not upgrade_choices.is_empty():
+        upgrade_reason = "talent"
+        upgrade_pending = true
+        audio.set_paused(true)
+        show_current_growth()
 
 func reachable_chest_position(at: Vector2) -> Vector2:
     # Every finite world coordinate is reachable on the streamed map.
@@ -1345,12 +1378,12 @@ func on_choice(key: String) -> void:
     if Growth.BUFFS.has(key):
         if not apply_buff(key):
             return
-        _finish_successful_choice()
+        _finish_successful_choice(key)
         return
     if Growth.item_level(key, inventory, {}) > 0:
         if not grant_weapon(key):
             return
-        _finish_successful_choice()
+        _finish_successful_choice(key)
         return
     var offered: int = int(upgrade_offer_levels.get(key, 1))
     if inventory.size() >= Rules.MAX_WEAPONS:
@@ -1358,17 +1391,33 @@ func on_choice(key: String) -> void:
         return
     if not grant_weapon(key, offered):
         return
-    _finish_successful_choice()
+    _finish_successful_choice(key)
 
-func _finish_successful_choice() -> void:
+func _finish_successful_choice(selected: String) -> void:
+    var follow_up: Array = []
+    if upgrade_reason == "xp" and has_double_growth():
+        follow_up = upgrade_choices.filter(func(key): return key != selected)
+        var is_weapon: bool = Catalog.WEAPONS.has(selected)
+        var preferred: Array = follow_up.filter(func(key): return Catalog.WEAPONS.has(key) != is_weapon)
+        if not preferred.is_empty():
+            follow_up = preferred
     if upgrade_reason == "xp":
         xp = maxf(0.0, xp - xp_needed)
         player_level += 1
         xp_needed = Growth.xp_needed_for(player_level)
         if audio != null:
             audio.play("level_up", -6.0)
-    elif upgrade_reason != "chest":
+    elif upgrade_reason not in ["chest", "talent"]:
         player_hp = minf(stats["max_hp"], player_hp + 1.0)
+    if not follow_up.is_empty():
+        upgrade_reason = "talent"
+        upgrade_choices = follow_up
+        upgrade_offer_levels.erase(selected)
+        replace_pending.clear()
+        show_current_growth()
+        update_hud()
+        auto_save()
+        return
     upgrade_pending = false
     upgrade_choices.clear()
     upgrade_offer_levels.clear()
@@ -1396,7 +1445,7 @@ func sell_reward(key: String) -> bool:
     elif owned>=int(Growth.BUFFS[key].max_level): return false
     # Convert only this offered reward. Equipped weapons and other candidates are untouched.
     coins += Economy.reward_sell_price(key, wave, offered)
-    _finish_successful_choice()
+    _finish_successful_choice(key)
     return true
 
 func visible_world_rect() -> Rect2:
@@ -2092,7 +2141,7 @@ func confirm_replace(remove_id: String) -> bool:
         auto_save()
         try_present_link_discovery()
         return true
-    _finish_successful_choice()
+    _finish_successful_choice(new_id)
     return true
 
 func cancel_replace() -> void:
@@ -2103,7 +2152,7 @@ func cancel_replace() -> void:
     if source == "shop":
         show_current_shop(false)
     elif upgrade_pending:
-        hud.show_choices(upgrade_choices, inventory, buff_levels, upgrade_reason, wave, upgrade_offer_levels)
+        show_current_growth()
     else:
         hud.hide_menu()
     update_hud()
@@ -2641,7 +2690,13 @@ func enchant_damage_multiplier(weapon_id: String) -> float:
     var totem_level: int = weapon_level("totem")
     if weapon_id == "hammer" and Rules.host_is_thunder_enchanted(active_links, weapon_id):
         return Rules.thunder_hammer_enchant_multiplier(totem_level)
-    return Rules.enchant_damage_bonus(active_links, weapon_id, Evolution.tier(weapon_level("firepot")), Evolution.tier(weapon_level("staff")), Evolution.tier(totem_level))
+    var fire_level: int = weapon_level("firepot")
+    var rune_level: int = weapon_level("staff")
+    var base: float = Rules.enchant_damage_bonus(active_links, weapon_id, Evolution.tier(fire_level), Evolution.tier(rune_level), Evolution.tier(totem_level))
+    if base <= 1.0:
+        return base
+    var catalyst: int = fire_level if Rules.host_is_fire_enchanted(active_links, weapon_id) else (rune_level if Rules.host_is_rune_enchanted(active_links, weapon_id) else totem_level)
+    return base * (1.0 + 0.01 * clampi(catalyst - 6, 0, 4))
 
 func update_armory(delta: float) -> void:
     if _armory_options_dirty or _armory_options_cache.is_empty():
@@ -2681,6 +2736,7 @@ func update_armory(delta: float) -> void:
             "flash":
                 var fwid: String = str(command.get("weapon_id", ""))
                 flash_weapon(fwid)
+                talents.start_armory_attack(self, fwid)
                 if fwid == "totem" or (fwid == "bonebow" and Rules.host_is_thunder_enchanted(active_links, "bonebow")):
                     _consume_thunder_red(fwid)
             "hit":
@@ -2693,6 +2749,8 @@ func update_armory(delta: float) -> void:
                 elif cmd_wid in ["spear", "boomerang"] and Rules.host_is_thunder_enchanted(active_links, cmd_wid):
                     cmd_force_red = 1 if _consume_thunder_red(cmd_wid) else 0
                 hurt_enemy(command["enemy"],command["damage"],command["weapon_id"],false,command["direction"],cmd_force_red)
+                if was_living_monster and float(command.enemy.hp) < before_hp:
+                    talents.landed_armory_hit(self, command.enemy, cmd_wid, command.damage, command.direction)
                 apply_weapon_link_hit(command.enemy.position, cmd_wid, str(command.enemy.get("id", "")), float(command.get("damage", 0.0)), cmd_force_red)
                 flash_weapon(command["weapon_id"])
             "area":
@@ -2966,10 +3024,15 @@ func update_weapons(delta: float,allow_attacks: bool=true) -> void:
                 if not staff_bonus.is_empty():
                     count = maxi(count, int(staff_bonus.get("shot_count", count)))
                     shot_damage = damage * float(staff_bonus.get("damage_multiplier", 1.25))
+                var echo_origin: Vector2 = talents.staff_echo(self, muzzle)
+                var echo_direction: Vector2 = echo_origin.direction_to(target.position) if echo_origin.is_finite() else Vector2.ZERO
                 for index in range(count):
                     var offset: float=index-(count-1)*0.5
                     var shot_aim: Vector2 = direction.rotated(offset * (0.055 if collapsed else 0.24))
                     fire_projectile(muzzle, shot_aim, key, shot_damage, attack_range, false, false, float(staff_bonus.get("homing", 0.0)))
+                    if echo_origin.is_finite():
+                        fire_projectile(echo_origin, echo_direction.rotated(offset * (0.055 if collapsed else 0.24)), key,
+                            shot_damage * 0.55, attack_range, true, false, float(staff_bonus.get("homing", 0.0)))
                 audio.play("magic", -2.0, 1.0)
                 flash_weapon(key)
             else:
@@ -3396,7 +3459,7 @@ func apply_weapon_link_hit(point: Vector2, weapon_id: String, except_id: String 
     if kinds.has("rune_enchant") or kinds.has("rune"):
         _apply_rune_burst(point, weapon_id == "hammer")
     if kinds.has("thunder_enchant"):
-        _apply_thunder_jump(point, except_id, source_damage, 3 if weapon_id == "hammer" else 1, force_red)
+        _apply_thunder_jump(point, except_id, source_damage, 3 if weapon_id == "hammer" else 1, force_red, weapon_id == "hammer")
 
 func _spawn_attachment_fire(point: Vector2, host_id: String) -> void:
     for field in burning_fields:
@@ -3435,7 +3498,7 @@ func _apply_rune_burst(point: Vector2, heavy: bool = false) -> void:
         if burning_fields.size() > 6:
             burning_fields.pop_front()
 
-func _apply_thunder_jump(point: Vector2, except_id: String = "", source_damage: float = -1.0, max_bolts: int = 1, force_red: int = -1) -> void:
+func _apply_thunder_jump(point: Vector2, except_id: String = "", source_damage: float = -1.0, max_bolts: int = 1, force_red: int = -1, keep_previous_growth: bool = false) -> void:
     var used_ids: Array = []
     if not except_id.is_empty():
         used_ids.append(except_id)
@@ -3443,7 +3506,7 @@ func _apply_thunder_jump(point: Vector2, except_id: String = "", source_damage: 
     var totem_bonus: Dictionary = Catalog.exclusive_bonus(character_id, "totem")
     var is_red: bool = (force_red == 1) if force_red >= 0 else (rng.randf() < Rules.red_lightning_chance(totem_lvl))
     var red_mult: float = Rules.red_lightning_multiplier(totem_lvl) if is_red else 1.0
-    var damage: float = source_damage * 0.58 if source_damage > 0.0 else Catalog.WEAPONS["totem"]["damage"] * Evolution.damage_multiplier("totem", totem_lvl) * 0.58
+    var damage: float = source_damage * 0.58 if source_damage > 0.0 else Catalog.WEAPONS["totem"]["damage"] * Evolution.damage_multiplier("totem", totem_lvl, keep_previous_growth) * 0.58
     damage *= float(totem_bonus.get("damage_multiplier", 1.0)) * red_mult
     var reach: float = 190.0 if max_bolts > 1 else 130.0
     var reach_sq: float = reach * reach
@@ -3622,6 +3685,8 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
         amount *= 1.0 + float(stats["close_damage_bonus"])
     if not neutral:
         amount *= Progression.outgoing_damage_scale(wave)
+        if not smashed_egg:
+            amount *= talents.hunter_multiplier(self, enemy, weapon_id, from_combo)
     var min_enemy_hp: float = 1.0 if (training_mode and training_enemy_immortal and not smashed_egg) else 0.0
     enemy["hp"] = maxf(min_enemy_hp, enemy["hp"] - amount)
     var is_thunder_hammer_hit: bool = weapon_id == "hammer" and Rules.host_is_thunder_enchanted(active_links, "hammer")
@@ -3710,6 +3775,8 @@ func hurt_enemy(enemy: Dictionary, damage: float, weapon_id: String, from_combo:
             elite_chest_due = not drops_chest
             if drops_chest:
                 offer_elite_chest(enemy.position)
+    if not smashed_egg and amount > 0.0:
+        talents.counter_melee(self, enemy, weapon_id, damage, from_combo)
     if not from_combo and not neutral:
         evolution_melee_hit(enemy,damage,weapon_id,direction)
 
@@ -3803,9 +3870,12 @@ func hurt_player(direction: Vector2, damage: float = 1.0) -> void:
         effects.floating_text(player_position, "闪避", Color("#9ce7f0"), 22)
         return
     var amount: float = damage * (1.0 - stats["reduction"])
+    if elapsed < talents.guard_until:
+        amount *= 0.50
     amount = minf(amount, Progression.HIT_CAP_RATIO * float(stats["max_hp"]))
     if amount > 0.0:
         regen_ready_at = elapsed + Growth.REGEN_DAMAGE_DELAY
+        talents.record_player_hit(self)
     player_hp = maxf(1.0 if (training_mode and training_godmode) else 0.0, player_hp - amount)
     invulnerable = 0.7
     hero.hurt()
@@ -3883,6 +3953,7 @@ func _draw() -> void:
         draw_string(demo_font, Vector2(360, 185), demo_caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color("#64513a"))
         draw_string(demo_font, Vector2(325, 715), "同一角色的身体、双手、双脚独立运动", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color("#766449"))
     draw_link_shapes()
+    talents.draw_markers(self, elapsed)
     if pickup_renderer != null and (_pickups_dirty or pickups.size() != _last_pickup_count or player_position.distance_squared_to(_last_pickup_view_pos) >= 2500.0):
         _pickups_dirty = false
         _last_pickup_count = pickups.size()
@@ -3896,6 +3967,9 @@ func _draw() -> void:
     for enemy in enemies:
         if enemy["hp"] <= 0.0:
             continue
+        if int(enemy.get("hunt_hits", 0)) == 3:
+            var marker: Vector2 = enemy.position - Vector2(0.0, float(enemy.radius) + 18.0)
+            draw_arc(marker, 7.0, 0.0, TAU, 16, Color("#f5c775"), 2.0, true)
         if BiomeEncounters.draw_attack(self, enemy) or EnemyRoster.draw_warning(self,enemy): continue
         if enemy["state"] == "windup" or enemy["state"] == "dash":
             var start: Vector2 = enemy["position"]

@@ -107,7 +107,7 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
             if state["has_fired"]:
                 view.position -= state["direction"] * maxf(0.0, 1.0 - state["age"] / 0.16) * 8.0
         "firepot":
-            advance_firepots(state, dt, targets, events)
+            advance_firepots(state, dt, targets, events, delta if stats.get("character_id", "") == "firekeeper" else 0.0)
             if state["has_fired"]:
                 view.rotation = -sin(minf(state["age"] / 0.35, 1.0) * PI) * 0.35
         "wardrum":
@@ -168,11 +168,16 @@ static func advance_projectiles(projectiles: Array, dt: float, targets: Array, e
         if shot["left"] <= 0.0 or shot["hit_count"] >= int(shot.get("pierce_limit",3)):
             projectiles.remove_at(index)
 
-static func advance_firepots(state: Dictionary, dt: float, targets: Array, events: Array) -> void:
+static func advance_firepots(state: Dictionary, dt: float, targets: Array, events: Array, talent_delta: float = 0.0) -> void:
     var fires: Array = state["fires"]
     for index in range(fires.size() - 1, -1, -1):
         var fire: Dictionary = fires[index]
-        fire["age"] += dt
+        var moving_fire: bool = bool(fire.get("living_fire", false))
+        fire["age"] += talent_delta if moving_fire else dt
+        if moving_fire:
+            var target: Dictionary = Rules.choose_target(fire.position, 380.0, targets, false)
+            if not target.is_empty() and Rules.is_living_monster(target):
+                fire["position"] = Vector2(fire.position).move_toward(target.position, 105.0 * talent_delta)
         # Fixed tick times keep an overlap from becoming a per-frame attack.
         while fire["next_tick"] <= minf(fire["age"], float(fire.get("life",1.85))-0.1):
             for target in targets:
@@ -188,6 +193,27 @@ static func advance_firepots(state: Dictionary, dt: float, targets: Array, event
         if pot["age"] >= pot["flight"]:
             fires.append({"position": pot["position"], "age": -0.18 + pot["age"] - pot["flight"], "next_tick": 0.0, "damage": pot["damage"] * Rules.BURN_TICK_SCALE, "radius": pot["radius"],"life":pot.get("life",1.85)})
             pots.remove_at(index)
+    if talent_delta > 0.0:
+        state["living_fire_wait"] = maxf(0.0, float(state.get("living_fire_wait", 0.0)) - talent_delta)
+        if is_zero_approx(state["living_fire_wait"]):
+            merge_overlapping_fires(state, fires)
+
+static func merge_overlapping_fires(state: Dictionary, fires: Array) -> void:
+    for index in range(fires.size()):
+        var first: Dictionary = fires[index]
+        if first.age < 0.0 or first.get("living_fire", false):
+            continue
+        for other in range(index + 1, fires.size()):
+            var second: Dictionary = fires[other]
+            if second.age < 0.0 or second.get("living_fire", false):
+                continue
+            if Vector2(first.position).distance_to(second.position) > float(first.radius) + float(second.radius):
+                continue
+            fires[index] = {"position": Vector2(first.position).lerp(second.position, 0.5), "age": 0.0, "life": 2.0,
+                "next_tick": 0.22, "damage": maxf(first.damage, second.damage) * 1.25, "radius": maxf(first.radius, second.radius) * 1.15, "living_fire": true}
+            fires.remove_at(other)
+            state["living_fire_wait"] = 6.0
+            return
 
 static func advance_drum(state: Dictionary, dt: float, hero: Vector2, targets: Array, damage: float, area: float, events: Array) -> void:
     var waves: Array = state["waves"]
@@ -293,6 +319,8 @@ static func draw(canvas: Node2D, key: String, state: Dictionary) -> void:
                 var point: Vector2 = fire["position"]
                 var radius: float = fire["radius"]
                 canvas.draw_texture_rect(CombatArt.texture("fire",fmod(float(fire.age)*2.5,1.0)),Rect2(point-Vector2(radius*1.2,radius*1.0),Vector2(radius*2.4,radius*1.7)),false)
+                if fire.get("living_fire", false):
+                    canvas.draw_arc(point, radius, 0.0, TAU, 24, Color("#f08940"), 2.3, true)
         "wardrum":
             for wave in state["waves"]:
                 var alpha: float = 0.85 * (1.0 - wave["radius"] / (wave["maximum"] + 25.0))

@@ -183,7 +183,7 @@ func check_named_host_combat_effects(world: Node) -> void:
         world.weapon_runtime["hammer"]["next_thunder_red"] = false
         for frame in range(32):
             world.update_armory(1.0 / 60.0)
-        var jump_damage: float = Catalog.WEAPONS["totem"]["damage"] * world.Evolution.damage_multiplier("totem", level) * 0.58
+        var jump_damage: float = Catalog.WEAPONS["totem"]["damage"] * world.Evolution.damage_multiplier("totem", level, true) * 0.58
         jump_damage *= float(Catalog.exclusive_bonus(world.character_id, "totem").get("damage_multiplier", 1.0))
         expect(is_equal_approx(1000.0 - target.hp, 21.6 * 0.92 * expected + jump_damage), "the real bolt at Totem Lv.%d applies the enchant multiplier and its usual jump" % level)
     expect(is_equal_approx(float(Catalog.WEAPONS["hammer"]["cooldown"]) * world.weapon_reload_penalty("hammer"), 2.60), "the linked thunder hammer uses the longer base interval")

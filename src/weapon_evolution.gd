@@ -53,7 +53,7 @@ static func stage_damage_bonus(level: int) -> float:
         return 1.10
     return 0.92
 
-static func damage_multiplier(key: String, level: int) -> float:
+static func damage_multiplier(key: String, level: int, keep_previous_growth: bool = false) -> float:
     var lvl: int = maxi(1, level)
     var growth_rate: float = 0.325
     if key == "sling":
@@ -74,7 +74,8 @@ static func damage_multiplier(key: String, level: int) -> float:
         mult *= 1.23
     elif lvl >= 5:
         mult *= 1.06
-    return mult
+    var late_gain: float = 0.0 if keep_previous_growth or lvl < 7 else 0.01 * (mini(lvl, 10) - 4)
+    return mult * (1.0 + late_gain)
 
 static func sky_lightning_unlocked(level: int) -> bool:
     return level >= SKY_LIGHTNING_LEVEL

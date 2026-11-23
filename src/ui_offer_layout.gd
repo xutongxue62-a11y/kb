@@ -122,7 +122,8 @@ static func growth(h,ids: Array,inventory: Array,levels: Dictionary,reason: Stri
     var column: VBoxContainer = h.parchment_column(1068,22 if compact else 86)
     column.get_meta("scroll_frame").reward_style=true
     column.add_theme_constant_override("separation",8)
-    var heading: Label = h.make_display("精英宝箱 · 选择奖励" if reason == "chest" else "选择成长",30)
+    var headings := {"chest":"精英宝箱 · 选择奖励", "xp_bonus":"举一反三 · 选择第一份成长", "talent":"举一反三 · 选择第二份成长"}
+    var heading: Label = h.make_display(headings.get(reason, "选择成长"),30)
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     column.add_child(heading)
     var shortcut: String="1–6" if compact else "1 / 2 / 3"
