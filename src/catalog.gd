@@ -156,7 +156,7 @@ const CHARACTERS = {
         "weapon_blurb": "自动瞄准 · 符能散射",
         "skills": [
             {"id": "rune_echo", "name": "回响符印", "description": "每第三轮法杖齐射留下符印，下一轮从符印补射 55% 伤害的符弹。"},
-            {"id": "five_runes", "name": "五芒符阵", "description": "魔法杖发射 5 枚略带追踪的符弹。"}
+            {"id": "five_runes", "name": "五芒符阵", "description": "魔法杖发射 5 枚略带追踪的符弹，每枚伤害 +3%。"}
         ]
     },
     "firekeeper": {
@@ -171,7 +171,7 @@ const CHARACTERS = {
         "weapon_blurb": "自动瞄准 · 定点火场",
         "skills": [
             {"id": "living_fire", "name": "活火", "description": "重叠的火种壶火场合成追敌火带，持续 2 秒。冷却 6 秒。"},
-            {"id": "living_ember", "name": "薪火更盛", "description": "火种壶火场更大、更久。生命 +1。"}
+            {"id": "living_ember", "name": "薪火更盛", "description": "火种壶火场更大、更久，灼烧伤害 +3%。生命 +1。"}
         ],
         "modifiers": {
             "max_hp": 1.0
@@ -257,9 +257,9 @@ static func exclusive_bonus(character_id: String, weapon_id: String) -> Dictiona
         "bonebow":
             return {"pierce_limit": 5, "range_multiplier": 1.12}
         "staff":
-            return {"shot_count": 5, "homing": 1.6}
+            return {"shot_count": 5, "homing": 1.6, "shot_damage_multiplier": 1.03}
         "firepot":
-            return {"area_multiplier": 1.15, "life_multiplier": 1.35}
+            return {"area_multiplier": 1.15, "life_multiplier": 1.35, "field_damage_multiplier": 1.03}
         "totem":
             return {"chain_count": 5, "decay": 0.80}
         _:

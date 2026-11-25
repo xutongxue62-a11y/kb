@@ -92,7 +92,7 @@ static func advance(key: String, delta: float, hero: Vector2, targets: Array, it
                     var pot_radius: float = 56.0*area
                     var pot_life: float = 1.45 if stage>=2 else 1.15
                     if not mastery.is_empty():
-                        pot_damage *= float(mastery.get("damage_multiplier", 1.0))
+                        pot_damage *= float(mastery.get("field_damage_multiplier", 1.0))
                         pot_radius *= float(mastery.get("area_multiplier", 1.0))
                         pot_life *= float(mastery.get("life_multiplier", 1.0))
                     state.pots.append({"from":mount,"position":target.position+offset,"age":0.0,"flight":flight,"damage":pot_damage,"radius":pot_radius,"life":pot_life})

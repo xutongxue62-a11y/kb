@@ -171,7 +171,7 @@ func check_exclusive_weapons() -> void:
     if not mastered.is_empty():
         expect(is_equal_approx(float(mastered.get("radius", 0.0)), 56.0 * 1.15), "the firekeeper field is slightly larger")
         expect(is_equal_approx(float(mastered.get("life", 0.0)), 1.15 * 1.35), "the firekeeper field lasts longer")
-        expect(is_equal_approx(float(mastered.get("damage", 0.0)), base_damage), "the firekeeper ordinary fire does not gain automatic damage")
+        expect(is_equal_approx(float(mastered.get("damage", 0.0)), base_damage * 1.03), "the firekeeper gets a small bonus on the ordinary firepot field")
 
     var chain: Array = [enemy(1, Vector2(90, 0), 20.0), enemy(2, Vector2(140, 0), 20.0), enemy(3, Vector2(190, 0), 20.0), enemy(4, Vector2(240, 0), 20.0), enemy(5, Vector2(290, 0), 20.0)]
     armory.reset()
@@ -214,7 +214,7 @@ func check_staff_exclusive() -> void:
     var shaman_shots: Array = shaman.projectiles.filter(func(shot): return str(shot.get("kind", "")) == "staff")
     expect(shaman_shots.size() == 5, "a shaman staff volley launches five runes")
     if not shaman_shots.is_empty():
-        expect(is_equal_approx(float(shaman_shots[0].get("damage", 0.0)), Catalog.WEAPONS["staff"]["damage"] * 0.92), "the shaman gets the distinctive volley without an automatic per-rune multiplier")
+        expect(is_equal_approx(float(shaman_shots[0].get("damage", 0.0)), Catalog.WEAPONS["staff"]["damage"] * 0.92 * 1.03), "the shaman gets a small bonus to staff projectiles")
         expect(is_equal_approx(float(shaman_shots[0].get("homing", 0.0)), 1.6), "shaman staff runes carry slight tracking")
     shaman.queue_free()
     await process_frame
