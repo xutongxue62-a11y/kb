@@ -15,7 +15,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--version', required=True)
 parser.add_argument('--build', required=True, type=int)
 parser.add_argument('--android-version-code', required=True, type=int)
+parser.add_argument('--previous-android-apk', type=Path, default=build.ROOT.parent / '原始人大作战_发行版/v0.23.0/PrimitiveWildfrontier-v0.23.0-Android.apk')
 options = parser.parse_args()
+previous = options.previous_android_apk.resolve()
+if not previous.is_file():
+    parser.error(f'Previous Android APK not found: {previous}')
 build.configure_release(options.version, options.build, options.android_version_code)
 proof = build.WORK / 'verification'
 proof.mkdir(parents=True, exist_ok=True)
@@ -81,11 +85,13 @@ sdk = build.DEPS / 'android_sdk/build-tools/35.0.1'
 signature = run([jdk / 'bin/java.exe', '-jar', sdk / 'lib/apksigner.jar', 'verify', '--verbose', '--print-certs', apk], 'android_signature')
 for scheme in ('v2', 'v3'):
     assert re.search(r'Verified using ' + scheme + r' scheme.*: true', signature)
-previous = build.ROOT.parent / '原始人大作战_发行版/v0.23.0/PrimitiveWildfrontier-v0.23.0-Android.apk'
 old_signature = run([jdk / 'bin/java.exe', '-jar', sdk / 'lib/apksigner.jar', 'verify', '--print-certs', previous], 'previous_android_signature')
 certificate = re.search(r'Signer #1 certificate SHA-256 digest: (\w+)', signature)[1]
 assert certificate == re.search(r'Signer #1 certificate SHA-256 digest: (\w+)', old_signature)[1], 'Android upgrade signing identity changed'
 badging = run([sdk / 'aapt.exe', 'dump', 'badging', apk.name], 'android_badging', build.OUTPUT)
+old_badging = run([sdk / 'aapt.exe', 'dump', 'badging', previous.name], 'previous_android_badging', previous.parent)
+assert "name='org.cavebattle.wildfrontier'" in old_badging
+assert int(re.search(r"versionCode='(\d+)'", old_badging)[1]) < options.android_version_code, 'Android version code must increase'
 assert "name='org.cavebattle.wildfrontier'" in badging and f"versionName='{options.version}'" in badging
 assert f"versionCode='{options.android_version_code}'" in badging and "sdkVersion:'24'" in badging
 with zipfile.ZipFile(apk) as archive:
